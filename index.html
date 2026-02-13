@@ -794,10 +794,10 @@ Respond with ONLY this JSON format (no other text):
                     // Build content array with all images
                     const contentArray = [];
                     
-                    uploadedImages.forEach((uploadedImage) => {
-                        const mediaTypeMatch = uploadedImage.match(/^data:(image\/[a-zA-Z]+);base64,/);
+                    uploadedImages.forEach((uploadedImages) => {
+                        const mediaTypeMatch = uploadedImages.match(/^data:(image\/[a-zA-Z]+);base64,/);
                         const mediaType = mediaTypeMatch ? mediaTypeMatch[1] : 'image/jpeg';
-                        const imageData = uploadedImage.split(',')[1];
+                        const imageData = uploadedImages.split(',')[1];
                         
                         contentArray.push({
                             type: "image",
@@ -1920,7 +1920,7 @@ Respond with ONLY this JSON format (no other text):
                                                             setEditedCard({...editedCard, subset: newSubset});
                                                             
                                                             // Trigger Opus re-analysis when subset changes
-                                                            if (uploadedImage && !isDeepAnalyzing) {
+                                                            if (uploadedImages && !isDeepAnalyzing) {
                                                                 setTimeout(() => performDeepAnalysis(), 100);
                                                             }
                                                         }}
