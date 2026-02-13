@@ -1,0 +1,2199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>F1 Card Tracker</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="application-name" content="F1 Card Tracker">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="F1 Tracker">
+    <meta name="description" content="Track your 2025 Topps Chrome F1 card collection">
+    <meta name="theme-color" content="#0f172a">
+    
+    <!-- App Icons -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' fill='%230f172a'/><text x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-size='100' fill='%2360a5fa'>🏎️</text></svg>">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🏎️</text></svg>">
+    
+    <!-- Manifest -->
+    <link rel="manifest" href="data:application/json,{%22name%22:%22F1%20Card%20Tracker%22,%22short_name%22:%22F1%20Tracker%22,%22start_url%22:%22./%22,%22display%22:%22standalone%22,%22background_color%22:%22%230f172a%22,%22theme_color%22:%22%230f172a%22,%22orientation%22:%22portrait%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%230f172a'/><text x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-size='120' fill='%2360a5fa'>🏎️</text></svg>%22,%22sizes%22:%22192x192%22,%22type%22:%22image/svg+xml%22},{%22src%22:%22data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%230f172a'/><text x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-size='320' fill='%2360a5fa'>🏎️</text></svg>%22,%22sizes%22:%22512x512%22,%22type%22:%22image/svg+xml%22}]}">
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+        .card-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .analysis-text { white-space: pre-wrap; line-height: 1.6; }
+        .analysis-text h3 { font-weight: bold; font-size: 1.1em; margin-top: 1em; margin-bottom: 0.5em; color: #93c5fd; }
+        .analysis-text ul { list-style-type: disc; margin-left: 1.5em; margin-bottom: 0.5em; }
+        .analysis-text li { margin-bottom: 0.25em; }
+        .analysis-text strong { color: #60a5fa; font-weight: 600; }
+        .needs-verification { background: rgba(251, 191, 36, 0.2); border: 1px solid rgba(251, 191, 36, 0.5); position: relative; }
+        .tooltip { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: #1e293b; color: #fbbf24; padding: 0.5rem; rounded: 0.5rem; white-space: nowrap; font-size: 0.75rem; display: none; z-index: 1000; border: 1px solid #fbbf24; }
+        .needs-verification:hover .tooltip { display: block; }
+        :root {
+            --page-number-top: 160px;
+            --page-divider-top: 176px;
+        }
+        .page-number {
+            position: sticky;
+            left: 0;
+            top: var(--page-number-top);
+            z-index: 20;
+            font-size: 4rem;
+            font-weight: 900;
+            color: #1e293b;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            line-height: 1;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            transform: rotate(180deg);
+            margin-right: 1rem;
+        }
+        .page-divider {
+            position: sticky;
+            top: var(--page-divider-top);
+            z-index: 20;
+        }
+        .page-container {
+            position: relative;
+            padding-left: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script src="card-database.js"></script>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const API_URL = "http://localhost:3000/api/recognize";
+        const cardData = COMPLETE_CARD_DATABASE || [];
+
+        const variants = [
+            "Base", "Refractor", "Purple Refractor /299", "Blue Refractor /150",
+            "Green Refractor /99", "Gold Refractor /50", "Orange Refractor /25",
+            "Red Refractor /5", "SuperFractor 1/1", "Printing Plate 1/1",
+            "Black Refractor /10", "Magenta/Pink Refractor /250", "Gold Wave /75"
+        ];
+
+        const allSubsets = [...new Set(cardData.map(c => c.subset))].sort();
+        const allCardNumbers = cardData.map(c => c.num);
+
+        // Variant color/label mapping
+        const variantStyles = {
+            "Base": { bg: "bg-slate-500", text: "B", color: "#64748b" },
+            "Refractor": { bg: "bg-gradient-to-r from-purple-400 to-pink-400", text: "R", color: "linear-gradient(to right, #c084fc, #f0abfc)" },
+            "Purple Refractor /299": { bg: "bg-purple-500", text: "PU", color: "#a855f7" },
+            "Blue Refractor /150": { bg: "bg-blue-500", text: "BL", color: "#3b82f6" },
+            "Green Refractor /99": { bg: "bg-green-500", text: "GR", color: "#22c55e" },
+            "Gold Refractor /50": { bg: "bg-yellow-500", text: "GO", color: "#eab308" },
+            "Orange Refractor /25": { bg: "bg-orange-500", text: "OR", color: "#f97316" },
+            "Red Refractor /5": { bg: "bg-red-500", text: "RD", color: "#ef4444" },
+            "SuperFractor 1/1": { bg: "bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-500", text: "SF", color: "#ec4899" },
+            "Printing Plate 1/1": { bg: "bg-slate-700", text: "PP", color: "#334155" },
+            "Black Refractor /10": { bg: "bg-black", text: "BK", color: "#000000" },
+            "Magenta/Pink Refractor /250": { bg: "bg-pink-500", text: "PK", color: "#ec4899" },
+            "Gold Wave /75": { bg: "bg-yellow-600", text: "GW", color: "#ca8a04" }
+        };
+
+        function App() {
+            const [collection, setCollection] = useState({});
+            const [selectedCard, setSelectedCard] = useState(null);
+            const [searchTerm, setSearchTerm] = useState("");
+            const [filterSubset, setFilterSubset] = useState("all");
+            const [filterRookie, setFilterRookie] = useState("all");
+            const [filterVariants, setFilterVariants] = useState([]); // Multi-select variant filter
+            const [filterValues, setFilterValues] = useState([]); // Multi-select value filter
+            const [showImageUpload, setShowImageUpload] = useState(false);
+            const [uploadedImages, setUploadedImages] = useState([]);
+            const [recognizedCard, setRecognizedCard] = useState(null);
+            const [isRecognizing, setIsRecognizing] = useState(false);
+            const [recognitionError, setRecognitionError] = useState(null);
+            const [serverOnline, setServerOnline] = useState(false);
+            const [isEditing, setIsEditing] = useState(false);
+            const [editedCard, setEditedCard] = useState(null);
+            const [showResetConfirm, setShowResetConfirm] = useState(false);
+            const [analyzingCards, setAnalyzingCards] = useState({});
+            const [deepAnalysis, setDeepAnalysis] = useState(null);
+            const [isDeepAnalyzing, setIsDeepAnalyzing] = useState(false);
+            const [selectedAnalysisSource, setSelectedAnalysisSource] = useState('sonnet'); // 'sonnet' or 'opus'
+            const [showImageViewer, setShowImageViewer] = useState(false);
+            const [imageViewerZoom, setImageViewerZoom] = useState(1);
+            const [imageViewerPosition, setImageViewerPosition] = useState({ x: 0, y: 0 });
+            const [manualCardNumber, setManualCardNumber] = useState(null);
+            const [cardDetailEdit, setCardDetailEdit] = useState(null);
+            const [originalCardDetail, setOriginalCardDetail] = useState(null);
+            const fileInputRef = useRef(null);
+            const importInputRef = useRef(null);
+
+            useEffect(() => {
+                loadCollection();
+                checkServer();
+            }, []);
+
+            useEffect(() => {
+                // Calculate header height and set page label position
+                const updatePageLabelPosition = () => {
+                    const header = document.querySelector('.sticky.top-0.z-30');
+                    if (header) {
+                        const headerHeight = header.offsetHeight;
+                        // Add 20px buffer below header
+                        const pageNumberTop = headerHeight + 20;
+                        const pageDividerTop = pageNumberTop + 16; // Additional spacing for divider
+                        document.documentElement.style.setProperty('--page-number-top', `${pageNumberTop}px`);
+                        document.documentElement.style.setProperty('--page-divider-top', `${pageDividerTop}px`);
+                    }
+                };
+
+                // Initial calculation
+                updatePageLabelPosition();
+
+                // Recalculate on window resize
+                window.addEventListener('resize', updatePageLabelPosition);
+                
+                // Small delay to ensure DOM is fully rendered
+                setTimeout(updatePageLabelPosition, 100);
+
+                return () => window.removeEventListener('resize', updatePageLabelPosition);
+            }, [serverOnline]); // Recalculate when server status changes (affects header height)
+
+            const checkServer = async () => {
+                try {
+                    const response = await fetch('http://localhost:3000/api/test');
+                    const data = await response.json();
+                    setServerOnline(data.status === 'ok' && data.apiKeySet);
+                } catch (error) {
+                    setServerOnline(false);
+                }
+            };
+
+            const loadCollection = () => {
+                try {
+                    const saved = localStorage.getItem('f1-collection-pro-v2');
+                    if (saved) {
+                        const loadedCollection = JSON.parse(saved);
+                        // Clean up any orphaned 0-count variants on load
+                        const cleanedCollection = cleanupCollection(loadedCollection);
+                        
+                        // Save cleaned version back if changes were made
+                        if (JSON.stringify(loadedCollection) !== JSON.stringify(cleanedCollection)) {
+                            console.log('Cleaned up orphaned data on load');
+                            localStorage.setItem('f1-collection-pro-v2', JSON.stringify(cleanedCollection));
+                        }
+                        
+                        setCollection(cleanedCollection);
+                    }
+                } catch (error) {
+                    console.log('No saved collection');
+                }
+            };
+
+            const cleanupCollection = (coll) => {
+                const cleaned = { ...coll };
+                const validVariants = new Set(variants); // Valid variant names
+                
+                Object.keys(cleaned).forEach(cardKey => {
+                    if (cardKey.startsWith('_')) return; // Skip metadata
+                    
+                    const cardData = cleaned[cardKey];
+                    const variantsToFix = {};
+                    
+                    Object.keys(cardData).forEach(variant => {
+                        if (variant.startsWith('_')) return; // Skip metadata like _analyses
+                        
+                        // Check if variant is valid
+                        if (!validVariants.has(variant)) {
+                            // Try to normalize variant name
+                            let normalized = variant;
+                            
+                            // Common normalization patterns
+                            if (variant.includes('/250') && !variant.includes('Refractor')) {
+                                normalized = 'Magenta/Pink Refractor /250';
+                            } else if (variant.includes('/299') && !variant.includes('Refractor')) {
+                                normalized = 'Purple Refractor /299';
+                            } else if (variant.includes('/150') && !variant.includes('Refractor')) {
+                                normalized = 'Blue Refractor /150';
+                            } else if (variant.includes('/99') && !variant.includes('Refractor')) {
+                                normalized = 'Green Refractor /99';
+                            } else if (variant.includes('/50') && !variant.includes('Refractor') && !variant.includes('Wave')) {
+                                normalized = 'Gold Refractor /50';
+                            } else if (variant.includes('/25') && !variant.includes('Refractor')) {
+                                normalized = 'Orange Refractor /25';
+                            } else if (variant.includes('/5') && !variant.includes('Refractor')) {
+                                normalized = 'Red Refractor /5';
+                            } else if (variant.includes('/10') && !variant.includes('Refractor')) {
+                                normalized = 'Black Refractor /10';
+                            } else if (variant.includes('/75') && !variant.includes('Wave')) {
+                                normalized = 'Gold Wave /75';
+                            }
+                            
+                            if (validVariants.has(normalized) && normalized !== variant) {
+                                console.log(`Normalizing variant: "${variant}" → "${normalized}" for ${cardKey}`);
+                                variantsToFix[variant] = normalized;
+                            } else {
+                                // Invalid variant that can't be normalized - remove it
+                                console.log(`Removing invalid variant: "${variant}" from ${cardKey}`);
+                                delete cardData[variant];
+                                return;
+                            }
+                        }
+                        
+                        // Remove variants with 0 or negative count
+                        if (cardData[variant] <= 0) {
+                            console.log(`Removing ${cardKey} ${variant} (count was ${cardData[variant]})`);
+                            delete cardData[variant];
+                        }
+                    });
+                    
+                    // Fix normalized variants
+                    Object.keys(variantsToFix).forEach(oldVariant => {
+                        const newVariant = variantsToFix[oldVariant];
+                        const count = cardData[oldVariant];
+                        
+                        // Merge into normalized variant
+                        cardData[newVariant] = (cardData[newVariant] || 0) + count;
+                        delete cardData[oldVariant];
+                        
+                        // Move analyses if they exist
+                        if (cardData._analyses && cardData._analyses[oldVariant]) {
+                            cardData._analyses[newVariant] = cardData._analyses[newVariant] || [];
+                            cardData._analyses[newVariant].push(...cardData._analyses[oldVariant]);
+                            delete cardData._analyses[oldVariant];
+                        }
+                    });
+                    
+                    // If card has no valid variants left (only metadata), remove the card entry
+                    const hasVariants = Object.keys(cardData).some(key => !key.startsWith('_') && cardData[key] > 0);
+                    if (!hasVariants) {
+                        console.log(`Removing empty card entry: ${cardKey}`);
+                        delete cleaned[cardKey];
+                    }
+                });
+                
+                return cleaned;
+            };
+
+            const saveCollection = (newCollection) => {
+                try {
+                    // Clean up 0-count variants before saving
+                    const cleanedCollection = cleanupCollection(newCollection);
+                    localStorage.setItem('f1-collection-pro-v2', JSON.stringify(cleanedCollection));
+                    setCollection(cleanedCollection);
+                } catch (error) {
+                    console.error('Error saving:', error);
+                }
+            };
+
+            const getCardKey = (cardNum) => `card-${cardNum}`;
+            
+            const getCardInventory = (cardNum) => collection[getCardKey(cardNum)] || {};
+            
+            const getTotalCount = (cardNum) => {
+                const inventory = getCardInventory(cardNum);
+                return Object.keys(inventory)
+                    .filter(key => !key.startsWith('_'))
+                    .reduce((sum, variant) => sum + (inventory[variant] || 0), 0);
+            };
+
+            const getVariantBreakdown = (cardNum) => {
+                const inventory = getCardInventory(cardNum);
+                return Object.keys(inventory)
+                    .filter(key => !key.startsWith('_') && inventory[key] > 0)
+                    .map(variant => ({
+                        variant: variant,
+                        count: inventory[variant],
+                        style: variantStyles[variant] || { bg: "bg-gray-500", text: "??", color: "#6b7280" }
+                    }));
+            };
+
+            const getTotalCollectionCount = () => {
+                return Object.keys(collection)
+                    .filter(key => !key.startsWith('_'))
+                    .reduce((sum, cardKey) => {
+                        const cardInventory = collection[cardKey];
+                        return sum + Object.keys(cardInventory)
+                            .filter(key => !key.startsWith('_'))
+                            .reduce((s, variant) => s + (cardInventory[variant] || 0), 0);
+                    }, 0);
+            };
+
+            // Analyze card with LLM for value estimation
+            const analyzeCardValue = async (cardNum, variant) => {
+                const card = cardData.find(c => c.num === cardNum);
+                if (!card) return null;
+
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: "claude-sonnet-4-20250514",
+                            max_tokens: 500,
+                            messages: [{
+                                role: "user",
+                                content: `Provide a brief value analysis for this F1 trading card:
+Card: #${card.num} ${card.name}
+Team: ${card.team || 'N/A'}
+Variant: ${variant}
+Subset: ${card.subset}
+${card.rookie ? 'This is a ROOKIE card' : ''}
+
+Provide ONLY:
+1. Estimated value range (Raw, PSA 9, PSA 10)
+2. One sentence about desirability/demand
+3. One sentence about key value factors
+
+Keep response under 100 words total.`
+                            }]
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data.content && data.content[0]?.text) {
+                        return data.content[0].text.trim();
+                    }
+                    return null;
+                } catch (error) {
+                    console.error('Analysis error:', error);
+                    return null;
+                }
+            };
+
+            const reanalyzeCardValue = async (cardNum, variant) => {
+                const card = cardData.find(c => c.num === cardNum);
+                if (!card) return null;
+
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: "claude-opus-4-20250514",
+                            max_tokens: 2000,
+                            tools: [{
+                                type: "web_search_20250305",
+                                name: "web_search"
+                            }],
+                            messages: [{
+                                role: "user",
+                                content: `You are a trading card expert. Analyze the current market value of this 2025 Topps Chrome F1 card:
+
+Card #${card.num}: ${card.name}
+Team: ${card.team || 'N/A'}
+Variant: ${variant}
+Subset: ${card.subset}
+${card.rookie ? 'ROOKIE CARD' : ''}
+
+CARD SET CONTEXT:
+This card is from the 2025 Topps Chrome Formula 1 set. Even if imagery or data appears to be from a prior year, treat this as a 2025 Topps Chrome F1 card for valuation purposes.
+
+IMPORTANT: Use web search to find CURRENT market data for similar 2025 Topps Chrome F1 cards, especially for this driver and variant.
+
+Provide a comprehensive analysis including:
+
+CARD IDENTIFICATION:
+- Confirm driver, team, and variant details
+- Note any special characteristics (rookie, serial numbered, etc.)
+
+VARIANT & RARITY:
+- Explain this specific variant and its rarity
+- Compare to other variants in the set
+
+VALUE ESTIMATES:
+Provide current market values in this format:
+Raw: $X-Y
+PSA 9: $X-Y  
+PSA 10: $X-Y
+IMPORTANT: Do NOT use trailing commas after value ranges.
+
+COLLECTIBILITY:
+- Why collectors want this card
+- Investment potential
+- Market trends
+
+Base your analysis on current 2025 market data from web search.`
+                            }]
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data.content) {
+                        // Extract text from all content blocks (including after tool use)
+                        const analysisText = data.content
+                            .filter(block => block.type === 'text')
+                            .map(block => block.text)
+                            .join('\n\n')
+                            .trim();
+                        
+                        return analysisText || null;
+                    }
+                    return null;
+                } catch (error) {
+                    console.error('Reanalysis error:', error);
+                    return null;
+                }
+            };
+
+            const addCard = async (cardNum, variant, analysis = null) => {
+                const key = getCardKey(cardNum);
+                const newCollection = { ...collection };
+                if (!newCollection[key]) newCollection[key] = {};
+                
+                const isFirstOfVariant = !newCollection[key][variant] || newCollection[key][variant] === 0;
+                
+                if (!newCollection[key][variant]) {
+                    newCollection[key][variant] = 0;
+                }
+                newCollection[key][variant]++;
+                
+                if (analysis) {
+                    if (!newCollection[key]._analyses) newCollection[key]._analyses = {};
+                    if (!newCollection[key]._analyses[variant]) newCollection[key]._analyses[variant] = [];
+                    newCollection[key]._analyses[variant].push({
+                        id: Date.now(),
+                        addedDate: new Date().toISOString(),
+                        analysis: analysis
+                    });
+                }
+                
+                saveCollection(newCollection);
+
+                // If this is the first card of this variant and we have server, analyze it
+                if (isFirstOfVariant && serverOnline && !analysis) {
+                    const analyzeKey = `${cardNum}-${variant}`;
+                    setAnalyzingCards(prev => ({ ...prev, [analyzeKey]: true }));
+                    
+                    const cardAnalysis = await analyzeCardValue(cardNum, variant);
+                    
+                    setAnalyzingCards(prev => {
+                        const updated = { ...prev };
+                        delete updated[analyzeKey];
+                        return updated;
+                    });
+                    
+                    if (cardAnalysis) {
+                        const updatedCollection = { ...newCollection };
+                        if (!updatedCollection[key]._analyses) updatedCollection[key]._analyses = {};
+                        if (!updatedCollection[key]._analyses[variant]) updatedCollection[key]._analyses[variant] = [];
+                        updatedCollection[key]._analyses[variant].push({
+                            id: Date.now(),
+                            addedDate: new Date().toISOString(),
+                            analysis: cardAnalysis
+                        });
+                        saveCollection(updatedCollection);
+                    }
+                }
+            };
+
+            const removeCard = (cardNum, variant) => {
+                const key = getCardKey(cardNum);
+                const newCollection = { ...collection };
+                if (newCollection[key] && newCollection[key][variant] > 0) {
+                    newCollection[key][variant]--;
+                    if (newCollection[key][variant] === 0) {
+                        delete newCollection[key][variant];
+                    }
+                    saveCollection(newCollection);
+                }
+            };
+
+            const exportCollection = () => {
+                const dataStr = JSON.stringify(collection, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                const timestamp = new Date().toISOString().split('T')[0];
+                link.download = `f1-collection-backup-${timestamp}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            };
+
+            const importCollection = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const imported = JSON.parse(e.target.result);
+                        saveCollection(imported);
+                        alert(`✅ Collection imported successfully!\n\nCards restored: ${Object.keys(imported).filter(k => !k.startsWith('_')).length}`);
+                    } catch (error) {
+                        alert('❌ Error importing file. Make sure it\'s a valid backup file.');
+                        console.error('Import error:', error);
+                    }
+                };
+                reader.readAsText(file);
+                event.target.value = ''; // Reset input
+            };
+
+            // Compress image to reduce file size for API
+            const compressImage = async (dataUrl, maxWidth = 1200, quality = 0.8) => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+                        
+                        // Resize if too large
+                        if (width > maxWidth) {
+                            height = (height * maxWidth) / width;
+                            width = maxWidth;
+                        }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // Convert to JPEG with quality setting
+                        const compressed = canvas.toDataURL('image/jpeg', quality);
+                        resolve(compressed);
+                    };
+                    img.src = dataUrl;
+                });
+            };
+
+            const handleImageUpload = async (event) => {
+                const files = Array.from(event.target.files);
+                if (files.length === 0) return;
+                
+                // Limit to 2 images (front and back)
+                const filesToProcess = files.slice(0, 2);
+                if (files.length > 2) {
+                    alert(`📸 Multiple Images Selected\n\nProcessing first 2 images (front and back of card).\n\nTip: Upload front and back for best recognition accuracy!`);
+                }
+                
+                setDeepAnalysis(null);
+                setSelectedAnalysisSource('sonnet');
+                setIsRecognizing(true);
+                
+                const processedImages = [];
+                
+                for (let file of filesToProcess) {
+                    try {
+                        // Check if file is HEIC/HEIF
+                        const isHEIC = file.type === 'image/heic' || 
+                                       file.type === 'image/heif' || 
+                                       file.name.toLowerCase().endsWith('.heic') || 
+                                       file.name.toLowerCase().endsWith('.heif');
+                        
+                        if (isHEIC) {
+                            // Convert HEIC to JPEG automatically
+                            try {
+                                console.log(`Converting HEIC file: ${file.name}`);
+                                
+                                // Check if heic2any library is loaded
+                                if (typeof window.heic2any === 'undefined') {
+                                    throw new Error('heic2any library not loaded. Please refresh the page.');
+                                }
+                                
+                                const convertedBlob = await window.heic2any({
+                                    blob: file,
+                                    toType: 'image/jpeg',
+                                    quality: 0.9
+                                });
+                                
+                                // heic2any might return array of blobs
+                                const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+                                
+                                // Create a new File object with JPEG type
+                                file = new File([blob], file.name.replace(/\.heic$/i, '.jpg'), {
+                                    type: 'image/jpeg'
+                                });
+                                
+                                console.log(`✓ HEIC conversion successful: ${file.name}`);
+                            } catch (conversionError) {
+                                console.error('HEIC conversion error:', conversionError);
+                                setIsRecognizing(false);
+                                
+                                // Provide helpful error message based on error type
+                                let errorDetail = conversionError.message || 'Unknown error';
+                                let suggestion = '';
+                                
+                                if (errorDetail.includes('format not supported')) {
+                                    suggestion = '\n\n💡 This HEIC file uses a format variant that cannot be converted automatically.\n\n';
+                                } else if (errorDetail.includes('library not loaded')) {
+                                    suggestion = '\n\n💡 Please refresh the page and try again.\n\n';
+                                } else {
+                                    suggestion = '\n\n';
+                                }
+                                
+                                alert(`📱 Cannot Auto-Convert HEIC File\n\nFile: ${file.name}${suggestion}QUICK FIX - Use iPhone Screenshot:\n\n1️⃣ Open the photo in Photos app\n2️⃣ Take a SCREENSHOT of the photo\n   (Press Side + Volume Up buttons)\n3️⃣ Upload the screenshot instead\n   (Screenshots are JPG format!)\n\nOR Convert Manually:\n\n1️⃣ Open Photos app\n2️⃣ Select the photo\n3️⃣ Tap Share (⬆️)\n4️⃣ Scroll down → "Save to Files"\n5️⃣ Upload the converted file\n\n✨ Screenshots work instantly!`);
+                                event.target.value = '';
+                                return;
+                            }
+                        }
+                        
+                        // Read file as data URL
+                        const dataUrl = await new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = (e) => resolve(e.target.result);
+                            reader.onerror = reject;
+                            reader.readAsDataURL(file);
+                        });
+                        
+                        // Compress image to reduce size
+                        console.log(`Compressing image ${filesToProcess.indexOf(file) + 1}/${filesToProcess.length}...`);
+                        const compressed = await compressImage(dataUrl, 1200, 0.75);
+                        processedImages.push(compressed);
+                    } catch (error) {
+                        console.error('Error processing file:', file.name, error);
+                        setIsRecognizing(false);
+                        alert(`Error processing image: ${file.name}\n\nPlease try a different file.`);
+                        event.target.value = '';
+                        return;
+                    }
+                }
+                
+                if (processedImages.length > 0) {
+                    setUploadedImages(processedImages);
+                    recognizeCard(processedImages);
+                } else {
+                    setIsRecognizing(false);
+                    event.target.value = '';
+                }
+            };
+
+            const recognizeCard = async (base64Images) => {
+                setIsRecognizing(true);
+                setRecognizedCard(null);
+                setRecognitionError(null);
+                setSelectedAnalysisSource('sonnet');
+
+                try {
+                    // Handle both single image and array
+                    const images = Array.isArray(base64Images) ? base64Images : [base64Images];
+                    
+                    // Build content array with images
+                    const contentArray = [];
+                    
+                    images.forEach((base64Image, index) => {
+                        const mediaTypeMatch = base64Image.match(/^data:(image\/[a-zA-Z]+);base64,/);
+                        const mediaType = mediaTypeMatch ? mediaTypeMatch[1] : 'image/jpeg';
+                        const imageData = base64Image.split(',')[1];
+                        
+                        contentArray.push({
+                            type: "image",
+                            source: { type: "base64", media_type: mediaType, data: imageData }
+                        });
+                    });
+                    
+                    // Add text prompt after images
+                    const promptText = images.length > 1 
+                        ? `Analyze these F1 trading card images (front and back of the same card) and extract the following information. Use BOTH images to get complete details - the back often contains the card number or additional information.
+
+IMPORTANT: You are viewing the FRONT and BACK of the SAME physical card. Use information from both images.`
+                        : `Analyze this F1 trading card and extract the following information.`;
+                    
+                    contentArray.push({
+                        type: "text",
+                        text: `${promptText}
+
+CARD SET CONTEXT:
+This card is from the 2025 Topps Chrome Formula 1 set. Even if the image appears to be from a prior year's product or shows older photography, treat this as a 2025 Topps Chrome F1 card for identification and valuation purposes.
+
+IMPORTANT: Respond with ONLY a JSON object. Do not include any explanatory text before or after the JSON.
+
+CRITICAL DISTINCTION:
+- CARD NUMBER: The actual card number from the set (e.g., "1", "F1-25", "CR-3") - usually small text on the card${images.length > 1 ? ' (often on the BACK)' : ''}
+- SERIAL NUMBER: If there's a GOLD number in the upper right corner (e.g., "63/250", "142/299"), that's the serial number showing this specific copy's number out of total printed. DO NOT use this as the card number!
+
+Extract:
+1. Card number (the set card number, NOT the gold serial number)${images.length > 1 ? ' - CHECK THE BACK IMAGE for card number!' : ''}
+2. Serial number (if visible - the gold number like "63/250" in upper right corner)
+3. Driver name
+4. Team name
+5. Subset category (look for text at bottom of card like "Chrome Racers", "Diamond 75th Anniversary", "F1® Legends", etc.)
+6. Variant type - IMPORTANT: If you see a serial number, determine variant from the denominator (e.g., "/299" = Purple Refractor /299, "/150" = Blue Refractor /150, "/99" = Green Refractor /99, "/50" = Gold Refractor /50, "/25" = Orange Refractor /25, "/5" = Red Refractor /5, "1/1" = SuperFractor 1/1, "/10" = Black Refractor /10, "/250" = Magenta/Pink Refractor /250, "/75" = Gold Wave /75)
+7. Whether it's a rookie card (RC designation)
+8. Brief card description and value assessment including estimated values for Raw, PSA 9, and PSA 10 conditions
+   IMPORTANT: Do NOT use trailing commas after value ranges. Format as "Raw: $10-20, PSA 9: $30-50, PSA 10: $100-150" with NO comma after the last value.
+
+Valid card numbers from our database: ${allCardNumbers.slice(0, 50).join(', ')}... and more.
+
+Valid subsets: ${allSubsets.slice(0, 20).join(', ')}... and more.
+
+Try to match the card to our database by driver name, team, and visual appearance. If unsure about card number, make your best inference.
+
+Respond with ONLY this JSON format (no other text):
+{
+  "cardNumber": "inferred card number from database",
+  "cardNumberConfidence": "high/medium/low",
+  "serialNumber": "if visible, e.g. 63/250, otherwise null",
+  "driverName": "full name",
+  "team": "full team name",
+  "subset": "subset name from card or best guess",
+  "variant": "exact variant from list above",
+  "isRookie": true/false,
+  "analysis": "Brief description and value assessment including Raw: $X-Y, PSA 9: $X-Y, PSA 10: $X-Y"
+}`
+                    });
+                    
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: "claude-sonnet-4-20250514",
+                            max_tokens: 2000,
+                            messages: [{
+                                role: "user",
+                                content: contentArray
+                            }]
+                        })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.content && data.content[0]?.text) {
+                        let jsonText = data.content[0].text.trim();
+                        
+                        // Remove markdown code blocks
+                        jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                        
+                        // Try to extract JSON from the response even if there's extra text
+                        const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+                        if (jsonMatch) {
+                            jsonText = jsonMatch[0];
+                        }
+                        
+                        const recognized = JSON.parse(jsonText);
+                        setRecognizedCard(recognized);
+                    } else {
+                        throw new Error('Invalid response from API');
+                    }
+                } catch (error) {
+                    console.error('Recognition error:', error);
+                    setRecognitionError(error.message || 'Failed to recognize card');
+                } finally {
+                    setIsRecognizing(false);
+                }
+            };
+
+            const performDeepAnalysis = async () => {
+                if (!uploadedImages || uploadedImages.length === 0 || !recognizedCard) return;
+                
+                setIsDeepAnalyzing(true);
+                setDeepAnalysis(null);
+
+                try {
+                    // Build content array with all images
+                    const contentArray = [];
+                    
+                    uploadedImages.forEach((uploadedImage) => {
+                        const mediaTypeMatch = uploadedImage.match(/^data:(image\/[a-zA-Z]+);base64,/);
+                        const mediaType = mediaTypeMatch ? mediaTypeMatch[1] : 'image/jpeg';
+                        const imageData = uploadedImage.split(',')[1];
+                        
+                        contentArray.push({
+                            type: "image",
+                            source: { type: "base64", media_type: mediaType, data: imageData }
+                        });
+                    });
+                    
+                    const promptText = uploadedImages.length > 1
+                        ? `Perform a DEEP analysis of these F1 trading card images (front and back of the same card) using advanced reasoning. Use BOTH images to get complete information - the back often has the card number.`
+                        : `Perform a DEEP analysis of this F1 trading card using advanced reasoning.`;
+                    
+                    // Add text prompt
+                    contentArray.push({
+                        type: "text",
+                        text: `${promptText}
+
+CARD SET CONTEXT:
+This card is from the 2025 Topps Chrome Formula 1 set. Even if the image appears to be from a prior year's product or shows older photography, treat this as a 2025 Topps Chrome F1 card for identification and valuation purposes.
+
+Current Quick Analysis says:
+Card #${recognizedCard.cardNumber}, ${recognizedCard.driverName}, ${recognizedCard.variant}
+${recognizedCard.serialNumber ? `Serial: ${recognizedCard.serialNumber}` : ''}
+
+Your task: Provide comprehensive reasoning and improved card data.
+
+Respond with ONLY a JSON object containing:
+
+1. UPDATED CARD DATA (verify and correct if needed):
+   - cardNumber: Verify card number by matching driver, team, subset to database${uploadedImages.length > 1 ? ' - CHECK THE BACK IMAGE!' : ''}
+   - serialNumber: Gold serial number if visible (not the card number)
+   - driverName: Full driver name
+   - team: Full team name
+   - subset: Subset category
+   - variant: Exact variant (use serial denominator: /299=Purple Refractor /299, /150=Blue Refractor /150, /99=Green Refractor /99, /50=Gold Refractor /50, /25=Orange Refractor /25, /5=Red Refractor /5, 1/1=SuperFractor 1/1, /10=Black Refractor /10, /250=Magenta/Pink Refractor /250, /75=Gold Wave /75)
+   - confidence: "high/medium/low"
+
+2. DETAILED ANALYSIS TEXT:
+   Include sections on:
+   - CARD IDENTIFICATION: Your detailed reasoning
+   - VARIANT & RARITY: Specific variant analysis and rarity assessment
+   - VALUE ESTIMATES: Raw: $X-Y, PSA 9: $X-Y, PSA 10: $X-Y with factors affecting value
+     IMPORTANT: Do NOT use trailing commas or periods after value ranges. Format as "Raw: $10-20" NOT "Raw: $10-20,"
+   - COLLECTIBILITY: Why collectors want this, investment potential
+
+Respond with ONLY this JSON format (no other text):
+{
+  "cardNumber": "verified card number",
+  "serialNumber": "serial if visible, else null",
+  "driverName": "full name",
+  "team": "full team name", 
+  "subset": "subset name",
+  "variant": "exact variant",
+  "confidence": "high/medium/low",
+  "analysis": "CARD IDENTIFICATION:\n[Your detailed reasoning]\n\nVARIANT & RARITY:\n[Your analysis]\n\nVALUE ESTIMATES:\nRaw: $X-Y\nPSA 9: $X-Y\nPSA 10: $X-Y\n(No trailing commas after values)\n\nCOLLECTIBILITY:\n[Your insights]"
+}`
+                    });
+                    
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: "claude-opus-4-20250514",
+                            max_tokens: 3000,
+                            messages: [{
+                                role: "user",
+                                content: contentArray
+                            }]
+                        })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.content && data.content[0]?.text) {
+                        let analysisText = data.content[0].text.trim();
+                        
+                        // Remove markdown code blocks
+                        analysisText = analysisText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                        
+                        // Extract JSON even if there's extra text
+                        const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
+                        if (jsonMatch) {
+                            analysisText = jsonMatch[0];
+                        }
+                        
+                        try {
+                            const opusData = JSON.parse(analysisText);
+                            
+                            // Store the analysis text
+                            setDeepAnalysis(opusData.analysis);
+                            
+                            // Compare with Sonnet data and update recognizedCard with differences noted
+                            // If card number was manually entered, preserve it
+                            const updatedCard = {
+                                ...recognizedCard,
+                                cardNumber: manualCardNumber || opusData.cardNumber,
+                                _opusData: opusData,
+                                _differences: {
+                                    cardNumber: manualCardNumber ? false : (opusData.cardNumber !== recognizedCard.cardNumber),
+                                    serialNumber: opusData.serialNumber !== recognizedCard.serialNumber,
+                                    driverName: opusData.driverName !== recognizedCard.driverName,
+                                    team: opusData.team !== recognizedCard.team,
+                                    subset: opusData.subset !== recognizedCard.subset,
+                                    variant: opusData.variant !== recognizedCard.variant
+                                }
+                            };
+                            
+                            setRecognizedCard(updatedCard);
+                            
+                        } catch (parseError) {
+                            console.error('Failed to parse Opus JSON:', parseError);
+                            // Fallback: use as plain text
+                            setDeepAnalysis(analysisText);
+                        }
+                    } else {
+                        throw new Error('Invalid response from API');
+                    }
+                } catch (error) {
+                    console.error('Deep analysis error:', error);
+                    setDeepAnalysis('Error performing deep analysis. Please try again.');
+                } finally {
+                    setIsDeepAnalyzing(false);
+                }
+            };
+
+            const handleDoneEditing = () => {
+                setRecognizedCard(editedCard);
+                setIsEditing(false);
+            };
+
+            const handleAddRecognizedCard = () => {
+                if (recognizedCard) {
+                    // Use the selected analysis source
+                    const analysisToUse = selectedAnalysisSource === 'opus' && deepAnalysis 
+                        ? deepAnalysis 
+                        : recognizedCard.analysis;
+                    
+                    addCard(recognizedCard.cardNumber, recognizedCard.variant, analysisToUse);
+                    setShowImageUpload(false);
+                    setUploadedImages([]);
+                    setRecognizedCard(null);
+                    setEditedCard(null);
+                    setIsEditing(false);
+                    setRecognitionError(null);
+                    setDeepAnalysis(null);
+                    setSelectedAnalysisSource('sonnet'); // Reset to default
+                }
+            };
+
+            const needsVerification = (confidence) => {
+                return confidence === 'medium' || confidence === 'low';
+            };
+
+            const extractValueEstimates = (analysisText) => {
+                if (!analysisText) return null;
+                
+                // Updated regex to not capture trailing punctuation like commas
+                const rawMatch = analysisText.match(/Raw[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
+                const psa9Match = analysisText.match(/PSA\s*9[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
+                const psa10Match = analysisText.match(/PSA\s*10[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
+                
+                if (!rawMatch && !psa9Match && !psa10Match) return null;
+                
+                return {
+                    raw: rawMatch ? `$${rawMatch[1]}-$${rawMatch[2]}` : 'N/A',
+                    psa9: psa9Match ? `$${psa9Match[1]}-$${psa9Match[2]}` : 'N/A',
+                    psa10: psa10Match ? `$${psa10Match[1]}-$${psa10Match[2]}` : 'N/A'
+                };
+            };
+
+            const calculateCardValue = (cardNum) => {
+                const cardKey = getCardKey(cardNum);
+                const cardInventory = collection[cardKey] || {};
+                const analyses = cardInventory._analyses || {};
+                
+                let totalMaxValue = 0;
+                
+                // Get all variants for this card
+                Object.keys(cardInventory).forEach(variant => {
+                    if (variant === '_analyses') return; // Skip metadata
+                    
+                    const count = cardInventory[variant];
+                    if (count === 0) return; // Skip if no cards
+                    
+                    // Get latest analysis for this variant
+                    const variantAnalyses = analyses[variant] || [];
+                    if (variantAnalyses.length === 0) return; // No analysis available
+                    
+                    const latestAnalysis = variantAnalyses[variantAnalyses.length - 1];
+                    
+                    // Parse Raw value (using maximum)
+                    const rawMatch = latestAnalysis.analysis.match(/Raw[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
+                    
+                    if (rawMatch) {
+                        // Get max raw value and remove commas
+                        const maxValue = parseInt(rawMatch[2].replace(/,/g, ''));
+                        // Multiply by count and add to total
+                        totalMaxValue += maxValue * count;
+                    }
+                });
+                
+                // Return emoji based on total value
+                if (totalMaxValue === 0) return '';
+                if (totalMaxValue < 5) return '$';
+                if (totalMaxValue <= 40) return '$$';
+                if (totalMaxValue <= 100) return '$$$';
+                if (totalMaxValue <= 500) return '$$$$';
+                return '$$$$$';
+            };
+
+            const resetCollection = () => {
+                if (window.confirm('⚠️ Are you absolutely sure?\n\nThis will DELETE your entire collection.\n\nThis action CANNOT be undone!')) {
+                    localStorage.removeItem('f1-collection-pro-v2');
+                    setCollection({});
+                    setShowResetConfirm(false);
+                    alert('🗑️ Collection has been reset.');
+                }
+            };
+
+            // Get value tier for a card based on $ indicators
+            const getCardValueTier = (cardNum) => {
+                const valueStr = calculateCardValue(cardNum);
+                if (!valueStr) return null;
+                const dollarCount = valueStr.length;
+                if (dollarCount === 1) return '$';
+                if (dollarCount === 2) return '$$';
+                if (dollarCount === 3) return '$$$';
+                if (dollarCount === 4) return '$$$$';
+                if (dollarCount === 5) return '$$$$$';
+                return null;
+            };
+
+            // Use predefined variant list for filter dropdown
+            const allVariants = variants;
+
+            const filteredCards = cardData.filter(card => {
+                const matchesSearch = !searchTerm || 
+                    card.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    card.num.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (card.team && card.team.toLowerCase().includes(searchTerm.toLowerCase()));
+                
+                const matchesSubset = filterSubset === 'all' || card.subset === filterSubset;
+                const matchesRookie = filterRookie === 'all' || 
+                    (filterRookie === 'rookie' && card.rookie) ||
+                    (filterRookie === 'veteran' && !card.rookie);
+                
+                // Variant filtering (multi-select)
+                const matchesVariant = filterVariants.length === 0 || (() => {
+                    const cardKey = getCardKey(card.num);
+                    const cardInventory = collection[cardKey];
+                    if (!cardInventory) return false; // Card not in collection
+                    
+                    // Check if any of the card's variants match the filter
+                    const cardVariants = Object.keys(cardInventory).filter(key => key !== '_analyses');
+                    return cardVariants.some(variant => filterVariants.includes(variant));
+                })();
+                
+                // Value-based filtering (multi-select)
+                const matchesValue = filterValues.length === 0 || (() => {
+                    const totalCount = getTotalCount(card.num);
+                    if (totalCount === 0) return false; // Don't show cards not in collection when filtering by value
+                    const tier = getCardValueTier(card.num);
+                    return tier && filterValues.includes(tier);
+                })();
+                
+                return matchesSearch && matchesSubset && matchesRookie && matchesVariant && matchesValue;
+            });
+
+            const stats = {
+                totalCards: cardData.length,
+                cardsOwned: Object.keys(collection).filter(k => !k.startsWith('_')).length,
+                totalCopies: getTotalCollectionCount()
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+                    {/* Floating Header */}
+                    <div className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-sm shadow-xl">
+                        <div className="max-w-7xl mx-auto p-3">
+                            {!serverOnline && (
+                                <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-2 mb-2">
+                                    <p className="font-semibold text-sm mb-1">⚠️ Server Offline - AI Scanner Disabled</p>
+                                    <p className="text-xs text-red-200 mb-1">
+                                        The AI card scanner requires a local server. 
+                                        Start: <code className="bg-black/30 px-1 py-0.5 rounded text-xs">node server.js</code>
+                                    </p>
+                                    <button onClick={checkServer} className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-xs">
+                                        Check Again
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="mb-2">
+                                <div className="flex justify-between items-start mb-1">
+                                    <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 via-red-500 to-yellow-400 bg-clip-text text-transparent pb-2" style={{fontSize: '2.5rem'}}>
+                                        2025 Topps Chrome F1 Collection
+                                    </h1>
+                                    <div className="text-right flex flex-col gap-1">
+                                        <div className="flex items-baseline gap-2" title="Total number of cards in your collection (including duplicates)">
+                                            <span className="text-2xl font-bold text-green-400">{stats.totalCopies}</span>
+                                            <span className="text-xs text-slate-400">Total Cards</span>
+                                        </div>
+                                        <div className="flex items-baseline gap-2" title="Number of different cards you own out of total cards in set">
+                                            <span className="text-lg font-semibold text-blue-400">{stats.cardsOwned}/{stats.totalCards}</span>
+                                            <span className="text-xs text-slate-400">Unique Count</span>
+                                        </div>
+                                        <div className="flex items-baseline gap-2" title="Percentage of the complete set you own">
+                                            <span className="text-lg font-semibold text-purple-400">{((stats.cardsOwned/stats.totalCards)*100).toFixed(1)}%</span>
+                                            <span className="text-xs text-slate-400">Completion %</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p className="text-slate-400 text-sm">
+                                    Pro Tracker {serverOnline && <span className="text-green-400">✓ Online</span>}
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        placeholder="Search..."
+                                        title="Search by driver name or card number"
+                                        className="px-3 py-2 pr-10 bg-slate-800 border border-slate-700 rounded-lg focus:border-blue-500 focus:outline-none text-sm w-full"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                    />
+                                    {searchTerm && (
+                                        <button
+                                            onClick={() => setSearchTerm('')}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                                            title="Clear search"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    )}
+                                </div>
+                                <select
+                                    className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm"
+                                    title="Filter by variant type"
+                                    value={filterVariants.length > 0 ? filterVariants[0] : ''}
+                                    onChange={(e) => {
+                                        setFilterVariants(e.target.value ? [e.target.value] : []);
+                                    }}
+                                >
+                                    <option value="">All Variants</option>
+                                    {allVariants.map(v => <option key={v} value={v}>{v}</option>)}
+                                </select>
+                                <select
+                                    className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm"
+                                    title="Filter cards by subset (F1® Drivers, Inserts, etc.)"
+                                    value={filterSubset}
+                                    onChange={(e) => setFilterSubset(e.target.value)}
+                                >
+                                    <option value="all">All Subsets</option>
+                                    {allSubsets.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                                <select
+                                    className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm"
+                                    title="Show all cards or only rookies/veterans"
+                                    value={filterRookie}
+                                    onChange={(e) => setFilterRookie(e.target.value)}
+                                >
+                                    <option value="all">Rookies vs Veterans</option>
+                                    <option value="rookie">Rookies</option>
+                                    <option value="veteran">Veterans</option>
+                                </select>
+                                <select
+                                    className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm"
+                                    title="Value Estimate ($)"
+                                    value={filterValues.length > 0 ? filterValues[0] : ''}
+                                    onChange={(e) => {
+                                        setFilterValues(e.target.value ? [e.target.value] : []);
+                                    }}
+                                >
+                                    <option value="">Value Estimate ($)</option>
+                                    <option value="$$$$$">$$$$$ (&gt;$500)</option>
+                                    <option value="$$$$">$$$$ ($100-$500)</option>
+                                    <option value="$$$">$$$ ($40-$100)</option>
+                                    <option value="$$">$$ ($5-$40)</option>
+                                    <option value="$">$ (&lt;$5)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="max-w-7xl mx-auto p-4">
+                        <div className="mb-2 text-slate-400 text-sm">Showing {filteredCards.length} cards</div>
+
+                        {/* Card Grid with page numbers and separators every 12 cards */}
+                        <div className="space-y-6">
+                            {Array.from({ length: Math.ceil(filteredCards.length / 12) }).map((_, groupIndex) => {
+                                const startIdx = groupIndex * 12;
+                                const groupCards = filteredCards.slice(startIdx, startIdx + 12);
+                                const startCardNum = startIdx + 1;
+                                const endCardNum = Math.min(startIdx + 12, filteredCards.length);
+                                
+                                return (
+                                    <div key={groupIndex}>
+                                        <div className="page-container flex items-start">
+                                            {/* Large page number in left margin */}
+                                            <div className="page-number flex-shrink-0" title="Page number (12 cards per page)">
+                                                Page {groupIndex + 1}
+                                            </div>
+                                            
+                                            <div className="flex-1">
+                                            <div className="card-grid mb-4">
+                                                {groupCards.map(card => {
+                                                    const totalCount = getTotalCount(card.num);
+                                                    const hasCard = totalCount > 0;
+                                                    const variantBreakdown = getVariantBreakdown(card.num);
+                                                    const cardKey = getCardKey(card.num);
+                                                    const cardInventory = collection[cardKey] || {};
+                                                    const analyses = cardInventory._analyses || {};
+
+                                                    return (
+                                                        <div
+                                                            key={card.num}
+                                                            className={`bg-slate-800/50 rounded-xl p-4 border-2 cursor-pointer hover:scale-105 transition-all relative ${
+                                                                hasCard ? 'border-green-500 shadow-lg shadow-green-500/20' : 'border-slate-700'
+                                                            }`}
+                                                            onClick={() => setSelectedCard(card)}
+                                                        >
+                                                            <div className="mb-2">
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    <span className="text-lg font-bold text-blue-400">#{card.num}</span>
+                                                                    <span className="text-lg font-semibold text-white line-clamp-1 flex-1">{card.name}</span>
+                                                                    {card.rookie && (
+                                                                        <span className="bg-yellow-500 text-black text-xs px-2 py-0.5 rounded-full font-bold" title="Rookie Card - Driver's first official trading card">RC</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            {card.team && <p className="text-xs text-slate-400 mb-2 line-clamp-1">{card.team}</p>}
+                                                            <p className="text-xs text-slate-500 bg-slate-900/50 px-2 py-1 rounded mb-3">{card.subset}</p>
+                                                            
+                                                            {/* Variant breakdown without analysis on main page */}
+                                                            {hasCard && (
+                                                                <div className="mb-2">
+                                                                    {(() => {
+                                                                        // Find the most expensive variant by Raw max value
+                                                                        let mostExpensiveVariant = null;
+                                                                        let maxRawValue = 0;
+                                                                        
+                                                                        variantBreakdown.forEach(v => {
+                                                                            const variantAnalyses = analyses[v.variant] || [];
+                                                                            if (variantAnalyses.length > 0) {
+                                                                                const latestAnalysis = variantAnalyses[variantAnalyses.length - 1];
+                                                                                const values = extractValueEstimates(latestAnalysis.analysis);
+                                                                                if (values && values.raw !== 'N/A') {
+                                                                                    const rawMatch = values.raw.match(/\$?([\d,]+)-\$?([\d,]+)/);
+                                                                                    if (rawMatch) {
+                                                                                        const rawMax = parseInt(rawMatch[2].replace(/,/g, ''));
+                                                                                        if (rawMax > maxRawValue) {
+                                                                                            maxRawValue = rawMax;
+                                                                                            mostExpensiveVariant = v.variant;
+                                                                                        }
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        });
+                                                                        
+                                                                        return variantBreakdown.map((v, idx) => {
+                                                                            const isExpensive = v.variant === mostExpensiveVariant;
+                                                                            
+                                                                            return (
+                                                                                <div key={idx} className="mb-2">
+                                                                                    <div className={`flex items-center justify-between bg-slate-900/30 rounded px-2 py-1 ${isExpensive ? 'ring-2 ring-green-700' : ''}`}>
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <div
+                                                                                                className={`${v.style.bg} text-white text-xs px-2 py-1 rounded-full font-bold shadow-sm`}
+                                                                                                title={v.variant}
+                                                                                            >
+                                                                                                {v.style.text}
+                                                                                            </div>
+                                                                                            <span className="text-xs text-slate-300">{v.variant}</span>
+                                                                                        </div>
+                                                                                        <span className="text-xs font-bold text-green-400" title="Number of this variant in your collection">×{v.count}</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        });
+                                                                    })()}
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {/* Value Estimates Below Variants - Most Expensive Variant */}
+                                                            {hasCard && (() => {
+                                                                // Find the most expensive variant by Raw max value
+                                                                let mostExpensiveVariant = null;
+                                                                let maxRawValue = 0;
+                                                                let mostExpensiveValues = null;
+                                                                
+                                                                variantBreakdown.forEach(v => {
+                                                                    const variantAnalyses = analyses[v.variant] || [];
+                                                                    if (variantAnalyses.length > 0) {
+                                                                        const latestAnalysis = variantAnalyses[variantAnalyses.length - 1];
+                                                                        const values = extractValueEstimates(latestAnalysis.analysis);
+                                                                        if (values && values.raw !== 'N/A') {
+                                                                            const rawMatch = values.raw.match(/\$?([\d,]+)-\$?([\d,]+)/);
+                                                                            if (rawMatch) {
+                                                                                const rawMax = parseInt(rawMatch[2].replace(/,/g, ''));
+                                                                                if (rawMax > maxRawValue) {
+                                                                                    maxRawValue = rawMax;
+                                                                                    mostExpensiveVariant = v.variant;
+                                                                                    mostExpensiveValues = values;
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                });
+                                                                
+                                                                if (!mostExpensiveValues) return null;
+                                                                
+                                                                return (
+                                                                    <div className="mt-3 flex items-center gap-3 justify-between">
+                                                                        <div className="flex items-center gap-3">
+                                                                            {/* $ Indicator - Vertically Centered */}
+                                                                            <span className="text-lg font-bold text-green-400" style={{textShadow: '0 0 10px rgba(34, 197, 94, 0.5)'}} title="Estimated total collection value (Raw max values): $ = <$5, $$ = $5-40, $$$ = $40-100, $$$$ = $100-500, $$$$$ = >$500">
+                                                                                {calculateCardValue(card.num)}
+                                                                            </span>
+                                                                            
+                                                                            {/* Value Box */}
+                                                                            <div className="text-xs space-y-0.5 bg-slate-900/80 rounded px-2 py-1 ring-2 ring-green-700">
+                                                                                <div className="text-slate-300" title="Most expensive variant - Raw value range">Raw: {mostExpensiveValues.raw}</div>
+                                                                                <div className="text-blue-400" title="Most expensive variant - PSA 9 value range">PSA 9: {mostExpensiveValues.psa9}</div>
+                                                                                <div className="text-yellow-400" title="Most expensive variant - PSA 10 value range">PSA 10: {mostExpensiveValues.psa10}</div>
+                                                                            </div>
+                                                                        </div>
+                                                                        
+                                                                        {/* Count Badge - Same Row */}
+                                                                        <span className="bg-green-500 text-white text-sm px-3 py-1.5 rounded-full font-bold shadow-lg" title="Total number of this card in your collection">
+                                                                            {totalCount}
+                                                                        </span>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Horizontal separator between pages */}
+                                        {groupIndex < Math.ceil(filteredCards.length / 12) - 1 && (
+                                            <div className="my-9 relative">
+                                                <div className="absolute inset-0 flex items-center">
+                                                    <div className="w-full border-t-4 border-slate-700"></div>
+                                                </div>
+                                                <div className="relative flex justify-center page-divider">
+                                                    <span className="bg-slate-900 px-4 py-1 text-xs text-slate-500 font-semibold">
+                                                        Page {groupIndex + 1} / {Math.ceil(filteredCards.length / 12)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Right Sidebar - Fixed buttons */}
+                        {/* AI Scanner - Mid-Right (Green) */}
+                        <div className="fixed top-1/2 -translate-y-1/2 right-6 z-40">
+                            <button
+                                onClick={() => setShowImageUpload(true)}
+                                disabled={!serverOnline}
+                                title={serverOnline ? "Open AI Scanner to analyze card images" : "Server offline - start server to enable AI scanning"}
+                                className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-4 rounded-lg font-semibold shadow-lg disabled:opacity-50 flex flex-col items-center justify-center gap-2"
+                                style={{width: '160px', height: '280px'}}
+                            >
+                                <span className="text-6xl">📷</span>
+                                <span className="text-lg">AI Scanner</span>
+                                {!serverOnline && <span className="text-xs text-red-300">Offline</span>}
+                            </button>
+                        </div>
+                        
+                        {/* Import/Export/Reset - Bottom Right */}
+                        <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-40">
+                            <button
+                                onClick={() => importInputRef.current?.click()}
+                                title="Import a collection from a JSON file"
+                                className="bg-green-600 hover:bg-green-700 text-white px-4 py-4 rounded-lg text-sm font-semibold shadow-lg flex items-center gap-2"
+                                style={{width: '160px'}}
+                            >
+                                📂 Import
+                            </button>
+                            <input
+                                ref={importInputRef}
+                                type="file"
+                                accept=".json"
+                                onChange={importCollection}
+                                className="hidden"
+                            />
+                            <button
+                                onClick={exportCollection}
+                                title="Download your collection as a JSON file"
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-4 rounded-lg text-sm font-semibold shadow-lg flex items-center gap-2"
+                                style={{width: '160px'}}
+                            >
+                                💾 Export
+                            </button>
+                            <div className="h-4"></div>
+                            <button
+                                onClick={() => setShowResetConfirm(true)}
+                                title="Delete your entire collection (cannot be undone)"
+                                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-lg"
+                                style={{width: '160px'}}
+                            >
+                                🗑️ Reset
+                            </button>
+                        </div>
+
+                        {selectedCard && (
+                            <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50" onClick={() => {
+                                setSelectedCard(null);
+                                setCardDetailEdit(null);
+                                setOriginalCardDetail(null);
+                            }}>
+                                <div className="bg-slate-800 rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto scrollbar-hide" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className="flex-1">
+                                            <h2 className="text-3xl font-bold mb-2">#{selectedCard.num} {selectedCard.name}</h2>
+                                            {selectedCard.team && <p className="text-slate-400">{selectedCard.team}</p>}
+                                            <p className="text-sm text-slate-500">{selectedCard.subset}</p>
+                                        </div>
+                                        <div className="flex gap-2 items-start">
+                                            <button 
+                                                onClick={() => {
+                                                    // Save changes
+                                                    if (cardDetailEdit) {
+                                                        saveCollection(collection);
+                                                    }
+                                                    setCardDetailEdit(null);
+                                                    setOriginalCardDetail(null);
+                                                    setSelectedCard(null);
+                                                }}
+                                                title="Save changes and close"
+                                                className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-semibold"
+                                            >
+                                                ✓ Done
+                                            </button>
+                                            <button 
+                                                onClick={() => {
+                                                    // Cancel changes and restore original
+                                                    if (originalCardDetail) {
+                                                        // Restore original data
+                                                        const key = getCardKey(selectedCard.num);
+                                                        const newCollection = { ...collection };
+                                                        newCollection[key] = originalCardDetail;
+                                                        setCollection(newCollection);
+                                                        saveCollection(newCollection);
+                                                    }
+                                                    setCardDetailEdit(null);
+                                                    setOriginalCardDetail(null);
+                                                    setSelectedCard(null);
+                                                }}
+                                                title="Discard changes and close"
+                                                className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm font-semibold"
+                                            >
+                                                ✕ Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h3 className="text-xl font-semibold mb-4">Inventory</h3>
+                                        <div className="space-y-2">
+                                            {variants.map(variant => {
+                                                const count = getCardInventory(selectedCard.num)[variant] || 0;
+                                                const cardKey = getCardKey(selectedCard.num);
+                                                const cardInventory = collection[cardKey] || {};
+                                                const analyses = cardInventory._analyses || {};
+                                                const variantAnalyses = analyses[variant] || [];
+                                                const latestAnalysis = variantAnalyses.length > 0 ? variantAnalyses[variantAnalyses.length - 1] : null;
+                                                const isAnalyzing = analyzingCards[`${selectedCard.num}-${variant}`];
+                                                
+                                                return (
+                                                    <div key={variant} className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <span className="text-sm font-medium">{variant}</span>
+                                                            <div className="flex items-center gap-4">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        // Track original state before first change
+                                                                        if (!originalCardDetail) {
+                                                                            const key = getCardKey(selectedCard.num);
+                                                                            setOriginalCardDetail(JSON.parse(JSON.stringify(collection[key])));
+                                                                        }
+                                                                        setCardDetailEdit(true);
+                                                                        removeCard(selectedCard.num, variant);
+                                                                    }}
+                                                                    disabled={count === 0}
+                                                                    title="Remove one card from collection"
+                                                                    className="w-10 h-10 bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-30 font-bold"
+                                                                >−</button>
+                                                                <span className="w-12 text-center text-lg font-bold text-green-400" title="Number of this variant in your collection">{count}</span>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        // Track original state before first change
+                                                                        if (!originalCardDetail) {
+                                                                            const key = getCardKey(selectedCard.num);
+                                                                            setOriginalCardDetail(JSON.parse(JSON.stringify(collection[key] || {})));
+                                                                        }
+                                                                        setCardDetailEdit(true);
+                                                                        addCard(selectedCard.num, variant);
+                                                                    }}
+                                                                    title="Add one card to collection"
+                                                                    className="w-10 h-10 bg-green-600 hover:bg-green-700 rounded-lg font-bold"
+                                                                >+</button>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        {/* Show analysis if available */}
+                                                        {isAnalyzing && (
+                                                            <div className="mt-2 text-xs text-slate-400 italic">
+                                                                ⟳ Analyzing value...
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {latestAnalysis && !isAnalyzing && count > 0 && (
+                                                            <div className="mt-2 bg-blue-900/20 border border-blue-500/30 rounded p-3">
+                                                                <div className="flex justify-between items-center mb-2">
+                                                                    <div className="font-semibold text-blue-400 text-sm">💎 Card Value Analysis</div>
+                                                                    <button
+                                                                        onClick={async (e) => {
+                                                                            e.stopPropagation();
+                                                                            const analyzeKey = `${selectedCard.num}-${variant}`;
+                                                                            setAnalyzingCards(prev => ({ ...prev, [analyzeKey]: true }));
+                                                                            
+                                                                            try {
+                                                                                const newAnalysis = await reanalyzeCardValue(selectedCard.num, variant);
+                                                                                
+                                                                                if (newAnalysis) {
+                                                                                    const key = getCardKey(selectedCard.num);
+                                                                                    const updatedCollection = { ...collection };
+                                                                                    if (!updatedCollection[key]._analyses) updatedCollection[key]._analyses = {};
+                                                                                    if (!updatedCollection[key]._analyses[variant]) updatedCollection[key]._analyses[variant] = [];
+                                                                                    updatedCollection[key]._analyses[variant].push({
+                                                                                        id: Date.now(),
+                                                                                        addedDate: new Date().toISOString(),
+                                                                                        analysis: newAnalysis
+                                                                                    });
+                                                                                    setCollection(updatedCollection);
+                                                                                    saveCollection(updatedCollection);
+                                                                                }
+                                                                            } catch (error) {
+                                                                                console.error('Reanalysis error:', error);
+                                                                            } finally {
+                                                                                setAnalyzingCards(prev => {
+                                                                                    const updated = { ...prev };
+                                                                                    delete updated[analyzeKey];
+                                                                                    return updated;
+                                                                                });
+                                                                            }
+                                                                        }}
+                                                                        disabled={isAnalyzing}
+                                                                        className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1 rounded font-semibold disabled:opacity-50"
+                                                                        title="Reanalyze this card with current market data"
+                                                                    >
+                                                                        {isAnalyzing ? '⟳ Analyzing...' : '🔍 Reanalyze'}
+                                                                    </button>
+                                                                </div>
+                                                                <div className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{latestAnalysis.analysis}</div>
+                                                                <div className="text-xs text-slate-500 mt-2">
+                                                                    Added: {new Date(latestAnalysis.addedDate).toLocaleDateString()}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {showImageUpload && (
+                            <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
+                                onClick={() => {
+                                    setShowImageUpload(false);
+                                    setUploadedImages([]);
+                                    setRecognizedCard(null);
+                                    setEditedCard(null);
+                                    setIsEditing(false);
+                                    setRecognitionError(null);
+                                    setDeepAnalysis(null);
+                                    setSelectedAnalysisSource('sonnet');
+                                }}>
+                                <div className="bg-slate-800 rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto scrollbar-hide" onClick={(e) => e.stopPropagation()}>
+                                    <h2 className="text-2xl font-bold mb-6">📷 AI Scanner</h2>
+                                    <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageUpload} multiple className="hidden" />
+                                    
+                                    <>
+                                    {!uploadedImages || uploadedImages.length === 0 && !recognizedCard ? (
+                                        <>
+                                            <button onClick={() => fileInputRef.current?.click()} className="w-full h-80 border-2 border-dashed border-slate-600 rounded-xl flex flex-col items-center justify-center hover:border-blue-500 transition-colors bg-slate-900/50">
+                                                <span className="text-slate-300 text-base mb-3 font-semibold">Scan Card</span>
+                                                <span className="text-7xl mb-3">📷</span>
+                                                <span className="text-slate-400 text-sm text-center px-4">Upload front and back images for best accuracy</span>
+                                            </button>
+                                            <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 mt-4">
+                                                <p className="text-sm font-semibold text-blue-400 mb-1">
+                                                    📱 iPhone Tip: Use Screenshots!
+                                                </p>
+                                                <p className="text-xs text-slate-300">
+                                                    Open photo → Screenshot (Side + Volume Up) → Upload screenshot. 
+                                                    Screenshots are JPG format and work instantly - no conversion needed!
+                                                </p>
+                                            </div>
+                                        </>
+                                    ) : (!uploadedImages || uploadedImages.length === 0) && recognizedCard ? (
+                                        <div className="space-y-4">
+                                            <div className="relative bg-slate-900 rounded-xl p-8 flex items-center justify-center h-80">
+                                                <div className="text-center">
+                                                    <div className="text-8xl mb-4">🏎️</div>
+                                                    <p className="text-slate-400 text-lg font-semibold">2025 Topps Chrome F1</p>
+                                                    <p className="text-slate-500 text-sm mt-2">No image available</p>
+                                                    <button 
+                                                        onClick={() => fileInputRef.current?.click()} 
+                                                        className="mt-4 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-semibold"
+                                                    >
+                                                        📷 Upload Image
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : uploadedImages && uploadedImages.length > 0 ? (
+                                        <div className="space-y-4">
+                                            {/* Show all uploaded images */}
+                                            <div className={`grid ${uploadedImages.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
+                                                {uploadedImages.map((img, idx) => (
+                                                    <div key={idx} className="relative group cursor-pointer" onClick={() => setShowImageViewer(true)}>
+                                                        <img src={img} alt={`Card image ${idx + 1}`} className="w-full max-h-96 object-contain bg-slate-900 rounded-xl" />
+                                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                                            <span className="text-white text-lg font-semibold">🔍 Click to enlarge</span>
+                                                        </div>
+                                                        <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                                                            {uploadedImages.length === 2 ? (idx === 0 ? 'Front' : 'Back') : `Image ${idx + 1}/${uploadedImages.length}`}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            
+                                            {isRecognizing && (
+                                                <div className="text-center py-8 bg-slate-900/50 rounded-xl">
+                                                    <div className="animate-spin text-5xl mb-4">⟳</div>
+                                                    <p className="text-slate-300">AI analyzing card...</p>
+                                                    <p className="text-xs text-slate-400 mt-2">This may take 5-10 seconds</p>
+                                                </div>
+                                            )}
+                                            
+                                            {recognitionError && (
+                                                <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
+                                                    <p className="text-red-300 font-semibold mb-2">Recognition Error</p>
+                                                    <p className="text-sm text-red-200 mb-3">{recognitionError}</p>
+                                                    <button
+                                                        onClick={() => {
+                                                            setUploadedImages([]);
+                                                            setRecognitionError(null);
+                                                            setDeepAnalysis(null);
+                                                            setSelectedAnalysisSource('sonnet');
+                                                        }}
+                                                        className="w-full bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm mb-2"
+                                                    >
+                                                        Try Different Photo
+                                                    </button>
+                                                    <p className="text-xs text-red-300">
+                                                        💡 Tips: Ensure card number is clearly visible, good lighting, try a different angle
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : null}
+                                    
+                                    {recognizedCard && (
+                                        <div className="space-y-4">
+                                            <div className="bg-gradient-to-br from-green-900/20 to-blue-900/20 border border-green-500/30 rounded-xl p-5">
+                                                <div className="flex justify-between items-center mb-4">
+                                            <h3 className="font-semibold text-lg">✨ Card Analyzed</h3>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={performDeepAnalysis}
+                                                    disabled={isDeepAnalyzing}
+                                                    className="px-4 py-2 rounded-lg text-sm font-semibold bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
+                                                >
+                                                    {isDeepAnalyzing ? '⟳ Analyzing...' : '🔍 Re-analyze (Opus)'}
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        if (isEditing) {
+                                                            handleDoneEditing();
+                                                        } else {
+                                                            setIsEditing(true);
+                                                            setEditedCard({...recognizedCard});
+                                                        }
+                                                    }}
+                                                    className={`px-4 py-2 rounded-lg text-sm font-semibold ${
+                                                        isEditing ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
+                                                    }`}
+                                                >
+                                                    {isEditing ? '✓ Done' : '✎ Edit'}
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setShowImageUpload(false);
+                                                        setUploadedImages([]);
+                                                        setRecognizedCard(null);
+                                                        setEditedCard(null);
+                                                        setIsEditing(false);
+                                                        setRecognitionError(null);
+                                                        setDeepAnalysis(null);
+                                                        setSelectedAnalysisSource('sonnet');
+                                                    }}
+                                                    className="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-600 hover:bg-slate-700"
+                                                >
+                                                    ✕ Cancel
+                                                </button>
+                                                <button
+                                                    onClick={handleAddRecognizedCard}
+                                                    className="px-4 py-2 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-700"
+                                                >
+                                                    ✓ Done
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 gap-3 p-4 bg-slate-900/50 rounded-lg">
+                                            <div className={needsVerification(recognizedCard.cardNumberConfidence) ? 'needs-verification rounded p-2' : ''}>
+                                                <span className="text-xs text-slate-400 flex items-center gap-1">
+                                                    Card #
+                                                    {needsVerification(recognizedCard.cardNumberConfidence) && (
+                                                        <span className="text-yellow-400">⚠️</span>
+                                                    )}
+                                                    {recognizedCard._differences?.cardNumber && (
+                                                        <span className="text-purple-400" title="Opus updated this value">🔍</span>
+                                                    )}
+                                                </span>
+                                                {isEditing ? (
+                                                    <input
+                                                        type="text"
+                                                        value={editedCard.cardNumber}
+                                                        onChange={(e) => {
+                                                            const newValue = e.target.value;
+                                                            setEditedCard({...editedCard, cardNumber: newValue});
+                                                            // Mark as manually entered
+                                                            setManualCardNumber(newValue);
+                                                        }}
+                                                        onBlur={(e) => {
+                                                            const newValue = e.target.value;
+                                                            if (newValue !== recognizedCard.cardNumber && uploadedImage && !isDeepAnalyzing) {
+                                                                // Trigger Opus re-analysis
+                                                                setTimeout(() => performDeepAnalysis(), 100);
+                                                            }
+                                                        }}
+                                                        className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm mt-1"
+                                                    />
+                                                ) : (
+                                                    <div>
+                                                        <p className="font-bold">{recognizedCard.cardNumber}</p>
+                                                        {recognizedCard._differences?.cardNumber && (
+                                                            <div className="text-xs text-slate-500 mt-1">
+                                                                <span className="line-through">Sonnet: {recognizedCard.cardNumber}</span>
+                                                                <br/>
+                                                                <span className="text-purple-400">Opus: {recognizedCard._opusData.cardNumber}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="bg-yellow-900/20 border border-yellow-500/30 rounded p-2">
+                                                <span className="text-xs text-yellow-400 flex items-center gap-1">
+                                                    🏆 Serial #
+                                                    {recognizedCard._differences?.serialNumber && (
+                                                        <span className="text-purple-400" title="Opus updated this value">🔍</span>
+                                                    )}
+                                                </span>
+                                                {isEditing ? (
+                                                    <input
+                                                        type="text"
+                                                        value={editedCard.serialNumber || ''}
+                                                        onChange={(e) => setEditedCard({...editedCard, serialNumber: e.target.value})}
+                                                        placeholder="e.g., 63/250 or N/A"
+                                                        className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm mt-1 text-yellow-300 font-bold"
+                                                    />
+                                                ) : (
+                                                    <div>
+                                                        <p className="font-bold text-yellow-300">{recognizedCard.serialNumber || 'N/A'}</p>
+                                                        {recognizedCard._differences?.serialNumber && (
+                                                            <div className="text-xs text-slate-500 mt-1">
+                                                                <span className="line-through">Sonnet: {recognizedCard.serialNumber || 'N/A'}</span>
+                                                                <br/>
+                                                                <span className="text-purple-400">Opus: {recognizedCard._opusData.serialNumber || 'N/A'}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            <div>
+                                                <span className="text-xs text-slate-400 flex items-center gap-1">
+                                                    Driver
+                                                    {recognizedCard._differences?.driverName && (
+                                                        <span className="text-purple-400" title="Opus updated this value">🔍</span>
+                                                    )}
+                                                </span>
+                                                {isEditing ? (
+                                                    <div className="space-y-2">
+                                                        {recognizedCard._differences?.driverName && recognizedCard._opusData ? (
+                                                            <div className="space-y-2">
+                                                                <div className="text-xs text-slate-400 mb-1">Select detected value:</div>
+                                                                <label className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded cursor-pointer hover:bg-slate-700">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="driverName"
+                                                                        checked={editedCard.driverName === recognizedCard.driverName}
+                                                                        onChange={() => setEditedCard({...editedCard, driverName: recognizedCard.driverName})}
+                                                                    />
+                                                                    <span className="text-sm">⚡ Sonnet: {recognizedCard.driverName}</span>
+                                                                </label>
+                                                                <label className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded cursor-pointer hover:bg-slate-700">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="driverName"
+                                                                        checked={editedCard.driverName === recognizedCard._opusData.driverName}
+                                                                        onChange={() => setEditedCard({...editedCard, driverName: recognizedCard._opusData.driverName})}
+                                                                    />
+                                                                    <span className="text-sm">🔍 Opus: {recognizedCard._opusData.driverName}</span>
+                                                                </label>
+                                                                <div className="text-xs text-slate-500">Or type custom:</div>
+                                                            </div>
+                                                        ) : null}
+                                                        <input
+                                                            type="text"
+                                                            value={editedCard.driverName}
+                                                            onChange={(e) => setEditedCard({...editedCard, driverName: e.target.value})}
+                                                            className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm mt-1"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <p className="font-bold">{recognizedCard.driverName}</p>
+                                                        {recognizedCard._differences?.driverName && (
+                                                            <div className="text-xs text-slate-500 mt-1">
+                                                                <span className="line-through">Sonnet: {recognizedCard.driverName}</span>
+                                                                <br/>
+                                                                <span className="text-purple-400">Opus: {recognizedCard._opusData.driverName}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <span className="text-xs text-slate-400 flex items-center gap-1">
+                                                    Team
+                                                    {recognizedCard._differences?.team && (
+                                                        <span className="text-purple-400" title="Opus updated this value">🔍</span>
+                                                    )}
+                                                </span>
+                                                {isEditing ? (
+                                                    <div className="space-y-2">
+                                                        {recognizedCard._differences?.team && recognizedCard._opusData ? (
+                                                            <div className="space-y-2">
+                                                                <div className="text-xs text-slate-400 mb-1">Select detected value:</div>
+                                                                <label className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded cursor-pointer hover:bg-slate-700">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="team"
+                                                                        checked={editedCard.team === recognizedCard.team}
+                                                                        onChange={() => setEditedCard({...editedCard, team: recognizedCard.team})}
+                                                                    />
+                                                                    <span className="text-sm">⚡ Sonnet: {recognizedCard.team}</span>
+                                                                </label>
+                                                                <label className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded cursor-pointer hover:bg-slate-700">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="team"
+                                                                        checked={editedCard.team === recognizedCard._opusData.team}
+                                                                        onChange={() => setEditedCard({...editedCard, team: recognizedCard._opusData.team})}
+                                                                    />
+                                                                    <span className="text-sm">🔍 Opus: {recognizedCard._opusData.team}</span>
+                                                                </label>
+                                                                <div className="text-xs text-slate-500">Or type custom:</div>
+                                                            </div>
+                                                        ) : null}
+                                                        <input
+                                                            type="text"
+                                                            value={editedCard.team}
+                                                            onChange={(e) => setEditedCard({...editedCard, team: e.target.value})}
+                                                            className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm mt-1"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <p className="font-bold">{recognizedCard.team}</p>
+                                                        {recognizedCard._differences?.team && (
+                                                            <div className="text-xs text-slate-500 mt-1">
+                                                                <span className="line-through">Sonnet: {recognizedCard.team}</span>
+                                                                <br/>
+                                                                <span className="text-purple-400">Opus: {recognizedCard._opusData.team}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <span className="text-xs text-slate-400 flex items-center gap-1">
+                                                    Subset
+                                                    {recognizedCard._differences?.subset && (
+                                                        <span className="text-purple-400" title="Opus updated this value">🔍</span>
+                                                    )}
+                                                </span>
+                                                {isEditing ? (
+                                                    <select
+                                                        value={editedCard.subset || ''}
+                                                        onChange={async (e) => {
+                                                            const newSubset = e.target.value;
+                                                            setEditedCard({...editedCard, subset: newSubset});
+                                                            
+                                                            // Trigger Opus re-analysis when subset changes
+                                                            if (uploadedImage && !isDeepAnalyzing) {
+                                                                setTimeout(() => performDeepAnalysis(), 100);
+                                                            }
+                                                        }}
+                                                        className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm mt-1"
+                                                    >
+                                                        {/* AI-detected values first if both analyses exist */}
+                                                        {recognizedCard.subset && deepAnalysis && recognizedCard._opusData && (
+                                                            <>
+                                                                <option value={recognizedCard.subset}>⚡ Sonnet: {recognizedCard.subset}</option>
+                                                                <option value={recognizedCard._opusData.subset}>🔍 Opus: {recognizedCard._opusData.subset}</option>
+                                                                <option disabled>──────────</option>
+                                                            </>
+                                                        )}
+                                                        {allSubsets.map(s => <option key={s} value={s}>{s}</option>)}
+                                                    </select>
+                                                ) : (
+                                                    <div>
+                                                        <p className="font-bold">{recognizedCard.subset || 'Unknown'}</p>
+                                                        {recognizedCard._differences?.subset && (
+                                                            <div className="text-xs text-slate-500 mt-1">
+                                                                <span className="line-through">Sonnet: {recognizedCard.subset}</span>
+                                                                <br/>
+                                                                <span className="text-purple-400">Opus: {recognizedCard._opusData.subset}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <span className="text-xs text-slate-400 flex items-center gap-1">
+                                                    Variant
+                                                    {recognizedCard._differences?.variant && (
+                                                        <span className="text-purple-400" title="Opus updated this value">🔍</span>
+                                                    )}
+                                                </span>
+                                                {isEditing ? (
+                                                    <select
+                                                        value={editedCard.variant}
+                                                        onChange={(e) => setEditedCard({...editedCard, variant: e.target.value})}
+                                                        className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm mt-1"
+                                                    >
+                                                        {/* AI-detected values first if both analyses exist */}
+                                                        {recognizedCard.variant && deepAnalysis && recognizedCard._opusData && (
+                                                            <>
+                                                                <option value={recognizedCard.variant}>⚡ Sonnet: {recognizedCard.variant}</option>
+                                                                <option value={recognizedCard._opusData.variant}>🔍 Opus: {recognizedCard._opusData.variant}</option>
+                                                                <option disabled>──────────</option>
+                                                            </>
+                                                        )}
+                                                        {variants.map(v => <option key={v} value={v}>{v}</option>)}
+                                                    </select>
+                                                ) : (
+                                                    <div>
+                                                        <p className="font-bold">{recognizedCard.variant}</p>
+                                                        {recognizedCard._differences?.variant && (
+                                                            <div className="text-xs text-slate-500 mt-1">
+                                                                <span className="line-through">Sonnet: {recognizedCard.variant}</span>
+                                                                <br/>
+                                                                <span className="text-purple-400">Opus: {recognizedCard._opusData.variant}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {(recognizedCard.analysis || deepAnalysis) && (
+                                            <div className="mt-4 space-y-4">
+                                                {/* Value Estimates Row */}
+                                                {(() => {
+                                                    const sonnetValues = extractValueEstimates(recognizedCard.analysis);
+                                                    const opusValues = extractValueEstimates(deepAnalysis);
+                                                    const valuesToShow = selectedAnalysisSource === 'opus' && opusValues ? opusValues : sonnetValues;
+                                                    
+                                                    return valuesToShow && (
+                                                        <div className="bg-gradient-to-r from-green-900/20 to-blue-900/20 border border-green-500/30 rounded-lg p-4">
+                                                            <h4 className="font-semibold text-green-400 mb-3 text-center">💰 Value Estimates (2025 Topps Chrome F1)</h4>
+                                                            <div className="grid grid-cols-3 gap-4">
+                                                                <div className="text-center">
+                                                                    <div className="text-xs text-slate-400 mb-1">Raw</div>
+                                                                    <div className="text-xl font-bold text-green-400">{valuesToShow.raw}</div>
+                                                                </div>
+                                                                <div className="text-center">
+                                                                    <div className="text-xs text-slate-400 mb-1">PSA 9</div>
+                                                                    <div className="text-xl font-bold text-blue-400">{valuesToShow.psa9}</div>
+                                                                </div>
+                                                                <div className="text-center">
+                                                                    <div className="text-xs text-slate-400 mb-1">PSA 10</div>
+                                                                    <div className="text-xl font-bold text-purple-400">{valuesToShow.psa10}</div>
+                                                                </div>
+                                                            </div>
+                                                            {deepAnalysis && (
+                                                                <div className="mt-3 text-xs text-center text-slate-400">
+                                                                    Using {selectedAnalysisSource === 'opus' ? '🔍 Deep (Opus)' : '⚡ Quick (Sonnet)'} analysis values
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
+                                                
+                                                {/* Analysis Source Selection (only show if both exist) */}
+                                                {recognizedCard.analysis && deepAnalysis && (
+                                                    <div className="flex gap-2 justify-center">
+                                                        <span className="text-sm text-slate-400 self-center">Use analysis from:</span>
+                                                        <button
+                                                            onClick={() => setSelectedAnalysisSource('sonnet')}
+                                                            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                                                                selectedAnalysisSource === 'sonnet' 
+                                                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/50' 
+                                                                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                                            }`}
+                                                        >
+                                                            ⚡ Sonnet
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setSelectedAnalysisSource('opus')}
+                                                            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                                                                selectedAnalysisSource === 'opus' 
+                                                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/50' 
+                                                                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                                            }`}
+                                                        >
+                                                            🔍 Opus
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* Analysis Comparison */}
+                                                <div>
+                                                    <h4 className="font-semibold text-slate-200 mb-3">📊 Analysis Comparison</h4>
+                                                    <div className={`grid ${deepAnalysis ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
+                                                        {/* Quick Analysis (Sonnet) */}
+                                                        {recognizedCard.analysis && (
+                                                            <div className={`p-4 rounded-lg transition-all ${
+                                                                selectedAnalysisSource === 'sonnet' && deepAnalysis
+                                                                    ? 'bg-blue-900/40 border-2 border-blue-400 shadow-lg shadow-blue-500/30'
+                                                                    : 'bg-blue-900/20 border border-blue-500/30'
+                                                            }`}>
+                                                                <div className="flex items-center justify-between mb-2">
+                                                                    <h5 className="font-semibold text-blue-400">⚡ Quick Analysis (Sonnet)</h5>
+                                                                    {selectedAnalysisSource === 'sonnet' && deepAnalysis && (
+                                                                        <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">SELECTED</span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{recognizedCard.analysis}</div>
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* Deep Analysis (Opus) */}
+                                                        {deepAnalysis && (
+                                                            <div className={`p-4 rounded-lg transition-all ${
+                                                                selectedAnalysisSource === 'opus'
+                                                                    ? 'bg-purple-900/40 border-2 border-purple-400 shadow-lg shadow-purple-500/30'
+                                                                    : 'bg-purple-900/20 border border-purple-500/30'
+                                                            }`}>
+                                                                <div className="flex items-center justify-between mb-2">
+                                                                    <h5 className="font-semibold text-purple-400">🔍 Deep Analysis (Opus)</h5>
+                                                                    {selectedAnalysisSource === 'opus' && (
+                                                                        <span className="text-xs bg-purple-600 text-white px-2 py-1 rounded-full">SELECTED</span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{deepAnalysis}</div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                            </div>
+                                        </div>
+                                    )}
+                                    </>
+                                </div>
+                            </div>
+                        )}
+
+                        {showResetConfirm && (
+                            <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+                                <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full">
+                                    <h2 className="text-2xl font-bold mb-4">⚠️ Reset Collection?</h2>
+                                    <p className="text-slate-300 mb-6">
+                                        This will DELETE your entire collection. This action CANNOT be undone!
+                                    </p>
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => setShowResetConfirm(false)}
+                                            className="flex-1 bg-slate-600 hover:bg-slate-700 px-4 py-3 rounded-lg font-semibold"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={resetCollection}
+                                            className="flex-1 bg-red-600 hover:bg-red-700 px-4 py-3 rounded-lg font-semibold"
+                                        >
+                                            Yes, Reset
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Fullscreen Image Viewer */}
+                        {showImageViewer && uploadedImages && uploadedImages.length > 0 && (
+                            <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50">
+                                {/* Controls */}
+                                <div className="absolute top-4 right-4 flex gap-2 z-10">
+                                    <button
+                                        onClick={() => setImageViewerZoom(Math.max(0.5, imageViewerZoom - 0.25))}
+                                        className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg font-semibold"
+                                        title="Zoom Out"
+                                    >
+                                        −
+                                    </button>
+                                    <button
+                                        onClick={() => setImageViewerZoom(1)}
+                                        className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg font-semibold"
+                                        title="Reset Zoom"
+                                    >
+                                        {Math.round(imageViewerZoom * 100)}%
+                                    </button>
+                                    <button
+                                        onClick={() => setImageViewerZoom(Math.min(5, imageViewerZoom + 0.25))}
+                                        className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg font-semibold"
+                                        title="Zoom In"
+                                    >
+                                        +
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowImageViewer(false);
+                                            setImageViewerZoom(1);
+                                            setImageViewerPosition({ x: 0, y: 0 });
+                                        }}
+                                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold"
+                                        title="Close"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+
+                                {/* Image Container - Show all images in grid if multiple */}
+                                <div 
+                                    className={`w-full h-full flex items-center justify-center overflow-auto p-8 ${uploadedImages.length > 1 ? 'gap-4' : ''}`}
+                                >
+                                    {uploadedImages.map((img, idx) => (
+                                        <img 
+                                            key={idx}
+                                            src={img} 
+                                            alt={`Card image ${idx + 1}`}
+                                            style={{
+                                                transform: `scale(${imageViewerZoom})`,
+                                                maxWidth: uploadedImages.length > 1 ? '45vw' : '90vw',
+                                                maxHeight: '90vh',
+                                                objectFit: 'contain'
+                                            }}
+                                            draggable={false}
+                                        />
+                                    ))}
+                                </div>
+
+                                {/* Instructions */}
+                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-800/90 text-white px-6 py-3 rounded-lg text-sm">
+                                    <p>🖱️ Drag to pan • 🖱️ Scroll to zoom • Click buttons to zoom</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
