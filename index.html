@@ -217,7 +217,12 @@
                             let normalized = variant;
                             
                             // Common normalization patterns
-                            if (variant.includes('/250') && !variant.includes('Refractor')) {
+                            // Common normalization patterns
+                            if (variant.includes('Chrome') && !variant.includes('Refractor')) {
+                                normalized = 'Base';
+                            } else if (variant.includes('/250') && !variant.includes('Refractor')) {
+                                normalized = 'Magenta/Pink Refractor /250';
+                            } else if (variant.includes('/250') && !variant.includes('Refractor')) {
                                 normalized = 'Magenta/Pink Refractor /250';
                             } else if (variant.includes('/299') && !variant.includes('Refractor')) {
                                 normalized = 'Purple Refractor /299';
@@ -934,7 +939,9 @@ Respond with ONLY this JSON format (no other text):
                         ? deepAnalysis 
                         : recognizedCard.analysis;
                     
-                    addCard(recognizedCard.cardNumber, recognizedCard.variant, analysisToUse);
+                    let variant = recognizedCard.variant;
+                    if (variant === "Base Chrome") variant = "Base";
+                    addCard(recognizedCard.cardNumber, variant, analysisToUse);
                     setShowImageUpload(false);
                     setUploadedImages([]);
                     setRecognizedCard(null);
