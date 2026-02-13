@@ -1751,7 +1751,7 @@ Respond with ONLY this JSON format (no other text):
                                                         }}
                                                         onBlur={(e) => {
                                                             const newValue = e.target.value;
-                                                            if (newValue !== recognizedCard.cardNumber && uploadedImage && !isDeepAnalyzing) {
+                                                            if (newValue !== recognizedCard.cardNumber && uploadedImages && !isDeepAnalyzing) {
                                                                 // Trigger Opus re-analysis
                                                                 setTimeout(() => performDeepAnalysis(), 100);
                                                             }
