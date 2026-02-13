@@ -794,10 +794,10 @@ Respond with ONLY this JSON format (no other text):
                     // Build content array with all images
                     const contentArray = [];
                     
-                    uploadedImages.forEach((uploadedImages) => {
-                        const mediaTypeMatch = uploadedImages.match(/^data:(image\/[a-zA-Z]+);base64,/);
+                    uploadedImages.forEach((uploadedImage) => {
+                        const mediaTypeMatch = uploadedImage.match(/^data:(image\/[a-zA-Z]+);base64,/);
                         const mediaType = mediaTypeMatch ? mediaTypeMatch[1] : 'image/jpeg';
-                        const imageData = uploadedImages.split(',')[1];
+                        const imageData = uploadedImage.split(',')[1];
                         
                         contentArray.push({
                             type: "image",
