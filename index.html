@@ -177,25 +177,40 @@
                 }
             };
 
-            const loadCollection = () => {
-                try {
-                    const saved = localStorage.getItem('f1-collection-pro-v2');
-                    if (saved) {
-                        const loadedCollection = JSON.parse(saved);
-                        // Clean up any orphaned 0-count variants on load
-                        const cleanedCollection = cleanupCollection(loadedCollection);
-                        
-                        // Save cleaned version back if changes were made
-                        if (JSON.stringify(loadedCollection) !== JSON.stringify(cleanedCollection)) {
-                            console.log('Cleaned up orphaned data on load');
-                            localStorage.setItem('f1-collection-pro-v2', JSON.stringify(cleanedCollection));
-                        }
-                        
-                        setCollection(cleanedCollection);
-                    }
-                } catch (error) {
-                    console.log('No saved collection');
+            const [userId, setUserId] = useState(null);
+
+            const loadCollection = async () => {
+            try {
+                // Generate or get userId from localStorage
+                let id = localStorage.getItem('f1-user-id');
+                if (!id) {
+                id = 'user-' + Date.now();
+                localStorage.setItem('f1-user-id', id);
                 }
+                setUserId(id);
+
+                // Try to load from MongoDB
+                try {
+                const response = await fetch(`https://f1-card-tracker-backend-1.onrender.com/api/collection/${id}`);
+                const data = await response.json();
+                
+                if (data.cards && Object.keys(data.cards).length > 0) {
+                    setCollection(data.cards);
+                    console.log('✅ Collection loaded from MongoDB');
+                    return;
+                }
+                } catch (error) {
+                console.log('MongoDB not available, using localStorage');
+                }
+
+                // Fallback to localStorage
+                const saved = localStorage.getItem('f1-collection-pro-v2');
+                if (saved) {
+                setCollection(JSON.parse(saved));
+                }
+            } catch (error) {
+                console.log('Error loading collection:', error);
+            }
             };
 
             const cleanupCollection = (coll) => {
@@ -290,10 +305,24 @@
 
             const saveCollection = (newCollection) => {
                 try {
-                    // Clean up 0-count variants before saving
                     const cleanedCollection = cleanupCollection(newCollection);
-                    localStorage.setItem('f1-collection-pro-v2', JSON.stringify(cleanedCollection));
                     setCollection(cleanedCollection);
+                    
+                    // Save to localStorage (backup)
+                    localStorage.setItem('f1-collection-pro-v2', JSON.stringify(cleanedCollection));
+                    
+                    // Save to MongoDB (async, don't wait)
+                    if (userId) {
+                    fetch(`https://f1-card-tracker-backend-1.onrender.com/api/collection/${userId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ cards: cleanedCollection })
+                    }).then(() => {
+                        console.log('✅ Collection synced to MongoDB');
+                    }).catch(error => {
+                        console.log('Sync to MongoDB failed, using localStorage backup');
+                    });
+                    }
                 } catch (error) {
                     console.error('Error saving:', error);
                 }
