@@ -48,9 +48,10 @@
                 <button 
                     id="loginBtn"
                     onclick="handleLogin()"
-                    class="w-full bg-blue-600 hover:bg-blue-700 font-semibold py-2 rounded-lg transition mt-6"
+                    class="w-full bg-blue-600 hover:bg-blue-700 font-semibold py-2 rounded-lg transition mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled
                 >
-                    Login
+                    <span id="loginBtnText">Login</span>
                 </button>
 
                 <div class="text-center text-sm text-slate-400 mt-4">
@@ -104,9 +105,10 @@
                 <button 
                     id="signupBtn"
                     onclick="handleSignup()"
-                    class="w-full bg-green-600 hover:bg-green-700 font-semibold py-2 rounded-lg transition mt-6"
+                    class="w-full bg-green-600 hover:bg-green-700 font-semibold py-2 rounded-lg transition mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled
                 >
-                    Create Account
+                    <span id="signupBtnText">Create Account</span>
                 </button>
 
                 <div class="text-center text-sm text-slate-400 mt-4">
@@ -148,14 +150,20 @@
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
             const errorDiv = document.getElementById('loginError');
+            const btn = document.getElementById('loginBtn');
+            const btnText = document.getElementById('loginBtnText');
 
             errorDiv.classList.add('hidden');
+            btn.disabled = false;
 
             if (!email || !password) {
                 errorDiv.textContent = 'Please fill in all fields';
                 errorDiv.classList.remove('hidden');
                 return;
             }
+
+            btn.disabled = true;
+            btnText.textContent = 'Logging in...';
 
             try {
                 const response = await fetch(`${API_BASE}/api/auth/login`, {
@@ -169,18 +177,24 @@
                 if (!response.ok) {
                     errorDiv.textContent = data.error || 'Login failed';
                     errorDiv.classList.remove('hidden');
+                    btn.disabled = false;
+                    btnText.textContent = 'Login';
                     return;
                 }
 
-                // Save token
                 localStorage.setItem('f1-token', data.token);
                 localStorage.setItem('f1-email', email);
 
-                // Redirect to app
-                window.location.href = 'index.html';
+                btnText.textContent = '✓ Logged in!';
+                
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 500);
             } catch (error) {
                 errorDiv.textContent = 'Connection error. Try again.';
                 errorDiv.classList.remove('hidden');
+                btn.disabled = false;
+                btnText.textContent = 'Login';
             }
         }
 
@@ -189,8 +203,11 @@
             const password = document.getElementById('signupPassword').value;
             const confirm = document.getElementById('signupConfirm').value;
             const errorDiv = document.getElementById('signupError');
+            const btn = document.getElementById('signupBtn');
+            const btnText = document.getElementById('signupBtnText');
 
             errorDiv.classList.add('hidden');
+            btn.disabled = false;
 
             if (!email || !password || !confirm) {
                 errorDiv.textContent = 'Please fill in all fields';
@@ -210,6 +227,9 @@
                 return;
             }
 
+            btn.disabled = true;
+            btnText.textContent = 'Creating account...';
+
             try {
                 const response = await fetch(`${API_BASE}/api/auth/signup`, {
                     method: 'POST',
@@ -222,22 +242,27 @@
                 if (!response.ok) {
                     errorDiv.textContent = data.error || 'Signup failed';
                     errorDiv.classList.remove('hidden');
+                    btn.disabled = false;
+                    btnText.textContent = 'Create Account';
                     return;
                 }
 
-                // Save token
                 localStorage.setItem('f1-token', data.token);
                 localStorage.setItem('f1-email', email);
 
-                // Redirect to app
-                window.location.href = 'index.html';
+                btnText.textContent = '✓ Account created!';
+                
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 500);
             } catch (error) {
                 errorDiv.textContent = 'Connection error. Try again.';
                 errorDiv.classList.remove('hidden');
+                btn.disabled = false;
+                btnText.textContent = 'Create Account';
             }
         }
 
-        // Check if already logged in
         if (localStorage.getItem('f1-token')) {
             window.location.href = 'index.html';
         }
