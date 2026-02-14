@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F1 Card Tracker - Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-md">
+        <!-- Logo/Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold mb-2">🏎️ F1 Card Tracker</h1>
+            <p class="text-slate-400">Your AI-powered card collection manager</p>
+        </div>
+
+        <!-- Auth Container -->
+        <div class="bg-slate-800 rounded-lg border border-slate-700 p-8 shadow-2xl">
+            <!-- Login Tab -->
+            <div id="loginTab" class="space-y-4">
+                <h2 class="text-2xl font-bold mb-6">Login</h2>
+                
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Email</label>
+                    <input 
+                        type="email" 
+                        id="loginEmail" 
+                        placeholder="your@email.com"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Password</label>
+                    <input 
+                        type="password" 
+                        id="loginPassword" 
+                        placeholder="••••••••"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                    />
+                </div>
+
+                <div id="loginError" class="text-red-400 text-sm hidden"></div>
+
+                <button 
+                    id="loginBtn"
+                    onclick="handleLogin()"
+                    class="w-full bg-blue-600 hover:bg-blue-700 font-semibold py-2 rounded-lg transition mt-6"
+                >
+                    Login
+                </button>
+
+                <div class="text-center text-sm text-slate-400 mt-4">
+                    Don't have an account? 
+                    <button 
+                        onclick="switchToSignup()"
+                        class="text-blue-400 hover:text-blue-300 font-semibold"
+                    >
+                        Sign up
+                    </button>
+                </div>
+            </div>
+
+            <!-- Signup Tab -->
+            <div id="signupTab" class="space-y-4 hidden">
+                <h2 class="text-2xl font-bold mb-6">Create Account</h2>
+                
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Email</label>
+                    <input 
+                        type="email" 
+                        id="signupEmail" 
+                        placeholder="your@email.com"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Password</label>
+                    <input 
+                        type="password" 
+                        id="signupPassword" 
+                        placeholder="••••••••"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                    />
+                    <p class="text-xs text-slate-400 mt-1">Must be at least 6 characters</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Confirm Password</label>
+                    <input 
+                        type="password" 
+                        id="signupConfirm" 
+                        placeholder="••••••••"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                    />
+                </div>
+
+                <div id="signupError" class="text-red-400 text-sm hidden"></div>
+
+                <button 
+                    id="signupBtn"
+                    onclick="handleSignup()"
+                    class="w-full bg-green-600 hover:bg-green-700 font-semibold py-2 rounded-lg transition mt-6"
+                >
+                    Create Account
+                </button>
+
+                <div class="text-center text-sm text-slate-400 mt-4">
+                    Already have an account? 
+                    <button 
+                        onclick="switchToLogin()"
+                        class="text-blue-400 hover:text-blue-300 font-semibold"
+                    >
+                        Login
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info -->
+        <div class="text-center text-slate-400 text-sm mt-8">
+            <p>🔒 Your data is secure and encrypted</p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://f1-card-tracker-backend-1.onrender.com';
+
+        function switchToSignup() {
+            document.getElementById('loginTab').classList.add('hidden');
+            document.getElementById('signupTab').classList.remove('hidden');
+            document.getElementById('loginError').classList.add('hidden');
+            document.getElementById('signupError').classList.add('hidden');
+        }
+
+        function switchToLogin() {
+            document.getElementById('signupTab').classList.add('hidden');
+            document.getElementById('loginTab').classList.remove('hidden');
+            document.getElementById('loginError').classList.add('hidden');
+            document.getElementById('signupError').classList.add('hidden');
+        }
+
+        async function handleLogin() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginError');
+
+            errorDiv.classList.add('hidden');
+
+            if (!email || !password) {
+                errorDiv.textContent = 'Please fill in all fields';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    errorDiv.textContent = data.error || 'Login failed';
+                    errorDiv.classList.remove('hidden');
+                    return;
+                }
+
+                // Save token
+                localStorage.setItem('f1-token', data.token);
+                localStorage.setItem('f1-email', email);
+
+                // Redirect to app
+                window.location.href = 'index.html';
+            } catch (error) {
+                errorDiv.textContent = 'Connection error. Try again.';
+                errorDiv.classList.remove('hidden');
+            }
+        }
+
+        async function handleSignup() {
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+            const confirm = document.getElementById('signupConfirm').value;
+            const errorDiv = document.getElementById('signupError');
+
+            errorDiv.classList.add('hidden');
+
+            if (!email || !password || !confirm) {
+                errorDiv.textContent = 'Please fill in all fields';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            if (password.length < 6) {
+                errorDiv.textContent = 'Password must be at least 6 characters';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            if (password !== confirm) {
+                errorDiv.textContent = 'Passwords do not match';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, confirmPassword: confirm })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    errorDiv.textContent = data.error || 'Signup failed';
+                    errorDiv.classList.remove('hidden');
+                    return;
+                }
+
+                // Save token
+                localStorage.setItem('f1-token', data.token);
+                localStorage.setItem('f1-email', email);
+
+                // Redirect to app
+                window.location.href = 'index.html';
+            } catch (error) {
+                errorDiv.textContent = 'Connection error. Try again.';
+                errorDiv.classList.remove('hidden');
+            }
+        }
+
+        // Check if already logged in
+        if (localStorage.getItem('f1-token')) {
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>
