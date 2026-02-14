@@ -958,14 +958,23 @@ Provide comprehensive updated data:
                         // Remove markdown code blocks
                         fullText = fullText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
                         
-                        // Extract JSON object from the text - be more greedy to ensure we get the complete object
+                        // Strategy: Extract the analysis field first (which can contain newlines)
+                        // Then extract other fields from JSON
+                        let opusData = {};
+                        let analysisText = null;
+                        
+                        // Extract analysis field - handle newlines in the value
+                        const analysisMatch = fullText.match(/"analysis":\s*"([\s\S]*?)"\s*(?:}|,)/);
+                        if (analysisMatch && analysisMatch[1]) {
+                            analysisText = analysisMatch[1]
+                                .replace(/\\n/g, '\n')  // Convert escaped newlines to actual newlines
+                                .trim();
+                            console.log('✓ Extracted analysis text, length:', analysisText.length);
+                        }
+                        
+                        // Now try to extract the JSON object for other fields
                         let jsonMatch = fullText.match(/\{[\s\S]*\}(?=\s*$)/);
                         if (!jsonMatch) {
-                            // If no match at end, try to find any JSON object
-                            jsonMatch = fullText.match(/\{[\s\S]*?\}\s*$/);
-                        }
-                        if (!jsonMatch) {
-                            // Last resort: find the first { and last }
                             const startIdx = fullText.indexOf('{');
                             const endIdx = fullText.lastIndexOf('}');
                             if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
@@ -973,21 +982,43 @@ Provide comprehensive updated data:
                             }
                         }
                         
-                        let opusData = null;
-                        
                         if (jsonMatch && jsonMatch[0]) {
                             try {
+                                // Try to parse the full JSON first
                                 opusData = JSON.parse(jsonMatch[0]);
-                                console.log('✓ Successfully parsed Opus JSON response');
-                                console.log('Opus data keys:', Object.keys(opusData));
+                                console.log('✓ Successfully parsed full Opus JSON response');
                             } catch (parseError) {
-                                console.error('Failed to parse JSON:', parseError);
-                                console.error('Attempted to parse:', jsonMatch[0].substring(0, 300));
-                                console.error('JSON string length:', jsonMatch[0].length);
+                                console.warn('Full JSON parse failed, attempting field extraction:', parseError.message);
+                                
+                                // Fallback: extract individual fields using regex
+                                const cardNumberMatch = fullText.match(/"cardNumber":\s*"([^"]*)"/);
+                                const driverMatch = fullText.match(/"driverName":\s*"([^"]*)"/);
+                                const teamMatch = fullText.match(/"team":\s*"([^"]*)"/);
+                                const subsetMatch = fullText.match(/"subset":\s*"([^"]*)"/);
+                                const variantMatch = fullText.match(/"variant":\s*"([^"]*)"/);
+                                const serialMatch = fullText.match(/"serialNumber":\s*(?:null|"([^"]*)")/);
+                                const rookieMatch = fullText.match(/"isRookie":\s*(true|false)/);
+                                const confMatch = fullText.match(/"confidence":\s*"([^"]*)"/);
+                                
+                                opusData = {
+                                    cardNumber: cardNumberMatch?.[1] || 'Unknown',
+                                    driverName: driverMatch?.[1] || 'Unknown',
+                                    team: teamMatch?.[1] || 'Unknown',
+                                    subset: subsetMatch?.[1] || 'Unknown',
+                                    variant: variantMatch?.[1] || 'Base',
+                                    serialNumber: serialMatch?.[1] || null,
+                                    isRookie: rookieMatch?.[1] === 'true',
+                                    confidence: confMatch?.[1] || 'medium'
+                                };
+                                console.log('✓ Extracted fields via regex:', Object.keys(opusData));
                             }
                         } else {
-                            console.error('No JSON match found in text');
-                            console.log('Full text:', fullText.substring(0, 1000));
+                            console.warn('No JSON structure found in response');
+                        }
+                        
+                        // Use the extracted analysis text if available
+                        if (analysisText) {
+                            opusData.analysis = analysisText;
                         }
                         
                         if (opusData && opusData.analysis) {
@@ -1010,12 +1041,13 @@ Provide comprehensive updated data:
                             };
                             
                             setRecognizedCard(updatedCard);
+                            console.log('✓ Deep analysis complete');
                         } else {
                             // Could not parse or extract analysis
                             console.error('Could not extract analysis from Opus response');
                             console.error('opusData:', opusData);
                             console.error('Has analysis field:', opusData?.analysis ? 'yes' : 'no');
-                            setDeepAnalysis('Error: Opus analysis incomplete. Check browser console for details.');
+                            setDeepAnalysis('Error: Could not extract analysis. Please try again or check server logs.');
                         }
                     } else {
                         throw new Error('Invalid response from API - no content blocks');
