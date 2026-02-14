@@ -765,52 +765,56 @@ Base your analysis on current 2025 market data from web search.`
                     
                     // Add text prompt after images
                     const promptText = images.length > 1 
-                        ? `Analyze these F1 trading card images (front and back of the same card) and extract the following information. Use BOTH images to get complete details - the back often contains the card number or additional information.
+                        ? `Analyze these F1 trading card images (FRONT and BACK of the same card). 
 
-IMPORTANT: You are viewing the FRONT and BACK of the SAME physical card. Use information from both images.`
-                        : `Analyze this F1 trading card and extract the following information.`;
+CRITICAL: 
+- Image 1: Front of card (driver photo)
+- Image 2: Back of card (contains CARD NUMBER)
+
+The BACK IMAGE is ESSENTIAL - extract the card number from it very carefully!`
+                        : `Analyze this F1 trading card image.`;
                     
                     contentArray.push({
                         type: "text",
                         text: `${promptText}
 
 CARD SET CONTEXT:
-This card is from the 2025 Topps Chrome Formula 1 set. Even if the image appears to be from a prior year's product or shows older photography, treat this as a 2025 Topps Chrome F1 card for identification and valuation purposes.
+2025 Topps Chrome Formula 1 set. Treat all cards as 2025 edition even if imagery appears older.
 
-IMPORTANT: Respond with ONLY a JSON object. Do not include any explanatory text before or after the JSON.
+CRITICAL - CARD NUMBER EXTRACTION (FROM BACK IMAGE):
+${images.length > 1 ? `The BACK IMAGE contains the card number - extract it VERY carefully! Look for:
+  • Small card number in bottom left or elsewhere on back
+  • Format examples: "#1", "#42", "R-1", "CR-15", etc.
+  • This is NOT the gold serial number (e.g., "63/299")
+  • Back image card number guides web search for accurate details` : 'Extract the card number from the card'}
 
-CRITICAL DISTINCTION:
-- CARD NUMBER: The actual card number from the set (e.g., "1", "F1-25", "CR-3") - usually small text on the card${images.length > 1 ? ' (often on the BACK)' : ''}
-- SERIAL NUMBER: If there's a GOLD number in the upper right corner (e.g., "63/250", "142/299"), that's the serial number showing this specific copy's number out of total printed. DO NOT use this as the card number!
+Extract these details:
+1. Card number - ${images.length > 1 ? 'CRITICAL: from BACK image' : 'inferred from visual'}
+2. Card number confidence: high/medium/low
+3. Card number source: ${images.length > 1 ? 'back_image/front_image/inferred' : 'front_image/inferred'}
+4. Serial number (gold number if visible, e.g., "63/250" or null)
+5. Driver name
+6. Team name
+7. Subset category
+8. Variant - determine from serial denominator: /299=Purple /299, /150=Blue /150, /99=Green /99, /50=Gold /50, /25=Orange /25, /5=Red /5, 1/1=SuperFractor 1/1, /10=Black /10, /250=Magenta/Pink /250, /75=Gold Wave /75, or Base
+9. Rookie card? (true/false)
+10. Brief value assessment with Raw: $X-Y, PSA 9: $X-Y, PSA 10: $X-Y format (NO trailing commas)
 
-Extract:
-1. Card number (the set card number, NOT the gold serial number)${images.length > 1 ? ' - CHECK THE BACK IMAGE for card number!' : ''}
-2. Serial number (if visible - the gold number like "63/250" in upper right corner)
-3. Driver name
-4. Team name
-5. Subset category (look for text at bottom of card like "Chrome Racers", "Diamond 75th Anniversary", "F1® Legends", etc.)
-6. Variant type - IMPORTANT: If you see a serial number, determine variant from the denominator (e.g., "/299" = Purple Refractor /299, "/150" = Blue Refractor /150, "/99" = Green Refractor /99, "/50" = Gold Refractor /50, "/25" = Orange Refractor /25, "/5" = Red Refractor /5, "1/1" = SuperFractor 1/1, "/10" = Black Refractor /10, "/250" = Magenta/Pink Refractor /250, "/75" = Gold Wave /75)
-7. Whether it's a rookie card (RC designation)
-8. Brief card description and value assessment including estimated values for Raw, PSA 9, and PSA 10 conditions
-   IMPORTANT: Do NOT use trailing commas after value ranges. Format as "Raw: $10-20, PSA 9: $30-50, PSA 10: $100-150" with NO comma after the last value.
+Database card numbers: ${allCardNumbers.slice(0, 30).join(', ')}...
+Database subsets: ${allSubsets.slice(0, 15).join(', ')}...
 
-Valid card numbers from our database: ${allCardNumbers.slice(0, 50).join(', ')}... and more.
-
-Valid subsets: ${allSubsets.slice(0, 20).join(', ')}... and more.
-
-Try to match the card to our database by driver name, team, and visual appearance. If unsure about card number, make your best inference.
-
-Respond with ONLY this JSON format (no other text):
+Respond with ONLY this JSON (no markdown, no extra text):
 {
-  "cardNumber": "inferred card number from database",
+  "cardNumber": "from back image if visible, else inferred",
   "cardNumberConfidence": "high/medium/low",
-  "serialNumber": "if visible, e.g. 63/250, otherwise null",
+  "cardNumberSource": "${images.length > 1 ? 'back_image/front_image/inferred' : 'front_image/inferred'}",
+  "serialNumber": "null or serial like 63/250",
   "driverName": "full name",
-  "team": "full team name",
-  "subset": "subset name from card or best guess",
-  "variant": "exact variant from list above",
-  "isRookie": true/false,
-  "analysis": "Brief description and value assessment including Raw: $X-Y, PSA 9: $X-Y, PSA 10: $X-Y"
+  "team": "full team",
+  "subset": "subset name",
+  "variant": "exact variant name",
+  "isRookie": true or false,
+  "analysis": "Value assessment: Raw: $X-Y, PSA 9: $X-Y, PSA 10: $X-Y with brief notes"
 }`
                     });
                     
@@ -876,52 +880,46 @@ Respond with ONLY this JSON format (no other text):
                     });
                     
                     const promptText = uploadedImages.length > 1
-                        ? `Perform a DEEP analysis of these F1 trading card images (front and back of the same card) using advanced reasoning. Use BOTH images to get complete information - the back often has the card number.`
-                        : `Perform a DEEP analysis of this F1 trading card using advanced reasoning.`;
+                        ? `Perform DEEP analysis of these F1 card images (FRONT and BACK). The BACK image contains the card number which is KEY to accurate research.`
+                        : `Perform DEEP analysis of this F1 card image.`;
                     
                     // Add text prompt
                     contentArray.push({
                         type: "text",
                         text: `${promptText}
 
-CARD SET CONTEXT:
-This card is from the 2025 Topps Chrome Formula 1 set. Even if the image appears to be from a prior year's product or shows older photography, treat this as a 2025 Topps Chrome F1 card for identification and valuation purposes.
+CARD SET: 2025 Topps Chrome Formula 1 (treat all as 2025 regardless of imagery age)
 
-Current Quick Analysis says:
-Card #${recognizedCard.cardNumber}, ${recognizedCard.driverName}, ${recognizedCard.variant}
+Current Detection:
+Card #${recognizedCard.cardNumber} (confidence: ${recognizedCard.cardNumberConfidence})
+${recognizedCard.cardNumberSource ? `Source: ${recognizedCard.cardNumberSource}` : ''}
+Driver: ${recognizedCard.driverName}
+Team: ${recognizedCard.team}
+Variant: ${recognizedCard.variant}
 ${recognizedCard.serialNumber ? `Serial: ${recognizedCard.serialNumber}` : ''}
 
-Your task: Provide comprehensive reasoning and improved card data.
+TASK: Use the card number (especially from BACK IMAGE if available) to guide web search for accurate 2025 Topps Chrome F1 card details and current market values.
 
-Respond with ONLY a JSON object containing:
+Web Search Strategy:
+1. Use card number #${recognizedCard.cardNumber} as primary identifier
+2. Search for "2025 Topps Chrome F1 card #${recognizedCard.cardNumber} ${recognizedCard.driverName}"
+3. Find current market prices for this specific card and variant
+4. Verify driver, team, rookie status, and subset from search results
+5. Get accurate value ranges for Raw, PSA 9, PSA 10 conditions
 
-1. UPDATED CARD DATA (verify and correct if needed):
-   - cardNumber: Verify card number by matching driver, team, subset to database${uploadedImages.length > 1 ? ' - CHECK THE BACK IMAGE!' : ''}
-   - serialNumber: Gold serial number if visible (not the card number)
-   - driverName: Full driver name
-   - team: Full team name
-   - subset: Subset category
-   - variant: Exact variant (use serial denominator: /299=Purple Refractor /299, /150=Blue Refractor /150, /99=Green Refractor /99, /50=Gold Refractor /50, /25=Orange Refractor /25, /5=Red Refractor /5, 1/1=SuperFractor 1/1, /10=Black Refractor /10, /250=Magenta/Pink Refractor /250, /75=Gold Wave /75)
-   - confidence: "high/medium/low"
+Provide comprehensive updated data:
 
-2. DETAILED ANALYSIS TEXT:
-   Include sections on:
-   - CARD IDENTIFICATION: Your detailed reasoning
-   - VARIANT & RARITY: Specific variant analysis and rarity assessment
-   - VALUE ESTIMATES: Raw: $X-Y, PSA 9: $X-Y, PSA 10: $X-Y with factors affecting value
-     IMPORTANT: Do NOT use trailing commas or periods after value ranges. Format as "Raw: $10-20" NOT "Raw: $10-20,"
-   - COLLECTIBILITY: Why collectors want this, investment potential
-
-Respond with ONLY this JSON format (no other text):
 {
-  "cardNumber": "verified card number",
+  "cardNumber": "verified via back image and web search",
+  "cardNumberSource": "back_image/front_image/web_search/database",
   "serialNumber": "serial if visible, else null",
-  "driverName": "full name",
-  "team": "full team name", 
-  "subset": "subset name",
-  "variant": "exact variant",
+  "driverName": "full driver name",
+  "team": "full team name",
+  "subset": "subset category",
+  "variant": "exact variant (Base, Refractor, Purple /299, Blue /150, Green /99, Gold /50, Orange /25, Red /5, SuperFractor 1/1, Black /10, Magenta /250, Gold Wave /75, Printing Plate 1/1)",
+  "isRookie": true/false,
   "confidence": "high/medium/low",
-  "analysis": "CARD IDENTIFICATION:\n[Your detailed reasoning]\n\nVARIANT & RARITY:\n[Your analysis]\n\nVALUE ESTIMATES:\nRaw: $X-Y\nPSA 9: $X-Y\nPSA 10: $X-Y\n(No trailing commas after values)\n\nCOLLECTIBILITY:\n[Your insights]"
+  "analysis": "CARD IDENTIFICATION:\n[Back image card number and driver verification]\n\nWEB SEARCH FINDINGS:\n[2025 Topps Chrome F1 market data for this card and variant]\n\nVARIANT & RARITY:\n[Specific variant analysis]\n\nVALUE ESTIMATES (2025 Topps Chrome F1):\nRaw: $X-Y\nPSA 9: $X-Y\nPSA 10: $X-Y\n\nCOLLECTIBILITY:\n[Why collectors want this, market trends]"
 }`
                     });
                     
@@ -931,6 +929,10 @@ Respond with ONLY this JSON format (no other text):
                         body: JSON.stringify({
                             model: "claude-opus-4-20250514",
                             max_tokens: 3000,
+                            tools: [{
+                                type: "web_search_20250305",
+                                name: "web_search"
+                            }],
                             messages: [{
                                 role: "user",
                                 content: contentArray
@@ -1200,9 +1202,7 @@ Respond with ONLY this JSON format (no other text):
                                     <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 via-red-500 to-yellow-400 bg-clip-text text-transparent pb-2" style={{fontSize: '2.5rem'}}>
                                         2025 Topps Chrome F1 Collection
                                     </h1>
-                                    <a href="dashboard.html" className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-semibold">
-                                        📊 Dashboard
-                                    </a>
+
                                     <div className="text-right flex flex-col gap-1">
                                         <div className="flex items-baseline gap-2" title="Total number of cards in your collection (including duplicates)">
                                             <span className="text-2xl font-bold text-green-400">{stats.totalCopies}</span>
@@ -1481,11 +1481,11 @@ Respond with ONLY this JSON format (no other text):
 
                         {/* Right Sidebar - Fixed buttons */}
                         {/* AI Scanner - Mid-Right (Green) */}
-                        <div className="fixed top-1/2 -translate-y-1/2 right-6 z-40">
+                        <div className="fixed top-1/2 -translate-y-1/2 right-6 z-40 flex flex-col gap-4">
                             <button
                                 onClick={() => setShowImageUpload(true)}
                                 disabled={!serverOnline}
-                                title={serverOnline ? "Open AI Scanner to analyze card images" : "Server offline - start server to enable AI scanning"}
+                                title={serverOnline ? "Open AI Scanner to analyze card images (upload front and back)" : "Server offline - start server to enable AI scanning"}
                                 className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-4 rounded-lg font-semibold shadow-lg disabled:opacity-50 flex flex-col items-center justify-center gap-2"
                                 style={{width: '160px', height: '280px'}}
                             >
@@ -1493,6 +1493,17 @@ Respond with ONLY this JSON format (no other text):
                                 <span className="text-lg">AI Scanner</span>
                                 {!serverOnline && <span className="text-xs text-red-300">Offline</span>}
                             </button>
+
+                            {/* Dashboard Button */}
+                            <a 
+                                href="dashboard.html" 
+                                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-lg flex flex-col items-center justify-center gap-2 transition-all"
+                                style={{width: '160px', height: '100px'}}
+                                title="View your collection dashboard and analytics"
+                            >
+                                <span className="text-4xl">📊</span>
+                                <span className="text-sm">Collection<br/>Dashboard</span>
+                            </a>
                         </div>
 
                         {selectedCard && (
@@ -1680,18 +1691,21 @@ Respond with ONLY this JSON format (no other text):
                                     {!uploadedImages || uploadedImages.length === 0 && !recognizedCard ? (
                                         <>
                                             <button onClick={() => fileInputRef.current?.click()} className="w-full h-80 border-2 border-dashed border-slate-600 rounded-xl flex flex-col items-center justify-center hover:border-blue-500 transition-colors bg-slate-900/50">
-                                                <span className="text-slate-300 text-base mb-3 font-semibold">Scan Card</span>
+                                                <span className="text-slate-300 text-base mb-3 font-semibold">📸 Upload Card Images</span>
                                                 <span className="text-7xl mb-3">📷</span>
-                                                <span className="text-slate-400 text-sm text-center px-4">Upload front and back images for best accuracy</span>
+                                                <span className="text-slate-400 text-sm text-center px-4 font-semibold">Upload BOTH front and back images</span>
+                                                <span className="text-slate-500 text-xs text-center px-4 mt-2">The back image's card number guides AI analysis</span>
                                             </button>
-                                            <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 mt-4">
-                                                <p className="text-sm font-semibold text-blue-400 mb-1">
-                                                    📱 iPhone Tip: Use Screenshots!
+                                            <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mt-4">
+                                                <p className="text-sm font-semibold text-blue-400 mb-2">
+                                                    ✨ How to Get Best Results:
                                                 </p>
-                                                <p className="text-xs text-slate-300">
-                                                    Open photo → Screenshot (Side + Volume Up) → Upload screenshot. 
-                                                    Screenshots are JPG format and work instantly - no conversion needed!
-                                                </p>
+                                                <ul className="text-xs text-slate-300 space-y-1">
+                                                    <li>✓ <strong>Upload 2 images:</strong> First the front, then the back</li>
+                                                    <li>✓ <strong>Back image is crucial:</strong> Contains the card number</li>
+                                                    <li>✓ <strong>Good lighting:</strong> Ensures card details are visible</li>
+                                                    <li>✓ <strong>iPhone users:</strong> Use screenshots (JPG) for instant upload</li>
+                                                </ul>
                                             </div>
                                         </>
                                     ) : (!uploadedImages || uploadedImages.length === 0) && recognizedCard ? (
