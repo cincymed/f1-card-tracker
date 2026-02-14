@@ -928,7 +928,7 @@ Provide comprehensive updated data:
                         headers: getAuthHeaders(),
                         body: JSON.stringify({
                             model: "claude-opus-4-20250514",
-                            max_tokens: 3000,
+                            max_tokens: 4000,
                             tools: [{
                                 type: "web_search_20250305",
                                 name: "web_search"
@@ -943,6 +943,8 @@ Provide comprehensive updated data:
                     const data = await response.json();
                     
                     if (data.content) {
+                        console.log('Opus response blocks:', data.content.length);
+                        
                         // Extract all text content blocks (may include web search results)
                         let fullText = data.content
                             .filter(block => block.type === 'text')
@@ -950,21 +952,42 @@ Provide comprehensive updated data:
                             .join('\n\n')
                             .trim();
                         
+                        console.log('Extracted text length:', fullText.length);
+                        console.log('First 500 chars:', fullText.substring(0, 500));
+                        
                         // Remove markdown code blocks
                         fullText = fullText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
                         
-                        // Extract JSON object from the text
-                        const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+                        // Extract JSON object from the text - be more greedy to ensure we get the complete object
+                        let jsonMatch = fullText.match(/\{[\s\S]*\}(?=\s*$)/);
+                        if (!jsonMatch) {
+                            // If no match at end, try to find any JSON object
+                            jsonMatch = fullText.match(/\{[\s\S]*?\}\s*$/);
+                        }
+                        if (!jsonMatch) {
+                            // Last resort: find the first { and last }
+                            const startIdx = fullText.indexOf('{');
+                            const endIdx = fullText.lastIndexOf('}');
+                            if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+                                jsonMatch = [fullText.substring(startIdx, endIdx + 1)];
+                            }
+                        }
+                        
                         let opusData = null;
                         
-                        if (jsonMatch) {
+                        if (jsonMatch && jsonMatch[0]) {
                             try {
                                 opusData = JSON.parse(jsonMatch[0]);
                                 console.log('✓ Successfully parsed Opus JSON response');
+                                console.log('Opus data keys:', Object.keys(opusData));
                             } catch (parseError) {
                                 console.error('Failed to parse JSON:', parseError);
-                                console.error('Attempted to parse:', jsonMatch[0].substring(0, 200));
+                                console.error('Attempted to parse:', jsonMatch[0].substring(0, 300));
+                                console.error('JSON string length:', jsonMatch[0].length);
                             }
+                        } else {
+                            console.error('No JSON match found in text');
+                            console.log('Full text:', fullText.substring(0, 1000));
                         }
                         
                         if (opusData && opusData.analysis) {
@@ -990,13 +1013,12 @@ Provide comprehensive updated data:
                         } else {
                             // Could not parse or extract analysis
                             console.error('Could not extract analysis from Opus response');
-                            if (jsonMatch) {
-                                console.error('JSON structure:', JSON.stringify(opusData, null, 2).substring(0, 500));
-                            }
-                            setDeepAnalysis('Error: Could not extract analysis from response');
+                            console.error('opusData:', opusData);
+                            console.error('Has analysis field:', opusData?.analysis ? 'yes' : 'no');
+                            setDeepAnalysis('Error: Opus analysis incomplete. Check browser console for details.');
                         }
                     } else {
-                        throw new Error('Invalid response from API');
+                        throw new Error('Invalid response from API - no content blocks');
                     }
                 } catch (error) {
                     console.error('Deep analysis error:', error);
@@ -1213,7 +1235,7 @@ Provide comprehensive updated data:
                                                 </div>
                                             )}
                                         </div>
-                                        <h1 className="font-bold bg-gradient-to-r from-blue-400 via-red-500 to-yellow-400 bg-clip-text text-transparent pb-2" style={{fontSize: '3rem'}}>
+                                        <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-red-500 to-yellow-400 bg-clip-text text-transparent pb-2">
                                             2025 Topps Chrome F1 Collection
                                         </h1>
                                     </div>
