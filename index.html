@@ -803,7 +803,17 @@ ${images.length > 1 ? `The BACK IMAGE contains the card number - extract it VERY
   • This is NOT the gold serial number (e.g., "63/299")
   • Back image card number guides analysis for accurate details` : 'Extract the card number from the card'}
 
-Analyze this card THOROUGHLY with detailed structure:
+TASK: Analyze this card thoroughly with web search for current market values.
+
+Web Search Strategy:
+1. Use card number to search for exact 2025 Topps Chrome F1 card listings
+2. Find real eBay, Cardmarket, or PSA sales data for this specific card
+3. Look for current market prices in Raw, PSA 9, and PSA 10 conditions
+4. Use the card number to find accurate pricing data
+
+Analyze this card THOROUGHLY with detailed structure using web search results for value estimates.
+
+IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for line breaks, not actual newlines). No markdown, no extra text.
 
 {
   "cardNumber": "from back image if visible, else inferred",
@@ -816,7 +826,7 @@ Analyze this card THOROUGHLY with detailed structure:
   "variant": "exact variant name",
   "isRookie": true or false,
   "confidence": "high/medium/low",
-  "analysis": "CARD IDENTIFICATION:\n[Driver name, team, card number verification, visual details]\n\nVARIANT & RARITY:\n[Specific variant analysis, serial number details if present]\n\nVALUE ESTIMATES (2025 Topps Chrome F1):\nRaw: $X-Y\nPSA 9: $X-Y\nPSA 10: $X-Y\n\nCOLLECTIBILITY:\n[Why collectors want this card, factors affecting value]"
+  "analysis": "CARD IDENTIFICATION:\\n[Driver name, team, card number verification, visual details]\\n\\nVARIANT & RARITY:\\n[Specific variant analysis, serial number details if present]\\n\\nVALUE ESTIMATES (2025 Topps Chrome F1 - from web search):\\nRaw: $X-Y\\nPSA 9: $X-Y\\nPSA 10: $X-Y\\n\\nCOLLECTIBILITY:\\n[Why collectors want this card, current market trends]"
 }`
                     });
                     
@@ -826,6 +836,10 @@ Analyze this card THOROUGHLY with detailed structure:
                         body: JSON.stringify({
                             model: "claude-opus-4-20250514",
                             max_tokens: 3000,
+                            tools: [{
+                                type: "web_search_20250305",
+                                name: "web_search"
+                            }],
                             messages: [{
                                 role: "user",
                                 content: contentArray
@@ -973,7 +987,7 @@ Web Search Strategy:
 4. Verify driver, team, rookie status, and subset from search results
 5. Get accurate value ranges for Raw, PSA 9, PSA 10 conditions
 
-Provide comprehensive updated data:
+IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for line breaks, not actual newlines). No markdown, no extra text.
 
 {
   "cardNumber": "verified via back image and web search",
@@ -985,7 +999,7 @@ Provide comprehensive updated data:
   "variant": "exact variant (Base, Refractor, Purple /299, Blue /150, Green /99, Gold /50, Orange /25, Red /5, SuperFractor 1/1, Black /10, Magenta /250, Gold Wave /75, Printing Plate 1/1)",
   "isRookie": true/false,
   "confidence": "high/medium/low",
-  "analysis": "CARD IDENTIFICATION:\n[Back image card number and driver verification]\n\nWEB SEARCH FINDINGS:\n[2025 Topps Chrome F1 market data for this card and variant]\n\nVARIANT & RARITY:\n[Specific variant analysis]\n\nVALUE ESTIMATES (2025 Topps Chrome F1):\nRaw: $X-Y\nPSA 9: $X-Y\nPSA 10: $X-Y\n\nCOLLECTIBILITY:\n[Why collectors want this, market trends]"
+  "analysis": "CARD IDENTIFICATION:\\n[Back image card number and driver verification]\\n\\nWEB SEARCH FINDINGS:\\n[2025 Topps Chrome F1 market data for this card and variant]\\n\\nVARIANT & RARITY:\\n[Specific variant analysis]\\n\\nVALUE ESTIMATES (2025 Topps Chrome F1):\\nRaw: $X-Y\\nPSA 9: $X-Y\\nPSA 10: $X-Y\\n\\nCOLLECTIBILITY:\\n[Why collectors want this, market trends]"
 }`
                     });
                     
@@ -2304,7 +2318,7 @@ Provide comprehensive updated data:
                                                                         <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">SELECTED</span>
                                                                     )}
                                                                 </div>
-                                                                <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{recognizedCard.analysis}</div>
+                                                                <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{recognizedCard.analysis ? recognizedCard.analysis.replace(/\\n/g, '\n') : ''}</div>
                                                             </div>
                                                         )}
                                                         
@@ -2321,7 +2335,7 @@ Provide comprehensive updated data:
                                                                         <span className="text-xs bg-purple-600 text-white px-2 py-1 rounded-full">SELECTED</span>
                                                                     )}
                                                                 </div>
-                                                                <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{deepAnalysis}</div>
+                                                                <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{deepAnalysis ? deepAnalysis.replace(/\\n/g, '\n') : ''}</div>
                                                             </div>
                                                         )}
                                                     </div>
