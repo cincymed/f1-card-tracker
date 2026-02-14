@@ -219,32 +219,41 @@
 
             const loadCollection = async () => {
             try {
-                // Generate or get userId from localStorage
-                let id = 'cincymed-f1-collection'; // Fixed userId
+                // Load from localStorage FIRST (instant display)
+                const saved = localStorage.getItem('f1-collection-pro-v2');
+                if (saved) {
+                    try {
+                        setCollection(JSON.parse(saved));
+                        console.log('✅ Collection loaded from localStorage (instant)');
+                    } catch (e) {
+                        console.error('Error parsing localStorage:', e);
+                    }
+                }
+
+                // Set user ID
+                let id = 'cincymed-f1-collection';
                 localStorage.setItem('cincymed-f1-user-id', id);
                 setUserId(id);
 
-                // Try to load from MongoDB
+                // Try to sync from MongoDB in background (1 second timeout)
                 try {
-                const response = await fetch(`https://f1-card-tracker-backend-1.onrender.com/api/collection/${id}`, {
-                    method: 'GET',
-                    headers: getAuthHeaders()
-                });
-                const data = await response.json();
-                
-                if (data.cards && Object.keys(data.cards).length > 0) {
-                    setCollection(data.cards);
-                    console.log('✅ Collection loaded from MongoDB');
-                    return;
-                }
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 1000);
+                    
+                    const response = await fetch(`https://f1-card-tracker-backend-1.onrender.com/api/collection/${id}`, {
+                        method: 'GET',
+                        headers: getAuthHeaders(),
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+                    
+                    const data = await response.json();
+                    if (data.cards && Object.keys(data.cards).length > 0) {
+                        setCollection(data.cards);
+                        console.log('✅ Collection synced from MongoDB');
+                    }
                 } catch (error) {
-                console.log('MongoDB not available, using localStorage');
-                }
-
-                // Fallback to localStorage
-                const saved = localStorage.getItem('f1-collection-pro-v2');
-                if (saved) {
-                setCollection(JSON.parse(saved));
+                    console.log('MongoDB sync skipped (using localStorage):', error.message);
                 }
             } catch (error) {
                 console.log('Error loading collection:', error);
