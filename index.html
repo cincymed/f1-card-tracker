@@ -182,11 +182,8 @@
             const loadCollection = async () => {
             try {
                 // Generate or get userId from localStorage
-                let id = localStorage.getItem('f1-user-id');
-                if (!id) {
-                id = 'user-' + Date.now();
-                localStorage.setItem('f1-user-id', id);
-                }
+                let id = 'cincymed-f1-collection'; // Fixed userId
+                localStorage.setItem('cincymed-f1-user-id', id);
                 setUserId(id);
 
                 // Try to load from MongoDB
