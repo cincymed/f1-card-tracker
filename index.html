@@ -162,7 +162,7 @@
             const [manualCardNumber, setManualCardNumber] = useState(null);
             const [cardDetailEdit, setCardDetailEdit] = useState(null);
             const [originalCardDetail, setOriginalCardDetail] = useState(null);
-            const fileInputRef = useRef(null);
+            const [addCardCooldown, setAddCardCooldown] = useState(0);  // Rate limiting for adding cards
             const importInputRef = useRef(null);
             const menuRef = useRef(null);
 
@@ -219,44 +219,31 @@
 
             const loadCollection = async () => {
             try {
-                // Load from localStorage FIRST (instant display)
+                // Load from localStorage ONLY
                 const saved = localStorage.getItem('f1-collection-pro-v2');
                 if (saved) {
                     try {
                         setCollection(JSON.parse(saved));
-                        console.log('✅ Collection loaded from localStorage (instant)');
+                        console.log('✅ Collection loaded from localStorage');
                     } catch (e) {
                         console.error('Error parsing localStorage:', e);
+                        setCollection({});
                     }
+                } else {
+                    console.log('No collection in localStorage');
+                    setCollection({});
                 }
 
                 // Set user ID
                 let id = 'cincymed-f1-collection';
                 localStorage.setItem('cincymed-f1-user-id', id);
                 setUserId(id);
-
-                // Try to sync from MongoDB in background (1 second timeout)
-                try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 1000);
-                    
-                    const response = await fetch(`https://f1-card-tracker-backend-1.onrender.com/api/collection/${id}`, {
-                        method: 'GET',
-                        headers: getAuthHeaders(),
-                        signal: controller.signal
-                    });
-                    clearTimeout(timeoutId);
-                    
-                    const data = await response.json();
-                    if (data.cards && Object.keys(data.cards).length > 0) {
-                        setCollection(data.cards);
-                        console.log('✅ Collection synced from MongoDB');
-                    }
-                } catch (error) {
-                    console.log('MongoDB sync skipped (using localStorage):', error.message);
-                }
+                
+                // TODO: Re-enable MongoDB sync once backend is stable
+                // MongoDB sync temporarily disabled due to 500 errors
             } catch (error) {
-                console.log('Error loading collection:', error);
+                console.error('Error loading collection:', error);
+                setCollection({});
             }
             };
 
@@ -1164,6 +1151,19 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                     let variant = recognizedCard.variant;
                     if (variant === "Base Chrome") variant = "Base";
                     addCard(recognizedCard.cardNumber, variant, analysisToUse);
+                    
+                    // Set 5-second cooldown to prevent rate limit errors
+                    setAddCardCooldown(5);
+                    const cooldownInterval = setInterval(() => {
+                        setAddCardCooldown(prev => {
+                            if (prev <= 1) {
+                                clearInterval(cooldownInterval);
+                                return 0;
+                            }
+                            return prev - 1;
+                        });
+                    }, 1000);
+                    
                     setShowImageUpload(false);
                     setUploadedImages([]);
                     setPendingImages([]);
@@ -1183,6 +1183,56 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                     localStorage.removeItem('f1-email');
                     window.location.href = 'login.html';
                 }
+            };
+
+            const forceReloadCollection = async () => {
+                try {
+                    console.log('Starting force reload...');
+                    
+                    // Try MongoDB first with short timeout
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+                        
+                        const response = await fetch(`https://f1-card-tracker-backend-1.onrender.com/api/collection/cincymed-f1-collection`, {
+                            method: 'GET',
+                            headers: getAuthHeaders(),
+                            signal: controller.signal
+                        });
+                        clearTimeout(timeoutId);
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.cards && Object.keys(data.cards).length > 0) {
+                                setCollection(data.cards);
+                                // Also save to localStorage as backup
+                                localStorage.setItem('f1-collection-pro-v2', JSON.stringify(data.cards));
+                                const cardCount = Object.keys(data.cards).filter(k => k.startsWith('card-')).length;
+                                alert(`✅ Synced from MongoDB!\n${cardCount} cards loaded`);
+                                console.log('✅ Successfully synced from MongoDB');
+                                return;
+                            }
+                        }
+                    } catch (mongoError) {
+                        console.log('MongoDB sync failed, using localStorage:', mongoError.message);
+                    }
+                    
+                    // Fallback to localStorage
+                    const saved = localStorage.getItem('f1-collection-pro-v2');
+                    if (saved) {
+                        const collection = JSON.parse(saved);
+                        setCollection(collection);
+                        const cardCount = Object.keys(collection).filter(k => k.startsWith('card-')).length;
+                        alert(`📱 Reloaded from local storage!\n${cardCount} cards found`);
+                        console.log('✅ Reloaded from localStorage');
+                    } else {
+                        alert('⚠️ No collection found in storage');
+                    }
+                } catch (error) {
+                    console.error('Force reload error:', error);
+                    alert('❌ Error reloading collection');
+                }
+                setShowMenuDropdown(false);
             };
 
             const needsVerification = (confidence) => {
@@ -1349,8 +1399,11 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                                                     <div className="dropdown-item" onClick={() => { exportCollection(); setShowMenuDropdown(false); }}>
                                                         📤 Export
                                                     </div>
+                                                    <div className="dropdown-item" onClick={forceReloadCollection} style={{borderTop: '1px solid #475569', marginTop: '8px', paddingTop: '8px'}}>
+                                                        🔄 Force Reload Collection
+                                                    </div>
                                                     <div className="dropdown-item" onClick={() => { setShowResetConfirm(true); setShowMenuDropdown(false); }}>
-                                                        🔄 Reset
+                                                        🗑️ Reset
                                                     </div>
                                                     <div className="dropdown-item" onClick={handleLogout}>
                                                         🚪 Logout
@@ -1983,9 +2036,15 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                                                 </button>
                                                 <button
                                                     onClick={handleAddRecognizedCard}
-                                                    className="px-4 py-2 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-700"
+                                                    disabled={addCardCooldown > 0}
+                                                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                                                        addCardCooldown > 0 
+                                                            ? 'bg-gray-600 text-gray-300 cursor-not-allowed opacity-50' 
+                                                            : 'bg-green-600 hover:bg-green-700'
+                                                    }`}
+                                                    title={addCardCooldown > 0 ? `Wait ${addCardCooldown}s before adding another card` : 'Add card to collection'}
                                                 >
-                                                    ✓ Done
+                                                    {addCardCooldown > 0 ? `⏱️ Wait ${addCardCooldown}s` : '✓ Done'}
                                                 </button>
                                             </div>
                                         </div>
