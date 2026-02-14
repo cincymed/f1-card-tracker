@@ -29,11 +29,16 @@
                 const data = await response.json();
                 const collection = data.cards || {};
 
+                // Load price history
+                const historyResponse = await fetch(`${MONGODB_API}/${userId}/history`);
+                const historyData = await historyResponse.json();
+                const priceHistory = historyData.priceHistory || [];
+
                 // Calculate stats
                 const stats = calculateStats(collection);
                 
                 // Render dashboard
-                renderDashboard(collection, stats);
+                renderDashboard(collection, stats, priceHistory);
             } catch (error) {
                 console.error('Error loading dashboard:', error);
                 document.getElementById('root').innerHTML = '<div class="p-8"><p class="text-red-400">Failed to load collection</p></div>';
@@ -73,7 +78,7 @@
             };
         }
 
-        function renderDashboard(collection, stats) {
+        function renderDashboard(collection, stats, priceHistory = []) {
             const completion = ((stats.uniqueCards / stats.totalSetCards) * 100).toFixed(1);
 
             const html = `
@@ -123,6 +128,42 @@
                                     `).join('')
                                 }
                             </div>
+                        </div>
+
+                        <!-- Valuation History -->
+                        <div class="bg-slate-800 rounded-lg p-6 border border-slate-700 mb-8">
+                            <h2 class="text-xl font-bold mb-4">💰 Valuation History</h2>
+                            ${priceHistory.length > 0 ? `
+                                <div class="space-y-4">
+                                    <div class="text-sm text-slate-400 mb-4">
+                                        Total Snapshots: ${priceHistory.length}
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div class="bg-slate-700 rounded p-4">
+                                            <div class="text-slate-400 text-sm mb-2">Current Value</div>
+                                            <div class="text-3xl font-bold text-green-400">$${priceHistory[priceHistory.length - 1]?.totalValue || 0}</div>
+                                        </div>
+                                        <div class="bg-slate-700 rounded p-4">
+                                            <div class="text-slate-400 text-sm mb-2">Latest Snapshot</div>
+                                            <div class="text-lg font-semibold">${new Date(priceHistory[priceHistory.length - 1]?.date).toLocaleDateString()}</div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-4">
+                                        <div class="text-sm font-semibold mb-2">Recent History</div>
+                                        <div class="space-y-2 text-sm">
+                                            ${priceHistory.slice(-5).reverse().map(entry => `
+                                                <div class="flex justify-between bg-slate-700 p-2 rounded">
+                                                    <span>${new Date(entry.date).toLocaleDateString()}</span>
+                                                    <span class="font-semibold text-green-400">$${entry.totalValue}</span>
+                                                    <span class="text-slate-400">(${entry.cardCount} cards)</span>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : `
+                                <div class="text-slate-400">No valuation history yet. Add cards to start tracking!</div>
+                            `}
                         </div>
 
                         <!-- Collection Table -->
