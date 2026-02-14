@@ -364,17 +364,16 @@
                     localStorage.setItem('f1-collection-pro-v2', JSON.stringify(cleanedCollection));
                     
                     // Save to MongoDB (async, don't wait)
-                    if (userId) {
-                    fetch(`https://f1-card-tracker-backend-1.onrender.com/api/collection/${userId}`, {
+                    const id = 'cincymed-f1-collection'; // Always use this ID
+                    fetch(`https://f1-card-tracker-backend-1.onrender.com/api/collection/${id}`, {
                         method: 'POST',
                         headers: getAuthHeaders(),
                         body: JSON.stringify({ cards: cleanedCollection })
                     }).then(() => {
                         console.log('✅ Collection synced to MongoDB');
                     }).catch(error => {
-                        console.log('Sync to MongoDB failed, using localStorage backup');
+                        console.log('Sync to MongoDB failed, using localStorage backup:', error.message);
                     });
-                    }
                 } catch (error) {
                     console.error('Error saving:', error);
                 }
