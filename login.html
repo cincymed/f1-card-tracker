@@ -266,6 +266,10 @@
         if (localStorage.getItem('f1-token')) {
             window.location.href = 'index.html';
         }
+
+// Enable buttons on page load
+document.getElementById('loginBtn').disabled = false;
+document.getElementById('signupBtn').disabled = false;        
     </script>
 </body>
 </html>
