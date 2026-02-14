@@ -801,24 +801,10 @@ ${images.length > 1 ? `The BACK IMAGE contains the card number - extract it VERY
   • Small card number in bottom left or elsewhere on back
   • Format examples: "#1", "#42", "R-1", "CR-15", etc.
   • This is NOT the gold serial number (e.g., "63/299")
-  • Back image card number guides web search for accurate details` : 'Extract the card number from the card'}
+  • Back image card number guides analysis for accurate details` : 'Extract the card number from the card'}
 
-Extract these details:
-1. Card number - ${images.length > 1 ? 'CRITICAL: from BACK image' : 'inferred from visual'}
-2. Card number confidence: high/medium/low
-3. Card number source: ${images.length > 1 ? 'back_image/front_image/inferred' : 'front_image/inferred'}
-4. Serial number (gold number if visible, e.g., "63/250" or null)
-5. Driver name
-6. Team name
-7. Subset category
-8. Variant - determine from serial denominator: /299=Purple /299, /150=Blue /150, /99=Green /99, /50=Gold /50, /25=Orange /25, /5=Red /5, 1/1=SuperFractor 1/1, /10=Black /10, /250=Magenta/Pink /250, /75=Gold Wave /75, or Base
-9. Rookie card? (true/false)
-10. Brief value assessment with Raw: $X-Y, PSA 9: $X-Y, PSA 10: $X-Y format (NO trailing commas)
+Analyze this card THOROUGHLY with detailed structure:
 
-Database card numbers: ${allCardNumbers.slice(0, 30).join(', ')}...
-Database subsets: ${allSubsets.slice(0, 15).join(', ')}...
-
-Respond with ONLY this JSON (no markdown, no extra text):
 {
   "cardNumber": "from back image if visible, else inferred",
   "cardNumberConfidence": "high/medium/low",
@@ -829,7 +815,8 @@ Respond with ONLY this JSON (no markdown, no extra text):
   "subset": "subset name",
   "variant": "exact variant name",
   "isRookie": true or false,
-  "analysis": "Value assessment: Raw: $X-Y, PSA 9: $X-Y, PSA 10: $X-Y with brief notes"
+  "confidence": "high/medium/low",
+  "analysis": "CARD IDENTIFICATION:\n[Driver name, team, card number verification, visual details]\n\nVARIANT & RARITY:\n[Specific variant analysis, serial number details if present]\n\nVALUE ESTIMATES (2025 Topps Chrome F1):\nRaw: $X-Y\nPSA 9: $X-Y\nPSA 10: $X-Y\n\nCOLLECTIBILITY:\n[Why collectors want this card, factors affecting value]"
 }`
                     });
                     
@@ -838,7 +825,7 @@ Respond with ONLY this JSON (no markdown, no extra text):
                         headers: getAuthHeaders(),
                         body: JSON.stringify({
                             model: "claude-opus-4-20250514",
-                            max_tokens: 2000,
+                            max_tokens: 3000,
                             messages: [{
                                 role: "user",
                                 content: contentArray
@@ -2202,7 +2189,7 @@ Provide comprehensive updated data:
                                                             </div>
                                                             {deepAnalysis && (
                                                                 <div className="mt-3 text-xs text-center text-slate-400">
-                                                                    Using {selectedAnalysisSource === 'opus' ? '⚡ Quick (Opus)' : '🔍 Deep (Sonnet)'} analysis values
+                                                                    Using {selectedAnalysisSource === 'opus' ? '(Opus)' : '(Sonnet)'} analysis values
                                                                 </div>
                                                             )}
                                                         </div>
@@ -2224,7 +2211,7 @@ Provide comprehensive updated data:
                                                             ⚡ Opus
                                                         </button>
                                                         <button
-                                                            onClick={() => setSelectedAnalysisSource('opus')}
+                                                            onClick={() => setSelectedAnalysisSource('sonnet')}
                                                             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                                                                 selectedAnalysisSource === 'sonnet' 
                                                                     ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/50' 
@@ -2240,7 +2227,7 @@ Provide comprehensive updated data:
                                                 <div>
                                                     <h4 className="font-semibold text-slate-200 mb-3">📊 Analysis Comparison</h4>
                                                     <div className={`grid ${deepAnalysis ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
-                                                        {/* Quick Analysis (Opus) */}
+                                                        {/* Analysis (Opus) */}
                                                         {recognizedCard.analysis && (
                                                             <div className={`p-4 rounded-lg transition-all ${
                                                                 selectedAnalysisSource === 'sonnet' && deepAnalysis
@@ -2248,7 +2235,7 @@ Provide comprehensive updated data:
                                                                     : 'bg-blue-900/40 border-2 border-blue-400 shadow-lg shadow-blue-500/30'
                                                             }`}>
                                                                 <div className="flex items-center justify-between mb-2">
-                                                                    <h5 className="font-semibold text-blue-400">⚡ Quick Analysis (Opus)</h5>
+                                                                    <h5 className="font-semibold text-blue-400">⚡ Analysis (Opus)</h5>
                                                                     {selectedAnalysisSource === 'opus' && deepAnalysis && (
                                                                         <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">SELECTED</span>
                                                                     )}
@@ -2257,7 +2244,7 @@ Provide comprehensive updated data:
                                                             </div>
                                                         )}
                                                         
-                                                        {/* Deep Analysis (Sonnet) */}
+                                                        {/* Analysis (Sonnet) */}
                                                         {deepAnalysis && (
                                                             <div className={`p-4 rounded-lg transition-all ${
                                                                 selectedAnalysisSource === 'sonnet'
@@ -2265,7 +2252,7 @@ Provide comprehensive updated data:
                                                                     : 'bg-purple-900/20 border border-purple-500/30'
                                                             }`}>
                                                                 <div className="flex items-center justify-between mb-2">
-                                                                    <h5 className="font-semibold text-purple-400">🔍 Deep Analysis (Sonnet)</h5>
+                                                                    <h5 className="font-semibold text-purple-400">🔍 Analysis (Sonnet)</h5>
                                                                     {selectedAnalysisSource === 'sonnet' && (
                                                                         <span className="text-xs bg-purple-600 text-white px-2 py-1 rounded-full">SELECTED</span>
                                                                     )}
