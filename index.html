@@ -155,7 +155,7 @@
             const [analyzingCards, setAnalyzingCards] = useState({});
             const [deepAnalysis, setDeepAnalysis] = useState(null);
             const [isDeepAnalyzing, setIsDeepAnalyzing] = useState(false);
-            const [selectedAnalysisSource, setSelectedAnalysisSource] = useState('sonnet'); // 'sonnet' or 'opus'
+            const [selectedAnalysisSource, setSelectedAnalysisSource] = useState('opus'); // 'sonnet' or 'opus'
             const [showImageViewer, setShowImageViewer] = useState(false);
             const [imageViewerZoom, setImageViewerZoom] = useState(1);
             const [imageViewerPosition, setImageViewerPosition] = useState({ x: 0, y: 0 });
@@ -651,7 +651,7 @@ Base your analysis on current 2025 market data from web search.`
                 }
                 
                 setDeepAnalysis(null);
-                setSelectedAnalysisSource('sonnet');
+                setSelectedAnalysisSource('opus');
                 setIsRecognizing(true);
                 
                 const processedImages = [];
@@ -758,7 +758,7 @@ Base your analysis on current 2025 market data from web search.`
                 setIsRecognizing(true);
                 setRecognizedCard(null);
                 setRecognitionError(null);
-                setSelectedAnalysisSource('sonnet');
+                setSelectedAnalysisSource('opus');
 
                 try {
                     // Handle both single image and array
@@ -837,7 +837,7 @@ Respond with ONLY this JSON (no markdown, no extra text):
                         method: 'POST',
                         headers: getAuthHeaders(),
                         body: JSON.stringify({
-                            model: "claude-sonnet-4-20250514",
+                            model: "claude-opus-4-20250514",
                             max_tokens: 2000,
                             messages: [{
                                 role: "user",
@@ -942,7 +942,7 @@ Provide comprehensive updated data:
                         method: 'POST',
                         headers: getAuthHeaders(),
                         body: JSON.stringify({
-                            model: "claude-opus-4-20250514",
+                            model: "claude-sonnet-4-20250514",
                             max_tokens: 4000,
                             tools: [{
                                 type: "web_search_20250305",
@@ -1099,7 +1099,7 @@ Provide comprehensive updated data:
                     setIsEditing(false);
                     setRecognitionError(null);
                     setDeepAnalysis(null);
-                    setSelectedAnalysisSource('sonnet'); // Reset to default
+                    setSelectedAnalysisSource('opus'); // Reset to default
                 }
             };
 
@@ -1769,7 +1769,7 @@ Provide comprehensive updated data:
                                     setIsEditing(false);
                                     setRecognitionError(null);
                                     setDeepAnalysis(null);
-                                    setSelectedAnalysisSource('sonnet');
+                                    setSelectedAnalysisSource('opus');
                                 }}>
                                 <div className="bg-slate-800 rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto scrollbar-hide" onClick={(e) => e.stopPropagation()}>
                                     <h2 className="text-2xl font-bold mb-6">📷 AI Scanner</h2>
@@ -1848,7 +1848,7 @@ Provide comprehensive updated data:
                                                             setShowSecondImagePrompt(false);
                                                             setRecognitionError(null);
                                                             setDeepAnalysis(null);
-                                                            setSelectedAnalysisSource('sonnet');
+                                                            setSelectedAnalysisSource('opus');
                                                         }}
                                                         className="w-full bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm mb-2"
                                                     >
@@ -1873,7 +1873,7 @@ Provide comprehensive updated data:
                                                     disabled={isDeepAnalyzing}
                                                     className="px-4 py-2 rounded-lg text-sm font-semibold bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
                                                 >
-                                                    {isDeepAnalyzing ? '⟳ Analyzing...' : '🔍 Re-analyze (Opus)'}
+                                                    {isDeepAnalyzing ? '⟳ Analyzing...' : '🔍 Re-analyze (Sonnet)'}
                                                 </button>
                                                 <button
                                                     onClick={() => {
@@ -1901,7 +1901,7 @@ Provide comprehensive updated data:
                                                         setIsEditing(false);
                                                         setRecognitionError(null);
                                                         setDeepAnalysis(null);
-                                                        setSelectedAnalysisSource('sonnet');
+                                                        setSelectedAnalysisSource('opus');
                                                     }}
                                                     className="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-600 hover:bg-slate-700"
                                                 >
@@ -2202,7 +2202,7 @@ Provide comprehensive updated data:
                                                             </div>
                                                             {deepAnalysis && (
                                                                 <div className="mt-3 text-xs text-center text-slate-400">
-                                                                    Using {selectedAnalysisSource === 'opus' ? '🔍 Deep (Opus)' : '⚡ Quick (Sonnet)'} analysis values
+                                                                    Using {selectedAnalysisSource === 'opus' ? '⚡ Quick (Opus)' : '🔍 Deep (Sonnet)'} analysis values
                                                                 </div>
                                                             )}
                                                         </div>
@@ -2214,24 +2214,24 @@ Provide comprehensive updated data:
                                                     <div className="flex gap-2 justify-center">
                                                         <span className="text-sm text-slate-400 self-center">Use analysis from:</span>
                                                         <button
-                                                            onClick={() => setSelectedAnalysisSource('sonnet')}
+                                                            onClick={() => setSelectedAnalysisSource('opus')}
                                                             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                                                                selectedAnalysisSource === 'sonnet' 
+                                                                selectedAnalysisSource === 'opus' 
                                                                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/50' 
                                                                     : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                                                             }`}
                                                         >
-                                                            ⚡ Sonnet
+                                                            ⚡ Opus
                                                         </button>
                                                         <button
                                                             onClick={() => setSelectedAnalysisSource('opus')}
                                                             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                                                                selectedAnalysisSource === 'opus' 
+                                                                selectedAnalysisSource === 'sonnet' 
                                                                     ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/50' 
                                                                     : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                                                             }`}
                                                         >
-                                                            🔍 Opus
+                                                            🔍 Sonnet
                                                         </button>
                                                     </div>
                                                 )}
@@ -2240,16 +2240,16 @@ Provide comprehensive updated data:
                                                 <div>
                                                     <h4 className="font-semibold text-slate-200 mb-3">📊 Analysis Comparison</h4>
                                                     <div className={`grid ${deepAnalysis ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
-                                                        {/* Quick Analysis (Sonnet) */}
+                                                        {/* Quick Analysis (Opus) */}
                                                         {recognizedCard.analysis && (
                                                             <div className={`p-4 rounded-lg transition-all ${
                                                                 selectedAnalysisSource === 'sonnet' && deepAnalysis
-                                                                    ? 'bg-blue-900/40 border-2 border-blue-400 shadow-lg shadow-blue-500/30'
-                                                                    : 'bg-blue-900/20 border border-blue-500/30'
+                                                                    ? 'bg-purple-900/20 border border-purple-500/30'
+                                                                    : 'bg-blue-900/40 border-2 border-blue-400 shadow-lg shadow-blue-500/30'
                                                             }`}>
                                                                 <div className="flex items-center justify-between mb-2">
-                                                                    <h5 className="font-semibold text-blue-400">⚡ Quick Analysis (Sonnet)</h5>
-                                                                    {selectedAnalysisSource === 'sonnet' && deepAnalysis && (
+                                                                    <h5 className="font-semibold text-blue-400">⚡ Quick Analysis (Opus)</h5>
+                                                                    {selectedAnalysisSource === 'opus' && deepAnalysis && (
                                                                         <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">SELECTED</span>
                                                                     )}
                                                                 </div>
@@ -2257,16 +2257,16 @@ Provide comprehensive updated data:
                                                             </div>
                                                         )}
                                                         
-                                                        {/* Deep Analysis (Opus) */}
+                                                        {/* Deep Analysis (Sonnet) */}
                                                         {deepAnalysis && (
                                                             <div className={`p-4 rounded-lg transition-all ${
-                                                                selectedAnalysisSource === 'opus'
+                                                                selectedAnalysisSource === 'sonnet'
                                                                     ? 'bg-purple-900/40 border-2 border-purple-400 shadow-lg shadow-purple-500/30'
                                                                     : 'bg-purple-900/20 border border-purple-500/30'
                                                             }`}>
                                                                 <div className="flex items-center justify-between mb-2">
-                                                                    <h5 className="font-semibold text-purple-400">🔍 Deep Analysis (Opus)</h5>
-                                                                    {selectedAnalysisSource === 'opus' && (
+                                                                    <h5 className="font-semibold text-purple-400">🔍 Deep Analysis (Sonnet)</h5>
+                                                                    {selectedAnalysisSource === 'sonnet' && (
                                                                         <span className="text-xs bg-purple-600 text-white px-2 py-1 rounded-full">SELECTED</span>
                                                                     )}
                                                                 </div>
