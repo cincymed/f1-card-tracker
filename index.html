@@ -836,19 +836,83 @@ Analyze this card THOROUGHLY with detailed structure:
                     const data = await response.json();
                     
                     if (data.content && data.content[0]?.text) {
-                        let jsonText = data.content[0].text.trim();
+                        let fullText = data.content[0].text.trim();
                         
                         // Remove markdown code blocks
-                        jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                        fullText = fullText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
                         
-                        // Try to extract JSON from the response even if there's extra text
-                        const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-                        if (jsonMatch) {
-                            jsonText = jsonMatch[0];
+                        console.log('Opus response length:', fullText.length);
+                        
+                        // Strategy: Extract the analysis field first (which can contain newlines)
+                        let recognized = {};
+                        let analysisText = null;
+                        
+                        // Extract analysis field - handle newlines in the value
+                        const analysisMatch = fullText.match(/"analysis":\s*"([\s\S]*?)"\s*(?:}|,)/);
+                        if (analysisMatch && analysisMatch[1]) {
+                            analysisText = analysisMatch[1]
+                                .replace(/\\n/g, '\n')  // Convert escaped newlines to actual newlines
+                                .trim();
+                            console.log('✓ Extracted analysis text, length:', analysisText.length);
                         }
                         
-                        const recognized = JSON.parse(jsonText);
-                        setRecognizedCard(recognized);
+                        // Now try to extract the JSON object for other fields
+                        let jsonMatch = fullText.match(/\{[\s\S]*\}(?=\s*$)/);
+                        if (!jsonMatch) {
+                            const startIdx = fullText.indexOf('{');
+                            const endIdx = fullText.lastIndexOf('}');
+                            if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+                                jsonMatch = [fullText.substring(startIdx, endIdx + 1)];
+                            }
+                        }
+                        
+                        if (jsonMatch && jsonMatch[0]) {
+                            try {
+                                // Try to parse the full JSON first
+                                recognized = JSON.parse(jsonMatch[0]);
+                                console.log('✓ Successfully parsed full Opus response');
+                            } catch (parseError) {
+                                console.warn('Full JSON parse failed, attempting field extraction:', parseError.message);
+                                
+                                // Fallback: extract individual fields using regex
+                                const cardNumberMatch = fullText.match(/"cardNumber":\s*"([^"]*)"/);
+                                const confMatch = fullText.match(/"cardNumberConfidence":\s*"([^"]*)"/);
+                                const sourceMatch = fullText.match(/"cardNumberSource":\s*"([^"]*)"/);
+                                const driverMatch = fullText.match(/"driverName":\s*"([^"]*)"/);
+                                const teamMatch = fullText.match(/"team":\s*"([^"]*)"/);
+                                const subsetMatch = fullText.match(/"subset":\s*"([^"]*)"/);
+                                const variantMatch = fullText.match(/"variant":\s*"([^"]*)"/);
+                                const serialMatch = fullText.match(/"serialNumber":\s*(?:null|"([^"]*)")/);
+                                const rookieMatch = fullText.match(/"isRookie":\s*(true|false)/);
+                                
+                                recognized = {
+                                    cardNumber: cardNumberMatch?.[1] || 'Unknown',
+                                    cardNumberConfidence: confMatch?.[1] || 'medium',
+                                    cardNumberSource: sourceMatch?.[1] || 'inferred',
+                                    driverName: driverMatch?.[1] || 'Unknown',
+                                    team: teamMatch?.[1] || 'Unknown',
+                                    subset: subsetMatch?.[1] || 'Unknown',
+                                    variant: variantMatch?.[1] || 'Base',
+                                    serialNumber: serialMatch?.[1] || null,
+                                    isRookie: rookieMatch?.[1] === 'true'
+                                };
+                                console.log('✓ Extracted fields via regex');
+                            }
+                        } else {
+                            console.warn('No JSON structure found in response');
+                        }
+                        
+                        // Use the extracted analysis text if available
+                        if (analysisText) {
+                            recognized.analysis = analysisText;
+                        }
+                        
+                        if (recognized && recognized.analysis) {
+                            setRecognizedCard(recognized);
+                            console.log('✓ Card recognized with analysis');
+                        } else {
+                            throw new Error('Could not extract analysis from response');
+                        }
                     } else {
                         throw new Error('Invalid response from API');
                     }
