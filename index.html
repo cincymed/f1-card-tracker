@@ -942,26 +942,36 @@ Provide comprehensive updated data:
 
                     const data = await response.json();
                     
-                    if (data.content && data.content[0]?.text) {
-                        let analysisText = data.content[0].text.trim();
+                    if (data.content) {
+                        // Extract all text content blocks (may include web search results)
+                        let fullText = data.content
+                            .filter(block => block.type === 'text')
+                            .map(block => block.text)
+                            .join('\n\n')
+                            .trim();
                         
                         // Remove markdown code blocks
-                        analysisText = analysisText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                        fullText = fullText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
                         
-                        // Extract JSON even if there's extra text
-                        const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
+                        // Extract JSON object from the text
+                        const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+                        let opusData = null;
+                        
                         if (jsonMatch) {
-                            analysisText = jsonMatch[0];
+                            try {
+                                opusData = JSON.parse(jsonMatch[0]);
+                                console.log('✓ Successfully parsed Opus JSON response');
+                            } catch (parseError) {
+                                console.error('Failed to parse JSON:', parseError);
+                                console.error('Attempted to parse:', jsonMatch[0].substring(0, 200));
+                            }
                         }
                         
-                        try {
-                            const opusData = JSON.parse(analysisText);
-                            
-                            // Store the analysis text
+                        if (opusData && opusData.analysis) {
+                            // Successfully parsed - set ONLY the analysis field
                             setDeepAnalysis(opusData.analysis);
                             
-                            // Compare with Sonnet data and update recognizedCard with differences noted
-                            // If card number was manually entered, preserve it
+                            // Update card with Opus findings
                             const updatedCard = {
                                 ...recognizedCard,
                                 cardNumber: manualCardNumber || opusData.cardNumber,
@@ -977,11 +987,13 @@ Provide comprehensive updated data:
                             };
                             
                             setRecognizedCard(updatedCard);
-                            
-                        } catch (parseError) {
-                            console.error('Failed to parse Opus JSON:', parseError);
-                            // Fallback: use as plain text
-                            setDeepAnalysis(analysisText);
+                        } else {
+                            // Could not parse or extract analysis
+                            console.error('Could not extract analysis from Opus response');
+                            if (jsonMatch) {
+                                console.error('JSON structure:', JSON.stringify(opusData, null, 2).substring(0, 500));
+                            }
+                            setDeepAnalysis('Error: Could not extract analysis from response');
                         }
                     } else {
                         throw new Error('Invalid response from API');
@@ -1173,35 +1185,38 @@ Provide comprehensive updated data:
 
                             <div className="mb-2">
                                 <div className="flex justify-between items-start mb-1 relative">
-                                    {/* Hamburger Menu */}
-                                    <div ref={menuRef} className="relative">
-                                        <button
-                                            onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-                                            className="hamburger text-white hover:text-blue-400 transition"
-                                            title="Open menu"
-                                        >
-                                            ☰
-                                        </button>
-                                        {showMenuDropdown && (
-                                            <div className="dropdown-menu">
-                                                <div className="dropdown-item" onClick={() => { importInputRef.current?.click(); setShowMenuDropdown(false); }}>
-                                                    📥 Import
+                                    {/* Hamburger Menu + Title */}
+                                    <div className="flex items-center gap-3">
+                                        {/* Hamburger Menu */}
+                                        <div ref={menuRef} className="relative">
+                                            <button
+                                                onClick={() => setShowMenuDropdown(!showMenuDropdown)}
+                                                className="hamburger text-white hover:text-blue-400 transition"
+                                                title="Open menu"
+                                            >
+                                                ☰
+                                            </button>
+                                            {showMenuDropdown && (
+                                                <div className="dropdown-menu">
+                                                    <div className="dropdown-item" onClick={() => { importInputRef.current?.click(); setShowMenuDropdown(false); }}>
+                                                        📥 Import
+                                                    </div>
+                                                    <div className="dropdown-item" onClick={() => { exportCollection(); setShowMenuDropdown(false); }}>
+                                                        📤 Export
+                                                    </div>
+                                                    <div className="dropdown-item" onClick={() => { setShowResetConfirm(true); setShowMenuDropdown(false); }}>
+                                                        🔄 Reset
+                                                    </div>
+                                                    <div className="dropdown-item" onClick={handleLogout}>
+                                                        🚪 Logout
+                                                    </div>
                                                 </div>
-                                                <div className="dropdown-item" onClick={() => { exportCollection(); setShowMenuDropdown(false); }}>
-                                                    📤 Export
-                                                </div>
-                                                <div className="dropdown-item" onClick={() => { setShowResetConfirm(true); setShowMenuDropdown(false); }}>
-                                                    🔄 Reset
-                                                </div>
-                                                <div className="dropdown-item" onClick={handleLogout}>
-                                                    🚪 Logout
-                                                </div>
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
+                                        <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-red-500 to-yellow-400 bg-clip-text text-transparent pb-2">
+                                            2025 Topps Chrome F1 Collection
+                                        </h1>
                                     </div>
-                                    <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 via-red-500 to-yellow-400 bg-clip-text text-transparent pb-2" style={{fontSize: '2.5rem'}}>
-                                        2025 Topps Chrome F1 Collection
-                                    </h1>
 
                                     <div className="text-right flex flex-col gap-1">
                                         <div className="flex items-baseline gap-2" title="Total number of cards in your collection (including duplicates)">
