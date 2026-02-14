@@ -143,6 +143,8 @@
             const [showImageUpload, setShowImageUpload] = useState(false);
             const [showMenuDropdown, setShowMenuDropdown] = useState(false);
             const [uploadedImages, setUploadedImages] = useState([]);
+            const [pendingImages, setPendingImages] = useState([]);  // Images waiting for confirmation
+            const [showSecondImagePrompt, setShowSecondImagePrompt] = useState(false);  // Show prompt for second image
             const [recognizedCard, setRecognizedCard] = useState(null);
             const [isRecognizing, setIsRecognizing] = useState(false);
             const [recognitionError, setRecognitionError] = useState(null);
@@ -731,8 +733,21 @@ Base your analysis on current 2025 market data from web search.`
                 }
                 
                 if (processedImages.length > 0) {
-                    setUploadedImages(processedImages);
-                    recognizeCard(processedImages);
+                    // Combine with existing pending images if adding a second image
+                    const allImages = [...(showSecondImagePrompt ? pendingImages : uploadedImages || []), ...processedImages];
+                    
+                    if (allImages.length === 1) {
+                        // Still only 1 image - show prompt again
+                        setPendingImages(allImages);
+                        setShowSecondImagePrompt(true);
+                        setIsRecognizing(false);
+                    } else if (allImages.length >= 2) {
+                        // 2 or more images - close prompt and proceed with analysis
+                        setShowSecondImagePrompt(false);
+                        setPendingImages([]);
+                        setUploadedImages(allImages);
+                        recognizeCard(allImages);
+                    }
                 } else {
                     setIsRecognizing(false);
                     event.target.value = '';
@@ -1077,6 +1092,8 @@ Provide comprehensive updated data:
                     addCard(recognizedCard.cardNumber, variant, analysisToUse);
                     setShowImageUpload(false);
                     setUploadedImages([]);
+                    setPendingImages([]);
+                    setShowSecondImagePrompt(false);
                     setRecognizedCard(null);
                     setEditedCard(null);
                     setIsEditing(false);
@@ -1745,6 +1762,8 @@ Provide comprehensive updated data:
                                 onClick={() => {
                                     setShowImageUpload(false);
                                     setUploadedImages([]);
+                                    setPendingImages([]);
+                                    setShowSecondImagePrompt(false);
                                     setRecognizedCard(null);
                                     setEditedCard(null);
                                     setIsEditing(false);
@@ -1825,6 +1844,8 @@ Provide comprehensive updated data:
                                                     <button
                                                         onClick={() => {
                                                             setUploadedImages([]);
+                                                            setPendingImages([]);
+                                                            setShowSecondImagePrompt(false);
                                                             setRecognitionError(null);
                                                             setDeepAnalysis(null);
                                                             setSelectedAnalysisSource('sonnet');
@@ -1873,6 +1894,8 @@ Provide comprehensive updated data:
                                                     onClick={() => {
                                                         setShowImageUpload(false);
                                                         setUploadedImages([]);
+                                                        setPendingImages([]);
+                                                        setShowSecondImagePrompt(false);
                                                         setRecognizedCard(null);
                                                         setEditedCard(null);
                                                         setIsEditing(false);
@@ -2259,6 +2282,65 @@ Provide comprehensive updated data:
                                         </div>
                                     )}
                                     </>
+                                </div>
+                            </div>
+                        )}
+
+                        {showSecondImagePrompt && (
+                            <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+                                <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full">
+                                    <h2 className="text-2xl font-bold mb-4">📸 Upload Second Image?</h2>
+                                    <p className="text-slate-300 mb-4">
+                                        You've uploaded <strong>1 image</strong>. For best results, upload both:
+                                    </p>
+                                    <ul className="text-sm text-slate-400 mb-6 space-y-2 ml-4">
+                                        <li>✓ <strong>Front</strong> of the card</li>
+                                        <li>✓ <strong>Back</strong> of the card (contains card number)</li>
+                                    </ul>
+                                    <p className="text-xs text-slate-500 mb-6 italic">
+                                        The back image's card number guides AI analysis for better accuracy.
+                                    </p>
+                                    
+                                    {/* Show the uploaded image */}
+                                    {pendingImages.length > 0 && (
+                                        <div className="mb-6">
+                                            <p className="text-xs text-slate-400 mb-2">Current image:</p>
+                                            <img 
+                                                src={pendingImages[0]} 
+                                                alt="Uploaded card" 
+                                                className="w-full max-h-48 object-contain bg-slate-900/50 rounded-lg"
+                                            />
+                                        </div>
+                                    )}
+                                    
+                                    <div className="flex flex-col gap-3">
+                                        <button
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="w-full bg-green-600 hover:bg-green-700 px-4 py-3 rounded-lg font-semibold text-white"
+                                        >
+                                            📷 Add Second Image
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setUploadedImages(pendingImages);
+                                                setPendingImages([]);
+                                                setShowSecondImagePrompt(false);
+                                                recognizeCard(pendingImages);
+                                            }}
+                                            className="w-full bg-blue-600 hover:bg-blue-700 px-4 py-3 rounded-lg font-semibold text-white"
+                                        >
+                                            ➜ Proceed with 1 Image
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setShowSecondImagePrompt(false);
+                                                setPendingImages([]);
+                                            }}
+                                            className="w-full bg-slate-600 hover:bg-slate-700 px-4 py-3 rounded-lg font-semibold text-white"
+                                        >
+                                            ✕ Cancel
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}
