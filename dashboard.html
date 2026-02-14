@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F1 Card Tracker - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="card-database.js"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+        .card-table { width: 100%; border-collapse: collapse; }
+        .card-table th, .card-table td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        .card-table th { background: #0f172a; font-weight: bold; }
+        .card-table tr:hover { background: #1e293b; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+    <div id="root"></div>
+
+    <script>
+        const MONGODB_API = 'https://f1-card-tracker-backend-1.onrender.com/api/collection';
+        const userId = 'cincymed-f1-collection';
+        const cardDatabase = COMPLETE_CARD_DATABASE || [];
+
+        async function loadDashboard() {
+            try {
+                // Load collection from MongoDB
+                const response = await fetch(`${MONGODB_API}/${userId}`);
+                const data = await response.json();
+                const collection = data.cards || {};
+
+                // Calculate stats
+                const stats = calculateStats(collection);
+                
+                // Render dashboard
+                renderDashboard(collection, stats);
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                document.getElementById('root').innerHTML = '<div class="p-8"><p class="text-red-400">Failed to load collection</p></div>';
+            }
+        }
+
+        function calculateStats(collection) {
+            let totalCards = 0;
+            let uniqueCards = 0;
+            let totalValue = 0;
+            const cardsByVariant = {};
+
+            Object.keys(collection).forEach(cardKey => {
+                const cardNum = cardKey.replace('card-', '');
+                const variants = collection[cardKey];
+
+                Object.keys(variants).forEach(variant => {
+                    if (variant === '_analyses' || variant.startsWith('_')) return;
+                    
+                    const count = variants[variant];
+                    if (count > 0) {
+                        totalCards += count;
+                        cardsByVariant[variant] = (cardsByVariant[variant] || 0) + count;
+                    }
+                });
+
+                if (Object.keys(variants).some(k => !k.startsWith('_') && variants[k] > 0)) {
+                    uniqueCards++;
+                }
+            });
+
+            return {
+                totalCards,
+                uniqueCards,
+                cardsByVariant,
+                totalSetCards: cardDatabase.length
+            };
+        }
+
+        function renderDashboard(collection, stats) {
+            const completion = ((stats.uniqueCards / stats.totalSetCards) * 100).toFixed(1);
+
+            const html = `
+                <div class="min-h-screen p-8">
+                    <div class="max-w-7xl mx-auto">
+                        <!-- Header -->
+                        <div class="mb-8">
+                            <h1 class="text-4xl font-bold mb-4">📊 F1 Card Collection Dashboard</h1>
+                            <p class="text-slate-400">View and analyze your 2025 Topps Chrome F1 collection</p>
+                        </div>
+
+                        <!-- Stats Cards -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                                <div class="text-slate-400 text-sm mb-2">Total Cards</div>
+                                <div class="text-3xl font-bold text-green-400">${stats.totalCards}</div>
+                                <div class="text-xs text-slate-500 mt-2">Including duplicates</div>
+                            </div>
+                            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                                <div class="text-slate-400 text-sm mb-2">Unique Cards</div>
+                                <div class="text-3xl font-bold text-blue-400">${stats.uniqueCards}</div>
+                                <div class="text-xs text-slate-500 mt-2">Different card types</div>
+                            </div>
+                            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                                <div class="text-slate-400 text-sm mb-2">Completion</div>
+                                <div class="text-3xl font-bold text-purple-400">${completion}%</div>
+                                <div class="text-xs text-slate-500 mt-2">of ${stats.totalSetCards} set</div>
+                            </div>
+                            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                                <div class="text-slate-400 text-sm mb-2">Variants Owned</div>
+                                <div class="text-3xl font-bold text-yellow-400">${Object.keys(stats.cardsByVariant).length}</div>
+                                <div class="text-xs text-slate-500 mt-2">Different variants</div>
+                            </div>
+                        </div>
+
+                        <!-- Variant Breakdown -->
+                        <div class="bg-slate-800 rounded-lg p-6 border border-slate-700 mb-8">
+                            <h2 class="text-xl font-bold mb-4">Variant Breakdown</h2>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                ${Object.entries(stats.cardsByVariant)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .map(([variant, count]) => `
+                                        <div class="bg-slate-700 rounded p-3">
+                                            <div class="font-semibold text-sm">${variant}</div>
+                                            <div class="text-2xl font-bold text-green-400">${count}</div>
+                                        </div>
+                                    `).join('')
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Collection Table -->
+                        <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                            <h2 class="text-xl font-bold mb-4">Your Cards</h2>
+                            <div class="overflow-x-auto">
+                                <table class="card-table">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Driver</th>
+                                            <th>Team</th>
+                                            <th>Variants</th>
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${getCardsInCollection(collection)
+                                            .map(cardNum => {
+                                                const card = cardDatabase.find(c => c.num === cardNum);
+                                                if (!card) return '';
+                                                
+                                                const cardKey = `card-${cardNum}`;
+                                                const variants = collection[cardKey];
+                                                const totalCount = Object.keys(variants)
+                                                    .filter(k => !k.startsWith('_'))
+                                                    .reduce((sum, v) => sum + (variants[v] || 0), 0);
+
+                                                const variantList = Object.keys(variants)
+                                                    .filter(k => !k.startsWith('_') && variants[k] > 0)
+                                                    .map(v => `${v} (${variants[v]})`)
+                                                    .join(', ');
+
+                                                return `
+                                                    <tr>
+                                                        <td class="font-bold">#${card.num}</td>
+                                                        <td>${card.name}</td>
+                                                        <td class="text-sm text-slate-400">${card.team || 'N/A'}</td>
+                                                        <td class="text-sm">${variantList}</td>
+                                                        <td class="font-bold text-green-400">${totalCount}</td>
+                                                    </tr>
+                                                `;
+                                            }).join('')
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Back Link -->
+                        <div class="mt-8 text-center">
+                            <a href="index.html" class="text-blue-400 hover:text-blue-300 underline">← Back to Scanner</a>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('root').innerHTML = html;
+        }
+
+        function getCardsInCollection(collection) {
+            return Object.keys(collection)
+                .filter(key => !key.startsWith('_'))
+                .map(key => key.replace('card-', ''))
+                .sort((a, b) => {
+                    const numA = parseInt(a) || 999999;
+                    const numB = parseInt(b) || 999999;
+                    return numA - numB;
+                });
+        }
+
+        // Load on page load
+        loadDashboard();
+    </script>
+</body>
+</html>
