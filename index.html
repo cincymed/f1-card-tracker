@@ -456,9 +456,6 @@
                     localStorage.setItem('f1-collection-pro-v2', jsonStr);
                     console.log('✅ Saved to localStorage:', jsonStr.length, 'bytes');
                     
-                    // Show status alert with total copies to match the counter
-                    alert(`✅ Collection Saved!\n\n📦 Total Cards: ${totalCopies}\n💾 localStorage: ✅ ${(jsonStr.length / 1024).toFixed(1)}KB\n☁️ MongoDB: 🔄 Syncing...`);
-                    
                     // Save to MongoDB (async, don't wait)
                     const id = 'cincymed-f1-collection'; // Always use this ID
                     const authHeaders = getAuthHeaders();
@@ -633,7 +630,7 @@ Base your analysis on current 2025 market data from web search.`
                 }
             };
 
-            const addCard = async (cardNum, variant, analysis = null) => {
+            const addCard = async (cardNum, variant, analysis = null, gradeReport = null) => {
                 console.log('🔍 addCard called:', { cardNum, variant, analysisExists: !!analysis });
                 console.log('📊 Current collection state:', Object.keys(collection).length, 'cards');
                 console.log('📊 Current collection card count:', Object.keys(collection).filter(k => k.startsWith('card-')).length);
@@ -661,6 +658,11 @@ Base your analysis on current 2025 market data from web search.`
                         addedDate: new Date().toISOString(),
                         analysis: analysis
                     });
+                }
+
+                if (gradeReport) {
+                    if (!newCollection[key]._gradeReports) newCollection[key]._gradeReports = {};
+                    newCollection[key]._gradeReports[variant] = gradeReport;
                 }
                 
                 saveCollection(newCollection);
@@ -1370,10 +1372,33 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
             // Helper function to add card after variant is confirmed
             const addCardWithVariant = (cardNum, variant, analysis) => {
                 console.log(`Adding card: #${cardNum} (${variant})`);
-                addCard(cardNum, variant, analysis);
                 
-                // Show confirmation alert
-                alert(`✅ Added: Card #${cardNum}\n${variant}`);
+                // Pass gradeReport if it exists on recognizedCard
+                const gradeReport = recognizedCard?.gradeReport || null;
+                addCard(cardNum, variant, analysis, gradeReport);
+                
+                // Get card title from cardData
+                const card = cardData.find(c => c.num === cardNum);
+                const cardTitle = card ? card.name || card.driver || 'Unknown' : 'Unknown';
+                
+                // Get collection stats
+                const jsonStr = JSON.stringify(collection);
+                const totalCards = Object.values(collection)
+                    .filter(item => !Object.keys(item).some(k => k.startsWith('_')))
+                    .reduce((sum, cardInventory) => {
+                        return sum + Object.entries(cardInventory)
+                            .filter(([key]) => key !== '_analyses')
+                            .reduce((variantSum, [_, count]) => variantSum + count, 0);
+                    }, 0);
+                
+                // Show enhanced confirmation alert
+                alert(`✅ Added: Card #${cardNum}
+${cardTitle}
+Variant: ${variant}
+
+📦 Collection Updated!
+Total Cards: ${totalCards}
+Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                 
                 // Set 5-second cooldown to prevent rate limit errors
                 setAddCardCooldown(5);
@@ -2163,6 +2188,16 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                                                                 <div className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{latestAnalysis.analysis}</div>
                                                                 <div className="text-xs text-slate-500 mt-2">
                                                                     Added: {new Date(latestAnalysis.addedDate).toLocaleDateString()}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Quick Grade Assessment Section */}
+                                                        {variant && collection[getCardKey(selectedCard.num)]?._gradeReports?.[variant] && (
+                                                            <div className="mt-4 bg-amber-900/20 border border-amber-500/30 rounded p-3">
+                                                                <div className="font-semibold text-amber-400 text-sm mb-2">📊 Quick Grade Assessment</div>
+                                                                <div className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap font-mono overflow-auto max-h-96">
+                                                                    {collection[getCardKey(selectedCard.num)]._gradeReports[variant]}
                                                                 </div>
                                                             </div>
                                                         )}
