@@ -69,9 +69,11 @@
         .hamburger { cursor: pointer; font-size: 1.5rem; padding: 8px; }
         .hamburger:hover { color: #60a5fa; transition: color 0.2s; }
         .dropdown-menu { position: absolute; top: 60px; left: 16px; background: #1e293b; border: 1px solid #475569; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); z-index: 1000; min-width: 160px; }
-        .dropdown-item { padding: 12px 16px; cursor: pointer; color: #fff; border-bottom: 1px solid #475569; transition: background 0.2s; text-align: center; }
+        .dropdown-item { padding: 12px 16px; cursor: pointer; color: #fff; border-bottom: 1px solid #475569; transition: background 0.2s; text-align: center; display: flex; align-items: center; justify-content: center; gap: 8px; }
         .dropdown-item:last-child { border-bottom: none; }
         .dropdown-item:hover { background: #334155; }
+        .dropdown-item-delete { padding: 8px 12px; cursor: pointer; color: #fca5a5; border: 2px solid #dc2626; border-radius: 6px; transition: all 0.2s; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.9rem; margin: 16px 8px 0 8px; width: calc(100% - 16px); }
+        .dropdown-item-delete:hover { background: #7f1d1d; color: #fecaca; }
     </style>
 </head>
 <body>
@@ -167,25 +169,59 @@
             const [pendingCardToAdd, setPendingCardToAdd] = useState(null);  // {cardNum, variant, analysis}
             const [addCardCooldown, setAddCardCooldown] = useState(0);  // Rate limiting for adding cards
             // Authoritative list of 2025 Topps Chrome F1 variants
-            // Based on official Topps release and Beckett guide
+            // Based on official Topps release and comprehensive Beckett/collector guides
             const OFFICIAL_VARIANTS = [
+                // Base & Standard Refractors
                 'Base',
                 'Refractor',
-                'Purple Refractor /299',
-                'Magenta/Pink Refractor /250',
+                
+                // Numbered Color Refractors
+                'Teal Refractor /299',
+                'Pink Refractor /250',
+                'Aqua Refractor /199',
                 'Blue Refractor /150',
                 'Green Refractor /99',
                 'F1 75th Anniversary Refractor /75',
-                'Gold Wave /75',
                 'Gold Refractor /50',
                 'Orange Refractor /25',
                 'Black Refractor /10',
                 'Red Refractor /5',
+                
+                // Checker Flag Parallels (Hobby exclusive)
+                'Checker Flag',
+                'Pink Checker Flag /250',
+                'Aqua Checker Flag /199',
+                'Blue Checker Flag /150',
+                'Green Checker Flag /99',
+                'Gold Checker Flag /50',
+                'Orange Checker Flag /25',
+                'Black Checker Flag /10',
+                'Red Checker Flag /5',
+                
+                // RayWave Parallels (Blaster exclusive)
+                'B&W RayWave',
+                'Pink RayWave /250',
+                'Aqua RayWave /199',
+                'Blue RayWave /150',
+                'Forest Green RayWave /140',
+                'Green RayWave /99',
+                'Gold RayWave /50',
+                'Orange RayWave /25',
+                'Black RayWave /10',
+                'Red RayWave /5',
+                
+                // Lazer (Hobby exclusive)
+                'B&W Lazer',
+                
+                // Ultra Rare
                 'SuperFractor 1/1',
-                'Checker Flag Refractor',
+                
+                // Special Types
                 'Logofractor',
                 'Sapphire Edition',
                 'Padparadscha Sapphire 1/1',
+                
+                // Printing Plates
                 'Printing Plate Cyan 1/1',
                 'Printing Plate Magenta 1/1',
                 'Printing Plate Yellow 1/1',
@@ -1463,8 +1499,18 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                     const cardInventory = collection[cardKey];
                     if (!cardInventory) return false; // Card not in collection
                     
+                    // Get all variants for this card
+                    const cardVariants = Object.keys(cardInventory)
+                        .filter(key => key !== '_analyses')
+                        .map(variant => {
+                            // Normalize variant names for comparison
+                            if (variant.includes('Chrome') && !variant.includes('Refractor')) {
+                                return 'Base';
+                            }
+                            return variant;
+                        });
+                    
                     // Check if any of the card's variants match the filter
-                    const cardVariants = Object.keys(cardInventory).filter(key => key !== '_analyses');
                     return cardVariants.some(variant => filterVariants.includes(variant));
                 })();
                 
@@ -1534,9 +1580,12 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                                                         🚪 Logout
                                                     </div>
                                                     {/* Danger Zone - Delete Collection */}
-                                                    <div className="dropdown-item" onClick={() => { setShowExportBeforeDelete(true); setShowMenuDropdown(false); }} style={{borderTop: '1px solid #dc2626', marginTop: '16px', paddingTop: '8px', color: '#fca5a5'}}>
-                                                        🗑️ Delete Collection
-                                                    </div>
+                                                    <button
+                                                        onClick={() => { setShowExportBeforeDelete(true); setShowMenuDropdown(false); }}
+                                                        className="dropdown-item-delete"
+                                                    >
+                                                        🗑️ Delete
+                                                    </button>
                                                 </div>
                                             )}
                                         </div>
@@ -2676,22 +2725,126 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                                     <p className="text-slate-400 mb-4 text-sm">
                                         Please select the correct variant for Card #{variantValidationModal.cardNum}:
                                     </p>
-                                    <div className="space-y-2 mb-4">
-                                        {OFFICIAL_VARIANTS.map(variant => (
-                                            <button
-                                                key={variant}
-                                                onClick={() => {
-                                                    addCardWithVariant(
-                                                        variantValidationModal.cardNum,
-                                                        variant,
-                                                        variantValidationModal.pendingAnalysis
-                                                    );
-                                                }}
-                                                className="w-full text-left p-3 rounded-lg bg-slate-700 hover:bg-blue-600 transition-colors"
-                                            >
-                                                {variant}
-                                            </button>
-                                        ))}
+                                    <div className="space-y-3 mb-4 max-h-96 overflow-y-auto">
+                                        {/* Standard */}
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-400 px-3 py-2 uppercase">Standard</p>
+                                            {['Base', 'Refractor'].map(variant => (
+                                                <button
+                                                    key={variant}
+                                                    onClick={() => {
+                                                        addCardWithVariant(
+                                                            variantValidationModal.cardNum,
+                                                            variant,
+                                                            variantValidationModal.pendingAnalysis
+                                                        );
+                                                    }}
+                                                    className="w-full text-left p-3 rounded-lg bg-slate-700 hover:bg-blue-600 transition-colors mb-1"
+                                                >
+                                                    {variant}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Numbered Color Refractors */}
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-400 px-3 py-2 uppercase">Numbered Refractors</p>
+                                            {['Teal Refractor /299', 'Pink Refractor /250', 'Aqua Refractor /199', 'Blue Refractor /150', 'Green Refractor /99', 'F1 75th Anniversary Refractor /75', 'Gold Refractor /50', 'Orange Refractor /25', 'Black Refractor /10', 'Red Refractor /5'].map(variant => (
+                                                <button
+                                                    key={variant}
+                                                    onClick={() => {
+                                                        addCardWithVariant(
+                                                            variantValidationModal.cardNum,
+                                                            variant,
+                                                            variantValidationModal.pendingAnalysis
+                                                        );
+                                                    }}
+                                                    className="w-full text-left p-3 rounded-lg bg-slate-700 hover:bg-blue-600 transition-colors mb-1"
+                                                >
+                                                    {variant}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Checker Flag Parallels */}
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-400 px-3 py-2 uppercase">Checker Flag Parallels</p>
+                                            {['Checker Flag', 'Pink Checker Flag /250', 'Aqua Checker Flag /199', 'Blue Checker Flag /150', 'Green Checker Flag /99', 'Gold Checker Flag /50', 'Orange Checker Flag /25', 'Black Checker Flag /10', 'Red Checker Flag /5'].map(variant => (
+                                                <button
+                                                    key={variant}
+                                                    onClick={() => {
+                                                        addCardWithVariant(
+                                                            variantValidationModal.cardNum,
+                                                            variant,
+                                                            variantValidationModal.pendingAnalysis
+                                                        );
+                                                    }}
+                                                    className="w-full text-left p-3 rounded-lg bg-slate-700 hover:bg-blue-600 transition-colors mb-1"
+                                                >
+                                                    {variant}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* RayWave Parallels */}
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-400 px-3 py-2 uppercase">RayWave Parallels</p>
+                                            {['B&W RayWave', 'Pink RayWave /250', 'Aqua RayWave /199', 'Blue RayWave /150', 'Forest Green RayWave /140', 'Green RayWave /99', 'Gold RayWave /50', 'Orange RayWave /25', 'Black RayWave /10', 'Red RayWave /5'].map(variant => (
+                                                <button
+                                                    key={variant}
+                                                    onClick={() => {
+                                                        addCardWithVariant(
+                                                            variantValidationModal.cardNum,
+                                                            variant,
+                                                            variantValidationModal.pendingAnalysis
+                                                        );
+                                                    }}
+                                                    className="w-full text-left p-3 rounded-lg bg-slate-700 hover:bg-blue-600 transition-colors mb-1"
+                                                >
+                                                    {variant}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Lazer & Special Types */}
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-400 px-3 py-2 uppercase">Lazer & Special</p>
+                                            {['B&W Lazer', 'SuperFractor 1/1', 'Logofractor', 'Sapphire Edition', 'Padparadscha Sapphire 1/1'].map(variant => (
+                                                <button
+                                                    key={variant}
+                                                    onClick={() => {
+                                                        addCardWithVariant(
+                                                            variantValidationModal.cardNum,
+                                                            variant,
+                                                            variantValidationModal.pendingAnalysis
+                                                        );
+                                                    }}
+                                                    className="w-full text-left p-3 rounded-lg bg-slate-700 hover:bg-blue-600 transition-colors mb-1"
+                                                >
+                                                    {variant}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Printing Plates */}
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-400 px-3 py-2 uppercase">Printing Plates</p>
+                                            {['Printing Plate Cyan 1/1', 'Printing Plate Magenta 1/1', 'Printing Plate Yellow 1/1', 'Printing Plate Black 1/1'].map(variant => (
+                                                <button
+                                                    key={variant}
+                                                    onClick={() => {
+                                                        addCardWithVariant(
+                                                            variantValidationModal.cardNum,
+                                                            variant,
+                                                            variantValidationModal.pendingAnalysis
+                                                        );
+                                                    }}
+                                                    className="w-full text-left p-3 rounded-lg bg-slate-700 hover:bg-blue-600 transition-colors mb-1"
+                                                >
+                                                    {variant}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                     <button
                                         onClick={() => setVariantValidationModal(null)}
