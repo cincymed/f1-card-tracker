@@ -162,7 +162,94 @@
             const [manualCardNumber, setManualCardNumber] = useState(null);
             const [cardDetailEdit, setCardDetailEdit] = useState(null);
             const [originalCardDetail, setOriginalCardDetail] = useState(null);
+            const [variantValidationModal, setVariantValidationModal] = useState(null);  // {cardNum, aiVariant, suggestedVariant}
+            const [pendingCardToAdd, setPendingCardToAdd] = useState(null);  // {cardNum, variant, analysis}
             const [addCardCooldown, setAddCardCooldown] = useState(0);  // Rate limiting for adding cards
+            // Authoritative list of 2025 Topps Chrome F1 variants
+            // Based on official Topps release and Beckett guide
+            const OFFICIAL_VARIANTS = [
+                'Base',
+                'Refractor',
+                'Purple Refractor /299',
+                'Magenta/Pink Refractor /250',
+                'Blue Refractor /150',
+                'Green Refractor /99',
+                'F1 75th Anniversary Refractor /75',
+                'Gold Wave /75',
+                'Gold Refractor /50',
+                'Orange Refractor /25',
+                'Black Refractor /10',
+                'Red Refractor /5',
+                'SuperFractor 1/1',
+                'Checker Flag Refractor',
+                'Logofractor',
+                'Sapphire Edition',
+                'Padparadscha Sapphire 1/1',
+                'Printing Plate Cyan 1/1',
+                'Printing Plate Magenta 1/1',
+                'Printing Plate Yellow 1/1',
+                'Printing Plate Black 1/1'
+            ];
+
+            // Fuzzy string matching - returns similarity score 0-1
+            const fuzzyMatch = (str1, str2) => {
+                const s1 = str1.toLowerCase();
+                const s2 = str2.toLowerCase();
+                
+                // Exact match
+                if (s1 === s2) return 1.0;
+                
+                // Check if one contains the other
+                if (s1.includes(s2) || s2.includes(s1)) return 0.9;
+                
+                // Levenshtein distance based similarity
+                const longer = s1.length > s2.length ? s1 : s2;
+                const shorter = s1.length > s2.length ? s2 : s1;
+                
+                if (longer.length === 0) return 1.0;
+                
+                const editDistance = getEditDistance(longer, shorter);
+                return (longer.length - editDistance) / longer.length;
+            };
+
+            // Calculate Levenshtein distance
+            const getEditDistance = (s1, s2) => {
+                const costs = [];
+                for (let i = 0; i <= s1.length; i++) {
+                    let lastValue = i;
+                    for (let j = 0; j <= s2.length; j++) {
+                        if (i === 0) {
+                            costs[j] = j;
+                        } else if (j > 0) {
+                            let newValue = costs[j - 1];
+                            if (s1.charAt(i - 1) !== s2.charAt(j - 1)) {
+                                newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+                            }
+                            costs[j - 1] = lastValue;
+                            lastValue = newValue;
+                        }
+                    }
+                    if (i > 0) costs[s2.length] = lastValue;
+                }
+                return costs[s2.length];
+            };
+
+            // Find best matching variant or return null if no good match
+            const findBestVariantMatch = (aiVariant) => {
+                let bestMatch = null;
+                let bestScore = 0;
+                
+                OFFICIAL_VARIANTS.forEach(official => {
+                    const score = fuzzyMatch(aiVariant, official);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMatch = official;
+                    }
+                });
+                
+                // Only return match if score is above 0.6 (60% similarity)
+                return bestScore >= 0.6 ? bestMatch : null;
+            };
             const importInputRef = useRef(null);
             const fileInputRef = useRef(null);
             const menuRef = useRef(null);
@@ -268,79 +355,19 @@
             const cleanupCollection = (coll) => {
                 console.log('🧹 cleanupCollection input:', Object.keys(coll).length, 'keys');
                 const cleaned = { ...coll };
-                const validVariants = new Set(variants); // Valid variant names
                 
                 Object.keys(cleaned).forEach(cardKey => {
                     if (cardKey.startsWith('_')) return; // Skip metadata
                     
                     const cardData = cleaned[cardKey];
-                    const variantsToFix = {};
                     
+                    // Remove variants with 0 or negative count
                     Object.keys(cardData).forEach(variant => {
                         if (variant.startsWith('_')) return; // Skip metadata like _analyses
                         
-                        // Check if variant is valid
-                        if (!validVariants.has(variant)) {
-                            console.warn(`⚠️ Invalid variant "${variant}" in ${cardKey}`);
-                            // Try to normalize variant name
-                            let normalized = variant;
-                            
-                            // Common normalization patterns
-                            // Common normalization patterns
-                            if (variant.includes('Chrome') && !variant.includes('Refractor')) {
-                                normalized = 'Base';
-                            } else if (variant.includes('/250') && !variant.includes('Refractor')) {
-                                normalized = 'Magenta/Pink Refractor /250';
-                            } else if (variant.includes('/250') && !variant.includes('Refractor')) {
-                                normalized = 'Magenta/Pink Refractor /250';
-                            } else if (variant.includes('/299') && !variant.includes('Refractor')) {
-                                normalized = 'Purple Refractor /299';
-                            } else if (variant.includes('/150') && !variant.includes('Refractor')) {
-                                normalized = 'Blue Refractor /150';
-                            } else if (variant.includes('/99') && !variant.includes('Refractor')) {
-                                normalized = 'Green Refractor /99';
-                            } else if (variant.includes('/50') && !variant.includes('Refractor') && !variant.includes('Wave')) {
-                                normalized = 'Gold Refractor /50';
-                            } else if (variant.includes('/25') && !variant.includes('Refractor')) {
-                                normalized = 'Orange Refractor /25';
-                            } else if (variant.includes('/5') && !variant.includes('Refractor')) {
-                                normalized = 'Red Refractor /5';
-                            } else if (variant.includes('/10') && !variant.includes('Refractor')) {
-                                normalized = 'Black Refractor /10';
-                            } else if (variant.includes('/75') && !variant.includes('Wave')) {
-                                normalized = 'Gold Wave /75';
-                            }
-                            
-                            if (validVariants.has(normalized) && normalized !== variant) {
-                                console.log(`Normalizing variant: "${variant}" → "${normalized}" for ${cardKey}`);
-                                variantsToFix[variant] = normalized;
-                            } else {
-                                // Keep unknown variant as-is instead of deleting it
-                                console.log(`⚠️ Unknown variant kept: "${variant}" in ${cardKey} (will be preserved)`);
-                            }
-                        }
-                        
-                        // Remove variants with 0 or negative count
                         if (cardData[variant] <= 0) {
                             console.log(`Removing ${cardKey} ${variant} (count was ${cardData[variant]})`);
                             delete cardData[variant];
-                        }
-                    });
-                    
-                    // Fix normalized variants
-                    Object.keys(variantsToFix).forEach(oldVariant => {
-                        const newVariant = variantsToFix[oldVariant];
-                        const count = cardData[oldVariant];
-                        
-                        // Merge into normalized variant
-                        cardData[newVariant] = (cardData[newVariant] || 0) + count;
-                        delete cardData[oldVariant];
-                        
-                        // Move analyses if they exist
-                        if (cardData._analyses && cardData._analyses[oldVariant]) {
-                            cardData._analyses[newVariant] = cardData._analyses[newVariant] || [];
-                            cardData._analyses[newVariant].push(...cardData._analyses[oldVariant]);
-                            delete cardData._analyses[oldVariant];
                         }
                     });
                     
@@ -1199,42 +1226,64 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                             ? deepAnalysis 
                             : recognizedCard.analysis;
                         
-                        let variant = recognizedCard.variant;
-                        if (variant === "Base Chrome") variant = "Base";
+                        let aiVariant = recognizedCard.variant;
+                        if (aiVariant === "Base Chrome") aiVariant = "Base";
                         
-                        console.log(`Adding card: #${recognizedCard.cardNumber} (${variant})`);
-                        addCard(recognizedCard.cardNumber, variant, analysisToUse);
+                        // Validate variant against official list
+                        const validVariant = findBestVariantMatch(aiVariant);
                         
-                        // Show confirmation alert
-                        alert(`✅ Added: Card #${recognizedCard.cardNumber}\n${variant}`);
-                        
-                        // Set 5-second cooldown to prevent rate limit errors
-                        setAddCardCooldown(5);
-                        const cooldownInterval = setInterval(() => {
-                            setAddCardCooldown(prev => {
-                                if (prev <= 1) {
-                                    clearInterval(cooldownInterval);
-                                    return 0;
-                                }
-                                return prev - 1;
+                        if (validVariant) {
+                            // Good match found - proceed with adding
+                            console.log(`Variant validated: "${aiVariant}" → "${validVariant}"`);
+                            addCardWithVariant(recognizedCard.cardNumber, validVariant, analysisToUse);
+                        } else {
+                            // No good match - show user a selection modal
+                            console.warn(`⚠️ Unknown variant: "${aiVariant}" - asking user to select`);
+                            setVariantValidationModal({
+                                cardNum: recognizedCard.cardNumber,
+                                aiVariant: aiVariant,
+                                pendingAnalysis: analysisToUse
                             });
-                        }, 1000);
-                        
-                        setShowImageUpload(false);
-                        setUploadedImages([]);
-                        setPendingImages([]);
-                        setShowSecondImagePrompt(false);
-                        setRecognizedCard(null);
-                        setEditedCard(null);
-                        setIsEditing(false);
-                        setRecognitionError(null);
-                        setDeepAnalysis(null);
-                        setSelectedAnalysisSource('opus'); // Reset to default
+                            return; // Don't close scanner yet
+                        }
                     } catch (error) {
                         console.error('Error adding card:', error);
                         alert('❌ Error adding card: ' + error.message);
                     }
                 }
+            };
+
+            // Helper function to add card after variant is confirmed
+            const addCardWithVariant = (cardNum, variant, analysis) => {
+                console.log(`Adding card: #${cardNum} (${variant})`);
+                addCard(cardNum, variant, analysis);
+                
+                // Show confirmation alert
+                alert(`✅ Added: Card #${cardNum}\n${variant}`);
+                
+                // Set 5-second cooldown to prevent rate limit errors
+                setAddCardCooldown(5);
+                const cooldownInterval = setInterval(() => {
+                    setAddCardCooldown(prev => {
+                        if (prev <= 1) {
+                            clearInterval(cooldownInterval);
+                            return 0;
+                        }
+                        return prev - 1;
+                    });
+                }, 1000);
+                
+                setShowImageUpload(false);
+                setUploadedImages([]);
+                setPendingImages([]);
+                setShowSecondImagePrompt(false);
+                setRecognizedCard(null);
+                setEditedCard(null);
+                setIsEditing(false);
+                setRecognitionError(null);
+                setDeepAnalysis(null);
+                setSelectedAnalysisSource('opus'); // Reset to default
+                setVariantValidationModal(null);
             };
 
             const handleLogout = () => {
@@ -2563,7 +2612,43 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                             </div>
                         )}
 
-                        {/* Fullscreen Image Viewer */}
+                        {/* Variant Selection Modal */}
+                        {variantValidationModal && (
+                            <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+                                <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full max-h-96 overflow-y-auto">
+                                    <h2 className="text-2xl font-bold mb-2">⚠️ Confirm Card Variant</h2>
+                                    <p className="text-slate-300 mb-4 text-sm">
+                                        The AI detected "<span className="font-semibold text-blue-300">{variantValidationModal.aiVariant}</span>" but this doesn't match our official variants list.
+                                    </p>
+                                    <p className="text-slate-400 mb-4 text-sm">
+                                        Please select the correct variant for Card #{variantValidationModal.cardNum}:
+                                    </p>
+                                    <div className="space-y-2 mb-4">
+                                        {OFFICIAL_VARIANTS.map(variant => (
+                                            <button
+                                                key={variant}
+                                                onClick={() => {
+                                                    addCardWithVariant(
+                                                        variantValidationModal.cardNum,
+                                                        variant,
+                                                        variantValidationModal.pendingAnalysis
+                                                    );
+                                                }}
+                                                className="w-full text-left p-3 rounded-lg bg-slate-700 hover:bg-blue-600 transition-colors"
+                                            >
+                                                {variant}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <button
+                                        onClick={() => setVariantValidationModal(null)}
+                                        className="w-full bg-slate-600 hover:bg-slate-700 px-4 py-2 rounded-lg font-semibold"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                         {showImageViewer && uploadedImages && uploadedImages.length > 0 && (
                             <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50">
                                 {/* Controls */}
