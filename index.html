@@ -393,7 +393,22 @@
                     
                     const cleanedCollection = cleanupCollection(newCollection);
                     const cardCountAfter = Object.keys(cleanedCollection).filter(k => k.startsWith('card-')).length;
+                    
+                    // Count total copies across all variants
+                    let totalCopies = 0;
+                    Object.keys(cleanedCollection).forEach(key => {
+                        if (key.startsWith('card-')) {
+                            const card = cleanedCollection[key];
+                            Object.keys(card).forEach(variant => {
+                                if (!variant.startsWith('_') && card[variant] > 0) {
+                                    totalCopies += card[variant];
+                                }
+                            });
+                        }
+                    });
+                    
                     console.log('🧹 After cleanup:', cardCountAfter, 'cards');
+                    console.log('📊 Total copies:', totalCopies);
                     console.log('⚠️ CARDS LOST IN CLEANUP:', cardCountBefore - cardCountAfter);
                     
                     setCollection(cleanedCollection);
@@ -404,8 +419,8 @@
                     localStorage.setItem('f1-collection-pro-v2', jsonStr);
                     console.log('✅ Saved to localStorage:', jsonStr.length, 'bytes');
                     
-                    // Show status alert
-                    alert(`✅ Collection Saved!\n\n📦 Total cards: ${cardCountAfter}\n💾 localStorage: ✅ ${(jsonStr.length / 1024).toFixed(1)}KB\n☁️ MongoDB: 🔄 Syncing...`);
+                    // Show status alert with total copies to match the counter
+                    alert(`✅ Collection Saved!\n\n📦 Total Cards: ${totalCopies}\n💾 localStorage: ✅ ${(jsonStr.length / 1024).toFixed(1)}KB\n☁️ MongoDB: 🔄 Syncing...`);
                     
                     // Save to MongoDB (async, don't wait)
                     const id = 'cincymed-f1-collection'; // Always use this ID
@@ -1513,6 +1528,9 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                                                     </div>
                                                     <div className="dropdown-item" onClick={() => { setShowResetConfirm(true); setShowMenuDropdown(false); }}>
                                                         🗑️ Reset
+                                                    </div>
+                                                    <div className="dropdown-item" onClick={() => { window.location.reload(); }} style={{borderTop: '1px solid #475569', marginTop: '8px', paddingTop: '8px'}}>
+                                                        🔃 Refresh Page
                                                     </div>
                                                     <div className="dropdown-item" onClick={handleLogout}>
                                                         🚪 Logout
