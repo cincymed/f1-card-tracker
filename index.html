@@ -152,6 +152,7 @@
             const [isEditing, setIsEditing] = useState(false);
             const [editedCard, setEditedCard] = useState(null);
             const [showResetConfirm, setShowResetConfirm] = useState(false);
+            const [showExportBeforeDelete, setShowExportBeforeDelete] = useState(false);
             const [analyzingCards, setAnalyzingCards] = useState({});
             const [deepAnalysis, setDeepAnalysis] = useState(null);
             const [isDeepAnalyzing, setIsDeepAnalyzing] = useState(false);
@@ -1526,14 +1527,15 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                                                     <div className="dropdown-item" onClick={forceReloadCollection} style={{borderTop: '1px solid #475569', marginTop: '8px', paddingTop: '8px'}}>
                                                         🔄 Force Reload Collection
                                                     </div>
-                                                    <div className="dropdown-item" onClick={() => { setShowResetConfirm(true); setShowMenuDropdown(false); }}>
-                                                        🗑️ Reset
-                                                    </div>
                                                     <div className="dropdown-item" onClick={() => { window.location.reload(); }} style={{borderTop: '1px solid #475569', marginTop: '8px', paddingTop: '8px'}}>
                                                         🔃 Refresh Page
                                                     </div>
                                                     <div className="dropdown-item" onClick={handleLogout}>
                                                         🚪 Logout
+                                                    </div>
+                                                    {/* Danger Zone - Delete Collection */}
+                                                    <div className="dropdown-item" onClick={() => { setShowExportBeforeDelete(true); setShowMenuDropdown(false); }} style={{borderTop: '1px solid #dc2626', marginTop: '16px', paddingTop: '8px', color: '#fca5a5'}}>
+                                                        🗑️ Delete Collection
                                                     </div>
                                                 </div>
                                             )}
@@ -2605,12 +2607,45 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                             </div>
                         )}
 
+                        {/* Export Before Delete Modal */}
+                        {showExportBeforeDelete && (
+                            <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+                                <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full">
+                                    <h2 className="text-2xl font-bold mb-4">📤 Backup Your Collection?</h2>
+                                    <p className="text-slate-300 mb-6">
+                                        Before deleting your collection, would you like to export a backup file? You can import it later to restore your cards.
+                                    </p>
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => {
+                                                exportCollection();
+                                                setShowExportBeforeDelete(false);
+                                                setShowResetConfirm(true);
+                                            }}
+                                            className="flex-1 bg-blue-600 hover:bg-blue-700 px-4 py-3 rounded-lg font-semibold"
+                                        >
+                                            📥 Export First
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setShowExportBeforeDelete(false);
+                                                setShowResetConfirm(true);
+                                            }}
+                                            className="flex-1 bg-slate-600 hover:bg-slate-700 px-4 py-3 rounded-lg font-semibold"
+                                        >
+                                            Skip Export
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {showResetConfirm && (
                             <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
                                 <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full">
-                                    <h2 className="text-2xl font-bold mb-4">⚠️ Reset Collection?</h2>
+                                    <h2 className="text-2xl font-bold mb-4 text-red-400">⚠️ Delete Collection?</h2>
                                     <p className="text-slate-300 mb-6">
-                                        This will DELETE your entire collection. This action CANNOT be undone!
+                                        This will PERMANENTLY DELETE your entire collection. This action CANNOT be undone!
                                     </p>
                                     <div className="flex gap-3">
                                         <button
@@ -2623,7 +2658,7 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                                             onClick={resetCollection}
                                             className="flex-1 bg-red-600 hover:bg-red-700 px-4 py-3 rounded-lg font-semibold"
                                         >
-                                            Yes, Reset
+                                            Yes, Delete
                                         </button>
                                     </div>
                                 </div>
