@@ -361,15 +361,13 @@
 
             const saveCollection = (newCollection) => {
                 try {
-                    console.log('💾 saveCollection called with:', Object.keys(newCollection).length, 'keys');
+                    const cardCountBefore = Object.keys(newCollection).filter(k => k.startsWith('card-')).length;
+                    console.log('💾 saveCollection called with:', cardCountBefore, 'cards');
                     
                     const cleanedCollection = cleanupCollection(newCollection);
-                    console.log('🧹 After cleanup:', Object.keys(cleanedCollection).length, 'keys');
-                    
-                    const cardCount = Object.keys(cleanedCollection).filter(k => k.startsWith('card-')).length;
-                    
-                    // Show what we're about to save
-                    console.log(`📊 About to save: ${cardCount} cards`);
+                    const cardCountAfter = Object.keys(cleanedCollection).filter(k => k.startsWith('card-')).length;
+                    console.log('🧹 After cleanup:', cardCountAfter, 'cards');
+                    console.log('⚠️ CARDS LOST IN CLEANUP:', cardCountBefore - cardCountAfter);
                     
                     setCollection(cleanedCollection);
                     console.log('🔄 setCollection called');
@@ -380,7 +378,7 @@
                     console.log('✅ Saved to localStorage:', jsonStr.length, 'bytes');
                     
                     // Show status alert
-                    alert(`✅ Collection Saved!\n\n📦 Total cards: ${cardCount}\n💾 localStorage: ✅ ${(jsonStr.length / 1024).toFixed(1)}KB\n☁️ MongoDB: 🔄 Syncing...`);
+                    alert(`✅ Collection Saved!\n\n📦 Total cards: ${cardCountAfter}\n💾 localStorage: ✅ ${(jsonStr.length / 1024).toFixed(1)}KB\n☁️ MongoDB: 🔄 Syncing...`);
                     
                     // Save to MongoDB (async, don't wait)
                     const id = 'cincymed-f1-collection'; // Always use this ID
@@ -559,6 +557,7 @@ Base your analysis on current 2025 market data from web search.`
             const addCard = async (cardNum, variant, analysis = null) => {
                 console.log('🔍 addCard called:', { cardNum, variant, analysisExists: !!analysis });
                 console.log('📊 Current collection state:', Object.keys(collection).length, 'cards');
+                console.log('📊 Current collection card count:', Object.keys(collection).filter(k => k.startsWith('card-')).length);
                 
                 const key = getCardKey(cardNum);
                 const newCollection = { ...collection };
@@ -572,7 +571,8 @@ Base your analysis on current 2025 market data from web search.`
                 newCollection[key][variant]++;
                 
                 console.log('✅ Updated collection:', { key, variant, count: newCollection[key][variant] });
-                console.log('📝 About to save:', Object.keys(newCollection).length, 'cards');
+                console.log('📝 BEFORE cleanup - total cards:', Object.keys(newCollection).filter(k => k.startsWith('card-')).length);
+                console.log('📝 BEFORE cleanup - card #' + cardNum + ' variant "' + variant + '" count:', newCollection[key][variant]);
                 
                 if (analysis) {
                     if (!newCollection[key]._analyses) newCollection[key]._analyses = {};
