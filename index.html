@@ -362,20 +362,27 @@
                     
                     // Save to localStorage (backup)
                     localStorage.setItem('f1-collection-pro-v2', JSON.stringify(cleanedCollection));
+                    console.log('✅ Saved to localStorage');
                     
                     // Save to MongoDB (async, don't wait)
                     const id = 'cincymed-f1-collection'; // Always use this ID
+                    const authHeaders = getAuthHeaders();
+                    
                     fetch(`https://f1-card-tracker-backend-1.onrender.com/api/collection/${id}`, {
                         method: 'POST',
-                        headers: getAuthHeaders(),
+                        headers: authHeaders,
                         body: JSON.stringify({ cards: cleanedCollection })
-                    }).then(() => {
-                        console.log('✅ Collection synced to MongoDB');
+                    }).then(response => {
+                        if (response.ok) {
+                            console.log('✅ Collection synced to MongoDB');
+                        } else {
+                            console.error('MongoDB sync failed - status:', response.status);
+                        }
                     }).catch(error => {
-                        console.log('Sync to MongoDB failed, using localStorage backup:', error.message);
+                        console.error('MongoDB sync error:', error.message);
                     });
                 } catch (error) {
-                    console.error('Error saving:', error);
+                    console.error('Error saving collection:', error);
                 }
             };
 
@@ -1160,37 +1167,47 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
 
             const handleAddRecognizedCard = () => {
                 if (recognizedCard) {
-                    // Use the selected analysis source
-                    const analysisToUse = selectedAnalysisSource === 'opus' && deepAnalysis 
-                        ? deepAnalysis 
-                        : recognizedCard.analysis;
-                    
-                    let variant = recognizedCard.variant;
-                    if (variant === "Base Chrome") variant = "Base";
-                    addCard(recognizedCard.cardNumber, variant, analysisToUse);
-                    
-                    // Set 5-second cooldown to prevent rate limit errors
-                    setAddCardCooldown(5);
-                    const cooldownInterval = setInterval(() => {
-                        setAddCardCooldown(prev => {
-                            if (prev <= 1) {
-                                clearInterval(cooldownInterval);
-                                return 0;
-                            }
-                            return prev - 1;
-                        });
-                    }, 1000);
-                    
-                    setShowImageUpload(false);
-                    setUploadedImages([]);
-                    setPendingImages([]);
-                    setShowSecondImagePrompt(false);
-                    setRecognizedCard(null);
-                    setEditedCard(null);
-                    setIsEditing(false);
-                    setRecognitionError(null);
-                    setDeepAnalysis(null);
-                    setSelectedAnalysisSource('opus'); // Reset to default
+                    try {
+                        // Use the selected analysis source
+                        const analysisToUse = selectedAnalysisSource === 'opus' && deepAnalysis 
+                            ? deepAnalysis 
+                            : recognizedCard.analysis;
+                        
+                        let variant = recognizedCard.variant;
+                        if (variant === "Base Chrome") variant = "Base";
+                        
+                        console.log(`Adding card: #${recognizedCard.cardNumber} (${variant})`);
+                        addCard(recognizedCard.cardNumber, variant, analysisToUse);
+                        
+                        // Show confirmation alert
+                        alert(`✅ Added: Card #${recognizedCard.cardNumber}\n${variant}`);
+                        
+                        // Set 5-second cooldown to prevent rate limit errors
+                        setAddCardCooldown(5);
+                        const cooldownInterval = setInterval(() => {
+                            setAddCardCooldown(prev => {
+                                if (prev <= 1) {
+                                    clearInterval(cooldownInterval);
+                                    return 0;
+                                }
+                                return prev - 1;
+                            });
+                        }, 1000);
+                        
+                        setShowImageUpload(false);
+                        setUploadedImages([]);
+                        setPendingImages([]);
+                        setShowSecondImagePrompt(false);
+                        setRecognizedCard(null);
+                        setEditedCard(null);
+                        setIsEditing(false);
+                        setRecognitionError(null);
+                        setDeepAnalysis(null);
+                        setSelectedAnalysisSource('opus'); // Reset to default
+                    } catch (error) {
+                        console.error('Error adding card:', error);
+                        alert('❌ Error adding card: ' + error.message);
+                    }
                 }
             };
 
