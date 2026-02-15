@@ -1063,7 +1063,153 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                 }
             };
 
-            const performDeepAnalysis = async () => {
+            const performQuickGrade = async () => {
+                if (!uploadedImages || uploadedImages.length === 0) {
+                    alert('Please upload an image before grading.');
+                    return;
+                }
+
+                setIsDeepAnalyzing(true);
+                try {
+                    const imageBase64 = uploadedImages[0].split(',')[1];
+                    
+                    const gradingPrompt = `You are an expert trading card grader analyzing a 2025 Topps Chrome Formula 1 card for potential PSA grading.
+
+ANALYZE THIS IMAGE FOR THE FOLLOWING CRITERIA:
+
+1️⃣ CENTERING (The Silent Killer)
+- Examine left/right border thickness (aim for 55/45 ratio or better for PSA 10)
+- Check top/bottom border thickness
+- Assess logo and text alignment
+- Note any visible border imbalance
+
+2️⃣ SURFACE (The Chrome Minefield) 
+- Look for hairline scratches (tilt light detection)
+- Identify any print lines (horizontal streaks)
+- Check for dimples/"fish eyes"
+- Note roller marks or refractor scuffing
+- Examine back surface for scratches and gloss uniformity
+- Look for straight glare lines or surface indents
+
+3️⃣ CORNERS (Microscopic but Merciless)
+- Check all four corners on BOTH front and back
+- Look for whitening, fraying, rounding
+- Identify any chrome chipping or silver flecks
+
+4️⃣ EDGES (The Sneaky Dropper)
+- Inspect long edges for whitening
+- Look for rough cuts or micro-chips
+- Note any edge flecks visible against borders
+- Chrome often shows tiny edge damage
+
+5️⃣ PRINT QUALITY & REGISTRATION
+- Check for blur in text
+- Identify misregistration or shadowed text
+- Note off-color logos or background speckling
+
+6️⃣ SURFACE GLOSS & CLEANLINESS
+- Assess gloss uniformity under angled light
+- Look for fingerprints or dust
+- Distinguish sleeve artifacts from actual damage
+
+7️⃣ NUMBERING & FOIL AREAS
+- Inspect foil stamp indentation
+- Check for foil flaking
+- Assess numbering clarity
+
+PROVIDE YOUR ASSESSMENT IN THIS EXACT FORMAT:
+
+QUICK GRADE REPORT
+═══════════════════════════════════════
+
+📊 VISUAL CHECKLIST (5-Point System)
+☐ Centering within 55/45 (excellent alignment)
+☐ No visible surface lines or scratches
+☐ No corner whitening or chipping
+☐ No edge damage or flecking
+☐ Clean foil/number stamp
+
+[For each checkbox, mark with ✅ if PASS or ❌ if FAIL, then explain findings]
+
+🔍 DETAILED FINDINGS
+Centering: [Assessment with specific observations]
+Surface: [Specific findings on scratches, print lines, scuffing]
+Corners: [Assessment of all 4 corners on front and back]
+Edges: [Edge condition findings]
+Print Quality: [Quality and registration observations]
+Gloss & Cleanliness: [Surface appearance assessment]
+Foil/Numbering: [Stamping and foil condition]
+
+📈 GRADE PROBABILITY ESTIMATE
+PSA 10 Probability: [X]% - [Brief rationale based on visible condition]
+PSA 9 Probability: [X]% - [Brief rationale based on visible condition]
+
+💬 SUMMARY ASSESSMENT
+[1-2 sentences on overall condition and grading recommendation]
+
+GRADING LOGIC:
+- 5/5 checklist → PSA 10 candidate (95%+)
+- 4/5 checklist → Likely PSA 9 (likely 9, possible 10)
+- 3/5 checklist → Probably 8-9 (high 8 or low 9)
+- 2/5 or less → 8 or below
+
+Remember: For 2025 Topps Chrome F1:
+- Chrome cards are susceptible to surface damage
+- Centering is the #1 reason cards grade 9 instead of 10
+- Surface flaws = instant 9 ceiling
+- One soft corner = probably 9
+- Two+ soft corners = prepare for 8`;
+
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify({
+                            model: 'claude-opus-4-20250514',
+                            max_tokens: 2000,
+                            messages: [{
+                                role: 'user',
+                                content: [
+                                    {
+                                        type: 'image',
+                                        source: {
+                                            type: 'base64',
+                                            media_type: 'image/jpeg',
+                                            data: imageBase64
+                                        }
+                                    },
+                                    {
+                                        type: 'text',
+                                        text: gradingPrompt
+                                    }
+                                ]
+                            }]
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data.content && data.content.length > 0) {
+                        const gradeReport = data.content
+                            .filter(block => block.type === 'text')
+                            .map(block => block.text)
+                            .join('\n\n');
+                        
+                        // Append grade report to recognized card analysis
+                        if (recognizedCard) {
+                            setRecognizedCard(prev => ({
+                                ...prev,
+                                gradeReport: gradeReport
+                            }));
+                        }
+                        
+                        alert('✅ Grade Report Generated!\n\nScroll down to see full assessment.');
+                    }
+                } catch (error) {
+                    console.error('Grade analysis error:', error);
+                    alert('❌ Error generating grade report:\n' + error.message);
+                } finally {
+                    setIsDeepAnalyzing(false);
+                }
+            };
                 if (!uploadedImages || uploadedImages.length === 0 || !recognizedCard) return;
                 
                 setIsDeepAnalyzing(true);
@@ -1480,7 +1626,7 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
             };
 
             // Use predefined variant list for filter dropdown
-            const allVariants = variants;
+            const allVariants = OFFICIAL_VARIANTS;
 
             const filteredCards = cardData.filter(card => {
                 const matchesSearch = !searchTerm || 
@@ -1645,7 +1791,58 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                                     }}
                                 >
                                     <option value="">All Variants</option>
-                                    {allVariants.map(v => <option key={v} value={v}>{v}</option>)}
+                                    <optgroup label="Standard">
+                                        <option value="Base">Base</option>
+                                        <option value="Refractor">Refractor</option>
+                                    </optgroup>
+                                    <optgroup label="Numbered Refractors">
+                                        <option value="Teal Refractor /299">Teal Refractor /299</option>
+                                        <option value="Pink Refractor /250">Pink Refractor /250</option>
+                                        <option value="Aqua Refractor /199">Aqua Refractor /199</option>
+                                        <option value="Blue Refractor /150">Blue Refractor /150</option>
+                                        <option value="Green Refractor /99">Green Refractor /99</option>
+                                        <option value="F1 75th Anniversary Refractor /75">F1 75th Anniversary Refractor /75</option>
+                                        <option value="Gold Refractor /50">Gold Refractor /50</option>
+                                        <option value="Orange Refractor /25">Orange Refractor /25</option>
+                                        <option value="Black Refractor /10">Black Refractor /10</option>
+                                        <option value="Red Refractor /5">Red Refractor /5</option>
+                                    </optgroup>
+                                    <optgroup label="Checker Flag Parallels">
+                                        <option value="Checker Flag">Checker Flag</option>
+                                        <option value="Pink Checker Flag /250">Pink Checker Flag /250</option>
+                                        <option value="Aqua Checker Flag /199">Aqua Checker Flag /199</option>
+                                        <option value="Blue Checker Flag /150">Blue Checker Flag /150</option>
+                                        <option value="Green Checker Flag /99">Green Checker Flag /99</option>
+                                        <option value="Gold Checker Flag /50">Gold Checker Flag /50</option>
+                                        <option value="Orange Checker Flag /25">Orange Checker Flag /25</option>
+                                        <option value="Black Checker Flag /10">Black Checker Flag /10</option>
+                                        <option value="Red Checker Flag /5">Red Checker Flag /5</option>
+                                    </optgroup>
+                                    <optgroup label="RayWave Parallels">
+                                        <option value="B&W RayWave">B&W RayWave</option>
+                                        <option value="Pink RayWave /250">Pink RayWave /250</option>
+                                        <option value="Aqua RayWave /199">Aqua RayWave /199</option>
+                                        <option value="Blue RayWave /150">Blue RayWave /150</option>
+                                        <option value="Forest Green RayWave /140">Forest Green RayWave /140</option>
+                                        <option value="Green RayWave /99">Green RayWave /99</option>
+                                        <option value="Gold RayWave /50">Gold RayWave /50</option>
+                                        <option value="Orange RayWave /25">Orange RayWave /25</option>
+                                        <option value="Black RayWave /10">Black RayWave /10</option>
+                                        <option value="Red RayWave /5">Red RayWave /5</option>
+                                    </optgroup>
+                                    <optgroup label="Lazer & Special">
+                                        <option value="B&W Lazer">B&W Lazer</option>
+                                        <option value="SuperFractor 1/1">SuperFractor 1/1</option>
+                                        <option value="Logofractor">Logofractor</option>
+                                        <option value="Sapphire Edition">Sapphire Edition</option>
+                                        <option value="Padparadscha Sapphire 1/1">Padparadscha Sapphire 1/1</option>
+                                    </optgroup>
+                                    <optgroup label="Printing Plates">
+                                        <option value="Printing Plate Cyan 1/1">Printing Plate Cyan 1/1</option>
+                                        <option value="Printing Plate Magenta 1/1">Printing Plate Magenta 1/1</option>
+                                        <option value="Printing Plate Yellow 1/1">Printing Plate Yellow 1/1</option>
+                                        <option value="Printing Plate Black 1/1">Printing Plate Black 1/1</option>
+                                    </optgroup>
                                 </select>
                                 <select
                                     className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm"
@@ -2181,6 +2378,13 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                                                     {isDeepAnalyzing ? '⟳ Analyzing...' : '🔍 Re-analyze (Sonnet)'}
                                                 </button>
                                                 <button
+                                                    onClick={performQuickGrade}
+                                                    disabled={isDeepAnalyzing}
+                                                    className="px-4 py-2 rounded-lg text-sm font-semibold bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
+                                                >
+                                                    {isDeepAnalyzing ? '⟳ Grading...' : '📊 Quick Grade'}
+                                                </button>
+                                                <button
                                                     onClick={() => {
                                                         if (isEditing) {
                                                             handleDoneEditing();
@@ -2585,6 +2789,16 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                                                             </div>
                                                         )}
                                                     </div>
+
+                                                    {/* Quick Grade Report */}
+                                                    {recognizedCard?.gradeReport && (
+                                                        <div className="bg-gradient-to-br from-amber-900/20 to-orange-900/20 border border-amber-500/30 rounded-xl p-5">
+                                                            <div className="flex items-center gap-2 mb-4">
+                                                                <h5 className="font-semibold text-amber-400">📊 Quick Grade Assessment</h5>
+                                                            </div>
+                                                            <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap font-mono">{recognizedCard.gradeReport ? recognizedCard.gradeReport.replace(/\\n/g, '\n') : ''}</div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
