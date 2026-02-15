@@ -266,6 +266,7 @@
             };
 
             const cleanupCollection = (coll) => {
+                console.log('🧹 cleanupCollection input:', Object.keys(coll).length, 'keys');
                 const cleaned = { ...coll };
                 const validVariants = new Set(variants); // Valid variant names
                 
@@ -280,6 +281,7 @@
                         
                         // Check if variant is valid
                         if (!validVariants.has(variant)) {
+                            console.warn(`⚠️ Invalid variant "${variant}" in ${cardKey}`);
                             // Try to normalize variant name
                             let normalized = variant;
                             
@@ -352,17 +354,27 @@
                     }
                 });
                 
+                console.log('🧹 cleanupCollection output:', Object.keys(cleaned).length, 'keys');
+                if (Object.keys(cleaned).length === 0) {
+                    console.error('⚠️ WARNING: cleanupCollection returned empty collection!');
+                }
                 return cleaned;
             };
 
             const saveCollection = (newCollection) => {
                 try {
+                    console.log('💾 saveCollection called with:', Object.keys(newCollection).length, 'keys');
+                    
                     const cleanedCollection = cleanupCollection(newCollection);
+                    console.log('🧹 After cleanup:', Object.keys(cleanedCollection).length, 'keys');
+                    
                     setCollection(cleanedCollection);
+                    console.log('🔄 setCollection called');
                     
                     // Save to localStorage (backup)
-                    localStorage.setItem('f1-collection-pro-v2', JSON.stringify(cleanedCollection));
-                    console.log('✅ Saved to localStorage');
+                    const jsonStr = JSON.stringify(cleanedCollection);
+                    localStorage.setItem('f1-collection-pro-v2', jsonStr);
+                    console.log('✅ Saved to localStorage:', jsonStr.length, 'bytes');
                     
                     // Save to MongoDB (async, don't wait)
                     const id = 'cincymed-f1-collection'; // Always use this ID
@@ -537,6 +549,9 @@ Base your analysis on current 2025 market data from web search.`
             };
 
             const addCard = async (cardNum, variant, analysis = null) => {
+                console.log('🔍 addCard called:', { cardNum, variant, analysisExists: !!analysis });
+                console.log('📊 Current collection state:', Object.keys(collection).length, 'cards');
+                
                 const key = getCardKey(cardNum);
                 const newCollection = { ...collection };
                 if (!newCollection[key]) newCollection[key] = {};
@@ -547,6 +562,9 @@ Base your analysis on current 2025 market data from web search.`
                     newCollection[key][variant] = 0;
                 }
                 newCollection[key][variant]++;
+                
+                console.log('✅ Updated collection:', { key, variant, count: newCollection[key][variant] });
+                console.log('📝 About to save:', Object.keys(newCollection).length, 'cards');
                 
                 if (analysis) {
                     if (!newCollection[key]._analyses) newCollection[key]._analyses = {};
