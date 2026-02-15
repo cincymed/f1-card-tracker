@@ -315,10 +315,8 @@
                                 console.log(`Normalizing variant: "${variant}" → "${normalized}" for ${cardKey}`);
                                 variantsToFix[variant] = normalized;
                             } else {
-                                // Invalid variant that can't be normalized - remove it
-                                console.log(`Removing invalid variant: "${variant}" from ${cardKey}`);
-                                delete cardData[variant];
-                                return;
+                                // Keep unknown variant as-is instead of deleting it
+                                console.log(`⚠️ Unknown variant kept: "${variant}" in ${cardKey} (will be preserved)`);
                             }
                         }
                         
