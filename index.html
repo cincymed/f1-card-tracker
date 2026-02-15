@@ -1073,92 +1073,7 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                 try {
                     const imageBase64 = uploadedImages[0].split(',')[1];
                     
-                    const gradingPrompt = `You are an expert trading card grader analyzing a 2025 Topps Chrome Formula 1 card for potential PSA grading.
-
-ANALYZE THIS IMAGE FOR THE FOLLOWING CRITERIA:
-
-1️⃣ CENTERING (The Silent Killer)
-- Examine left/right border thickness (aim for 55/45 ratio or better for PSA 10)
-- Check top/bottom border thickness
-- Assess logo and text alignment
-- Note any visible border imbalance
-
-2️⃣ SURFACE (The Chrome Minefield) 
-- Look for hairline scratches (tilt light detection)
-- Identify any print lines (horizontal streaks)
-- Check for dimples/"fish eyes"
-- Note roller marks or refractor scuffing
-- Examine back surface for scratches and gloss uniformity
-- Look for straight glare lines or surface indents
-
-3️⃣ CORNERS (Microscopic but Merciless)
-- Check all four corners on BOTH front and back
-- Look for whitening, fraying, rounding
-- Identify any chrome chipping or silver flecks
-
-4️⃣ EDGES (The Sneaky Dropper)
-- Inspect long edges for whitening
-- Look for rough cuts or micro-chips
-- Note any edge flecks visible against borders
-- Chrome often shows tiny edge damage
-
-5️⃣ PRINT QUALITY & REGISTRATION
-- Check for blur in text
-- Identify misregistration or shadowed text
-- Note off-color logos or background speckling
-
-6️⃣ SURFACE GLOSS & CLEANLINESS
-- Assess gloss uniformity under angled light
-- Look for fingerprints or dust
-- Distinguish sleeve artifacts from actual damage
-
-7️⃣ NUMBERING & FOIL AREAS
-- Inspect foil stamp indentation
-- Check for foil flaking
-- Assess numbering clarity
-
-PROVIDE YOUR ASSESSMENT IN THIS EXACT FORMAT:
-
-QUICK GRADE REPORT
-═══════════════════════════════════════
-
-📊 VISUAL CHECKLIST (5-Point System)
-☐ Centering within 55/45 (excellent alignment)
-☐ No visible surface lines or scratches
-☐ No corner whitening or chipping
-☐ No edge damage or flecking
-☐ Clean foil/number stamp
-
-[For each checkbox, mark with ✅ if PASS or ❌ if FAIL, then explain findings]
-
-🔍 DETAILED FINDINGS
-Centering: [Assessment with specific observations]
-Surface: [Specific findings on scratches, print lines, scuffing]
-Corners: [Assessment of all 4 corners on front and back]
-Edges: [Edge condition findings]
-Print Quality: [Quality and registration observations]
-Gloss & Cleanliness: [Surface appearance assessment]
-Foil/Numbering: [Stamping and foil condition]
-
-📈 GRADE PROBABILITY ESTIMATE
-PSA 10 Probability: [X]% - [Brief rationale based on visible condition]
-PSA 9 Probability: [X]% - [Brief rationale based on visible condition]
-
-💬 SUMMARY ASSESSMENT
-[1-2 sentences on overall condition and grading recommendation]
-
-GRADING LOGIC:
-- 5/5 checklist → PSA 10 candidate (95%+)
-- 4/5 checklist → Likely PSA 9 (likely 9, possible 10)
-- 3/5 checklist → Probably 8-9 (high 8 or low 9)
-- 2/5 or less → 8 or below
-
-Remember: For 2025 Topps Chrome F1:
-- Chrome cards are susceptible to surface damage
-- Centering is the #1 reason cards grade 9 instead of 10
-- Surface flaws = instant 9 ceiling
-- One soft corner = probably 9
-- Two+ soft corners = prepare for 8`;
+                    const gradingPrompt = 'You are an expert trading card grader analyzing a 2025 Topps Chrome Formula 1 card for potential PSA grading.\n\nANALYZE THIS IMAGE FOR THE FOLLOWING CRITERIA:\n\n1. CENTERING (The Silent Killer)\n- Examine left/right border thickness (aim for 55/45 ratio or better for PSA 10)\n- Check top/bottom border thickness\n- Assess logo and text alignment\n- Note any visible border imbalance\n\n2. SURFACE (The Chrome Minefield)\n- Look for hairline scratches (tilt light detection)\n- Identify any print lines (horizontal streaks)\n- Check for dimples or "fish eyes"\n- Note roller marks or refractor scuffing\n- Examine back surface for scratches and gloss uniformity\n\n3. CORNERS (Microscopic but Merciless)\n- Check all four corners on BOTH front and back\n- Look for whitening, fraying, rounding\n- Identify any chrome chipping or silver flecks\n\n4. EDGES (The Sneaky Dropper)\n- Inspect long edges for whitening\n- Look for rough cuts or micro-chips\n- Note any edge flecks visible against borders\n\n5. PRINT QUALITY & REGISTRATION\n- Check for blur in text\n- Identify misregistration or shadowed text\n- Note off-color logos or background speckling\n\n6. SURFACE GLOSS & CLEANLINESS\n- Assess gloss uniformity under angled light\n- Look for fingerprints or dust\n- Distinguish sleeve artifacts from actual damage\n\n7. NUMBERING & FOIL AREAS\n- Inspect foil stamp indentation\n- Check for foil flaking\n- Assess numbering clarity\n\nPROVIDE YOUR ASSESSMENT IN THIS EXACT FORMAT:\n\nQUICK GRADE REPORT\n===================================================\n\nVISUAL CHECKLIST (5-Point System)\n[Check: Centering within 55/45]\n[Check: No visible surface lines]\n[Check: No corner whitening]\n[Check: No edge damage]\n[Check: Clean foil/stamp]\n\nFor each checkbox, mark with (PASS) or (FAIL) and explain.\n\nDETAILED FINDINGS\nCentering: [Assessment]\nSurface: [Findings]\nCorners: [All 4 corners front/back]\nEdges: [Edge condition]\nPrint Quality: [Observations]\nGloss & Cleanliness: [Assessment]\nFoil/Numbering: [Condition]\n\nGRADE PROBABILITY ESTIMATE\nPSA 10 Probability: [X]% - [Rationale]\nPSA 9 Probability: [X]% - [Rationale]\n\nSUMMARY ASSESSMENT\n[1-2 sentences on overall condition and recommendation]\n\nGRADING LOGIC:\n- 5/5 checklist = PSA 10 candidate (95%+)\n- 4/5 checklist = Likely PSA 9\n- 3/5 checklist = Probably 8-9\n- 2/5 or less = 8 or below\n\nFor 2025 Topps Chrome F1: Chrome cards are susceptible to surface damage. Centering is #1 reason for 9 vs 10. Surface flaws = instant 9 ceiling. One soft corner = probably 9. Two+ soft corners = prepare for 8.';
 
                     const response = await fetch(API_URL, {
                         method: 'POST',
@@ -1193,7 +1108,6 @@ Remember: For 2025 Topps Chrome F1:
                             .map(block => block.text)
                             .join('\n\n');
                         
-                        // Append grade report to recognized card analysis
                         if (recognizedCard) {
                             setRecognizedCard(prev => ({
                                 ...prev,
@@ -1201,15 +1115,17 @@ Remember: For 2025 Topps Chrome F1:
                             }));
                         }
                         
-                        alert('✅ Grade Report Generated!\n\nScroll down to see full assessment.');
+                        alert('Grade Report Generated!\n\nScroll down to see full assessment.');
                     }
                 } catch (error) {
                     console.error('Grade analysis error:', error);
-                    alert('❌ Error generating grade report:\n' + error.message);
+                    alert('Error generating grade report:\n' + error.message);
                 } finally {
                     setIsDeepAnalyzing(false);
                 }
             };
+
+            const performDeepAnalysis = async () => {
                 if (!uploadedImages || uploadedImages.length === 0 || !recognizedCard) return;
                 
                 setIsDeepAnalyzing(true);
