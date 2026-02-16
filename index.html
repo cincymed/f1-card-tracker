@@ -305,8 +305,8 @@
                 <div className="space-y-4">
                     {orderedSections.map((section, idx) => (
                         <div key={idx} className="space-y-2">
-                            {/* Section header - bold with underline */}
-                            <div className="text-sm font-bold text-blue-200 pt-1 border-b border-blue-500/40 pb-1">
+                            {/* Section header - clear and bold */}
+                            <div className="text-sm font-bold text-blue-300 pt-1 border-b border-blue-500/30 pb-1">
                                 {section.key.replace(/_/g, ' ')}
                             </div>
                             
@@ -325,8 +325,8 @@
                                                 <div className="flex gap-3 justify-between items-start">
                                                     <span className="text-slate-400 flex-shrink-0">✓</span>
                                                     <span className="flex-1">{checkItem}</span>
-                                                    <span className={`font-bold flex-shrink-0 ${isPass ? 'text-green-300' : status ? 'text-red-300' : 'text-slate-400'}`}>
-                                                        {status || ''}
+                                                    <span className={`font-bold flex-shrink-0 ${isPass ? 'text-green-400' : status ? 'text-red-400' : 'text-slate-400'}`}>
+                                                        {status.replace(/[\(\)]/g, '') || ''}
                                                     </span>
                                                 </div>
                                             </div>
@@ -344,7 +344,7 @@
                                         
                                         return (
                                             <div key={lineIdx} className={`flex gap-4 ${isGrade ? 'justify-between items-start' : ''}`}>
-                                                <span className="text-slate-400 min-w-fit font-medium">{label}:</span>
+                                                <span className="text-slate-300 min-w-fit font-semibold">{label}</span>
                                                 <span className={`text-slate-100 flex-1 ${
                                                     value.includes('PASS') || value.includes('Excellent') || value.includes('Clean') ? 'text-green-200' :
                                                     value.includes('FAIL') || value.includes('Poor') ? 'text-red-200' :
@@ -363,15 +363,6 @@
                                         return (
                                             <div key={lineIdx} className="text-slate-400 italic text-xs pl-2 border-l border-slate-600">
                                                 {content}
-                                            </div>
-                                        );
-                                    }
-                                    
-                                    // Handle "For each checkbox, mark with..." type instructions
-                                    if (line.toLowerCase().includes('for each') || line.toLowerCase().includes('note') || line.toLowerCase().includes('check')) {
-                                        return (
-                                            <div key={lineIdx} className="text-slate-500 italic text-xs">
-                                                {line}
                                             </div>
                                         );
                                     }
@@ -882,10 +873,13 @@ ${card.rookie ? 'This is a ROOKIE card' : ''}
 
 Please provide:
 1. Current market value range (Raw, PSA 9, PSA 10)
-2. 1-3 credible sources used (e.g., recent eBay sales, PSA guides, TCGPlayer)
-3. Brief explanation of how the value was derived
+2. 1-3 credible sources with specific details:
+   - Recent comparable sales (e.g., "eBay: 3 sales at $5-8 in last 30 days")
+   - Include web source URLs or references
+   - Show how averages were calculated
+3. Brief explanation of market factors affecting value
 
-Keep response under 150 words total.`
+Keep response under 150 words total, include source names and dates when available.`
                             }]
                         })
                     });
@@ -948,13 +942,15 @@ PSA 9: $X-Y
 PSA 10: $X-Y
 
 VALUE SOURCES & DERIVATION:
-- List up to 3 credible sources (eBay completed sales, PSA pricing guides, major card sites)
-- Include specific details about how the value was derived:
-  * Recent comparable sales data
-  * Average prices from different sources
-  * Market condition and demand factors
-  * Any premium or discount factors for this specific card
-Example: "Values based on 5 recent eBay sales ($X-Y avg), PSA guide ($X-Y), and TCGPlayer listings ($X-Y)"
+- List up to 3 credible sources with specific comparable sales data:
+  * eBay completed sales: Include specific listings found (e.g., "3 Base cards sold $5-8 in last 30 days")
+  * PSA Price Guide values with dates
+  * TCGPlayer or other market data with URLs/references
+- Show exact sales data: "Comparable card #XXX Refractor sold for $Y on [Date] on [Source]"
+- Include calculation method: "Average of X comparable sales across Y sources"
+- Note any market condition factors affecting the estimate
+
+Example format: "Values based on 5 recent eBay sales ($5-8 avg, Feb 2025), PSA guide ($7-10), and TCGPlayer listings ($6-9). Card #161 Base shows strong demand due to rookie status."
 
 IMPORTANT: Do NOT use trailing commas after value ranges.
 
@@ -1374,7 +1370,7 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
   "variant": "exact variant name",
   "isRookie": true or false,
   "confidence": "high/medium/low",
-  "analysis": "CARD IDENTIFICATION:\\n[Driver name, team, card number verification, visual details]\\n\\nVARIANT & RARITY:\\n[Specific variant analysis, serial number details if present]\\n\\nVALUE ESTIMATES (2025 Topps Chrome F1 - from web search):\\nRaw: $X-Y\\nPSA 9: $X-Y\\nPSA 10: $X-Y\\n\\nVALUE SOURCES & DERIVATION:\\n[List 1-3 credible sources: eBay completed sales, PSA guide, major card sites]\\n[Include specific details: recent sales prices, average across sources, market condition factors]\\nExample: 'Values based on 5 recent eBay sales ($5-8 avg), PSA guide ($7-10), and TCGPlayer listings ($6-9)'\\n\\nCOLLECTIBILITY:\\n[Why collectors want this card, current market trends]"
+  "analysis": "CARD IDENTIFICATION:\\n[Driver name, team, card number verification, visual details]\\n\\nVARIANT & RARITY:\\n[Specific variant analysis, serial number details if present]\\n\\nVALUE ESTIMATES (2025 Topps Chrome F1 - from web search):\\nRaw: $X-Y\\nPSA 9: $X-Y\\nPSA 10: $X-Y\\n\\nVALUE SOURCES & DERIVATION:\\n[List 1-3 credible sources with comparable sales data]\\n[Include: eBay recent sales (e.g. 3 sold $5-8 Feb 2025), PSA guide ($X-Y), TCGPlayer listings]\\n[Show specific comparable: Card #XXX sold for $Y on [Date]]\\n[Calculation: Average of X comparable sales]\\nExample: 'eBay: 5 Base cards $5-8 avg (Feb), PSA guide $7-10, TCGPlayer $6-9. #161 Base up 15% due to rookie demand'\\n\\nCOLLECTIBILITY:\\n[Why collectors want this card, current market trends]"
 }`
                     });
                     
@@ -1631,7 +1627,7 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
   "variant": "exact variant (Base, Refractor, Purple /299, Blue /150, Green /99, Gold /50, Orange /25, Red /5, SuperFractor 1/1, Black /10, Magenta /250, Gold Wave /75, Printing Plate 1/1)",
   "isRookie": true/false,
   "confidence": "high/medium/low",
-  "analysis": "CARD IDENTIFICATION:\\n[Back image card number and driver verification]\\n\\nWEB SEARCH FINDINGS:\\n[2025 Topps Chrome F1 market data for this card and variant]\\n\\nVARIANT & RARITY:\\n[Specific variant analysis]\\n\\nVALUE ESTIMATES (2025 Topps Chrome F1):\\nRaw: $X-Y\\nPSA 9: $X-Y\\nPSA 10: $X-Y\\n\\nVALUE SOURCES & DERIVATION:\\n[List 1-3 credible sources: eBay completed sales, PSA guide, major card sites]\\n[Include specific details: recent sales prices, average across sources, market condition factors]\\nExample: 'Values based on 5 recent eBay sales ($5-8 avg), PSA guide ($7-10), and TCGPlayer listings ($6-9)'\\n\\nCOLLECTIBILITY:\\n[Why collectors want this, market trends]"
+  "analysis": "CARD IDENTIFICATION:\\n[Back image card number and driver verification]\\n\\nWEB SEARCH FINDINGS:\\n[2025 Topps Chrome F1 market data for this card and variant]\\n\\nVARIANT & RARITY:\\n[Specific variant analysis]\\n\\nVALUE ESTIMATES (2025 Topps Chrome F1):\\nRaw: $X-Y\\nPSA 9: $X-Y\\nPSA 10: $X-Y\\n\\nVALUE SOURCES & DERIVATION:\\n[List 1-3 credible sources with comparable sales data]\\n[Include: eBay recent sales (e.g. 3 sold $5-8 Feb 2025), PSA guide, TCGPlayer prices]\\n[Show specific comparable: Card #XXX variant sold for $Y on [Date]]\\n[Calculation: Average of X comparable sales]\\nExample: 'eBay: 5 Base cards $5-8 avg (Feb), PSA guide $7-10, TCGPlayer $6-9. #161 Base up 15% due to rookie demand'\\n\\nCOLLECTIBILITY:\\n[Why collectors want this, market trends]"
 }`
                     });
                     
@@ -2189,7 +2185,20 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                     </div>
                                     {showFiltersDropdown && (
                                         <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 space-y-3">
-                                            {/* Variant Filter */}
+                                            {/* Subset Filter - Now First */}
+                                            <div>
+                                                <label className="text-xs font-semibold text-slate-400 block mb-2">Subset</label>
+                                                <select
+                                                    className="w-full px-2 py-2 bg-slate-700 border border-slate-600 rounded text-sm"
+                                                    title="Filter cards by subset (F1® Drivers, Inserts, etc.)"
+                                                    value={filterSubset}
+                                                    onChange={(e) => setFilterSubset(e.target.value)}
+                                                >
+                                                    <option value="all">All Subsets</option>
+                                                    {allSubsets.map(s => <option key={s} value={s}>{s}</option>)}
+                                                </select>
+                                            </div>
+                                            {/* Variant Filter - Now Second */}
                                             <div>
                                                 <label className="text-xs font-semibold text-slate-400 block mb-2">Variant Type</label>
                                                 <select
@@ -2253,19 +2262,6 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                         <option value="Printing Plate Yellow 1/1">Printing Plate Yellow 1/1</option>
                                                         <option value="Printing Plate Black 1/1">Printing Plate Black 1/1</option>
                                                     </optgroup>
-                                                </select>
-                                            </div>
-                                            {/* Subset Filter */}
-                                            <div>
-                                                <label className="text-xs font-semibold text-slate-400 block mb-2">Subset</label>
-                                                <select
-                                                    className="w-full px-2 py-2 bg-slate-700 border border-slate-600 rounded text-sm"
-                                                    title="Filter cards by subset (F1® Drivers, Inserts, etc.)"
-                                                    value={filterSubset}
-                                                    onChange={(e) => setFilterSubset(e.target.value)}
-                                                >
-                                                    <option value="all">All Subsets</option>
-                                                    {allSubsets.map(s => <option key={s} value={s}>{s}</option>)}
                                                 </select>
                                             </div>
                                             {/* Rookies Filter */}
@@ -2433,39 +2429,14 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                     <div className={`${isMobile ? 'p-3 pb-24' : 'max-w-7xl mx-auto p-4 pt-96'}`}>
                         <div className="flex justify-between items-center mb-4">
                             <div className="text-slate-400 text-sm">
-                                {showOwnedOnly 
-                                    ? `Showing ${filteredCards.length} owned cards` 
-                                    : `Showing ${filteredCards.length} of ${cardData.filter(c => {
-                                        const matchesSearch = !searchTerm || 
-                                            c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            c.num.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            (c.team && c.team.toLowerCase().includes(searchTerm.toLowerCase()));
-                                        const matchesSubset = filterSubset === 'all' || c.subset === filterSubset;
-                                        const matchesRookie = filterRookie === 'all' || 
-                                            (filterRookie === 'rookie' && c.rookie) ||
-                                            (filterRookie === 'veteran' && !c.rookie);
-                                        const matchesVariant = filterVariants.length === 0 || (() => {
-                                            const cardKey = getCardKey(c.num);
-                                            const cardInventory = collection[cardKey];
-                                            if (!cardInventory) return false;
-                                            const cardVariants = Object.keys(cardInventory)
-                                                .filter(key => key !== '_analyses')
-                                                .map(variant => {
-                                                    if (variant.includes('Chrome') && !variant.includes('Refractor')) {
-                                                        return 'Base';
-                                                    }
-                                                    return variant;
-                                                });
-                                            return cardVariants.some(variant => filterVariants.includes(variant));
-                                        })();
-                                        const matchesValue = filterValues.length === 0 || (() => {
-                                            const totalCount = getTotalCount(c.num);
-                                            if (totalCount === 0) return false;
-                                            const tier = getCardValueTier(c.num);
-                                            return tier && filterValues.includes(tier);
-                                        })();
-                                        return matchesSearch && matchesSubset && matchesRookie && matchesVariant && matchesValue;
-                                    }).length} cards`}
+                                {showOwnedOnly ? (
+                                    (() => {
+                                        const ownedInSubset = filteredCards.filter(card => getTotalCount(card.num) > 0).length;
+                                        return `Showing ${ownedInSubset} of ${filteredCards.length} cards`;
+                                    })()
+                                ) : (
+                                    `Showing ${filteredCards.length} cards`
+                                )}
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
