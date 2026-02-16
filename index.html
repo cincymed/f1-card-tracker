@@ -1433,15 +1433,9 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                 const card = cardData.find(c => c.num === cardNum);
                 const cardTitle = card ? card.name || card.driver || 'Unknown' : 'Unknown';
                 
-                // Get collection stats
+                // Get collection stats using the proper count function
                 const jsonStr = JSON.stringify(collection);
-                const totalCards = Object.values(collection)
-                    .filter(item => !Object.keys(item).some(k => k.startsWith('_')))
-                    .reduce((sum, cardInventory) => {
-                        return sum + Object.entries(cardInventory)
-                            .filter(([key]) => key !== '_analyses')
-                            .reduce((variantSum, [_, count]) => variantSum + count, 0);
-                    }, 0);
+                const totalCards = getTotalCollectionCount();
                 
                 // Show enhanced confirmation alert
                 alert(`✅ Added: Card #${cardNum}
@@ -2404,9 +2398,11 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
 
                                                         {/* Quick Grade Assessment Section */}
                                                         {variant && collection[getCardKey(selectedCard.num)]?._gradeReports?.[variant] && (
-                                                            <div className="mt-4 bg-amber-900/20 border border-amber-500/30 rounded p-3">
-                                                                <div className="font-semibold text-amber-400 text-sm mb-2">📊 Quick Grade Assessment</div>
-                                                                <div className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap font-mono overflow-auto max-h-96">
+                                                            <div className="mt-2 bg-blue-900/20 border border-blue-500/30 rounded p-3">
+                                                                <div className="flex justify-between items-center mb-2">
+                                                                    <div className="font-semibold text-blue-400 text-sm">📊 Quick Grade Assessment</div>
+                                                                </div>
+                                                                <div className="text-xs text-slate-300 leading-relaxed">
                                                                     {collection[getCardKey(selectedCard.num)]._gradeReports[variant]}
                                                                 </div>
                                                             </div>
@@ -2415,6 +2411,40 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                 );
                                                 });
                                             })()}
+                                        </div>
+
+                                        {/* Add New Variant Section */}
+                                        <div className="mt-6 pt-6 border-t border-slate-700">
+                                            <h4 className="text-sm font-semibold text-slate-300 mb-3">➕ Add New Card Variant</h4>
+                                            <p className="text-xs text-slate-400 mb-3">Don't see a variant you want to add? Select from the list below:</p>
+                                            <select
+                                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm focus:border-blue-500 focus:outline-none mb-3"
+                                                title="Select a variant to add"
+                                                onChange={(e) => {
+                                                    if (e.target.value) {
+                                                        // Track original state before first change
+                                                        if (!originalCardDetail) {
+                                                            const key = getCardKey(selectedCard.num);
+                                                            setOriginalCardDetail(JSON.parse(JSON.stringify(collection[key] || {})));
+                                                        }
+                                                        setCardDetailEdit(true);
+                                                        addCard(selectedCard.num, e.target.value);
+                                                        e.target.value = '';  // Reset dropdown
+                                                    }
+                                                }}
+                                                defaultValue=""
+                                            >
+                                                <option value="">Select a variant...</option>
+                                                {(() => {
+                                                    const cardKey = getCardKey(selectedCard.num);
+                                                    const cardInventory = collection[cardKey] || {};
+                                                    return OFFICIAL_VARIANTS
+                                                        .filter(v => !(cardInventory[v] > 0))  // Only show variants not in collection
+                                                        .map(variant => (
+                                                            <option key={variant} value={variant}>{variant}</option>
+                                                        ));
+                                                })()}
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
@@ -2954,11 +2984,11 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
 
                                                     {/* Quick Grade Report */}
                                                     {recognizedCard?.gradeReport && (
-                                                        <div className="bg-gradient-to-br from-amber-900/20 to-orange-900/20 border border-amber-500/30 rounded-xl p-5">
-                                                            <div className="flex items-center gap-2 mb-4">
-                                                                <h5 className="font-semibold text-amber-400">📊 Quick Grade Assessment</h5>
+                                                        <div className="mt-2 bg-blue-900/20 border border-blue-500/30 rounded p-3">
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <h5 className="font-semibold text-blue-400 text-sm">📊 Quick Grade Assessment</h5>
                                                             </div>
-                                                            <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap font-mono">{recognizedCard.gradeReport ? recognizedCard.gradeReport.replace(/\\n/g, '\n') : ''}</div>
+                                                            <div className="text-xs text-slate-300 leading-relaxed">{recognizedCard.gradeReport ? recognizedCard.gradeReport.replace(/\\n/g, '\n') : ''}</div>
                                                         </div>
                                                     )}
                                                 </div>
