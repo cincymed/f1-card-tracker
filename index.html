@@ -551,6 +551,8 @@
             const [showImageViewer, setShowImageViewer] = useState(false);
             const [imageViewerZoom, setImageViewerZoom] = useState(1);
             const [imageViewerPosition, setImageViewerPosition] = useState({ x: 0, y: 0 });
+            const [currentImageIndex, setCurrentImageIndex] = useState(0);  // Track current image being viewed
+            const [imageViewerTouchStart, setImageViewerTouchStart] = useState({ x: 0, y: 0, distance: 0 });  // Track touch gestures
             const [manualCardNumber, setManualCardNumber] = useState(null);
             const [cardDetailEdit, setCardDetailEdit] = useState(null);
             const [originalCardDetail, setOriginalCardDetail] = useState(null);
@@ -867,7 +869,7 @@
                         method: 'POST',
                         headers: getAuthHeaders(),
                         body: JSON.stringify({
-                            model: "claude-sonnet-4-20250514",
+                            model: "claude-sonnet-4-5-20250929",
                             max_tokens: 500,
                             messages: [{
                                 role: "user",
@@ -876,6 +878,11 @@ Card: #${card.num} ${card.name}
 Team: ${card.team || 'N/A'}
 Variant: ${variant}
 Subset: ${card.subset}
+
+Please provide:
+1. Current market value range (Raw, PSA 9, PSA 10)
+2. 1-3 credible sources used (e.g., recent eBay sales, PSA guides, TCGPlayer)
+3. Brief explanation of how the value was derived`
 ${card.rookie ? 'This is a ROOKIE card' : ''}
 
 Provide ONLY:
@@ -908,7 +915,7 @@ Keep response under 100 words total.`
                         method: 'POST',
                         headers: getAuthHeaders(),
                         body: JSON.stringify({
-                            model: "claude-opus-4-20250514",
+                            model: "claude-opus-4-5-20251101",
                             max_tokens: 2000,
                             tools: [{
                                 type: "web_search_20250305",
@@ -944,6 +951,16 @@ Provide current market values in this format:
 Raw: $X-Y
 PSA 9: $X-Y  
 PSA 10: $X-Y
+
+VALUE SOURCES & DERIVATION:
+- List up to 3 credible sources (eBay completed sales, PSA pricing guides, major card sites)
+- Include specific details about how the value was derived:
+  * Recent comparable sales data
+  * Average prices from different sources
+  * Market condition and demand factors
+  * Any premium or discount factors for this specific card
+Example: "Values based on 5 recent eBay sales ($X-Y avg), PSA guide ($X-Y), and TCGPlayer listings ($X-Y)"
+
 IMPORTANT: Do NOT use trailing commas after value ranges.
 
 COLLECTIBILITY:
@@ -1362,7 +1379,7 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
   "variant": "exact variant name",
   "isRookie": true or false,
   "confidence": "high/medium/low",
-  "analysis": "CARD IDENTIFICATION:\\n[Driver name, team, card number verification, visual details]\\n\\nVARIANT & RARITY:\\n[Specific variant analysis, serial number details if present]\\n\\nVALUE ESTIMATES (2025 Topps Chrome F1 - from web search):\\nRaw: $X-Y\\nPSA 9: $X-Y\\nPSA 10: $X-Y\\n\\nCOLLECTIBILITY:\\n[Why collectors want this card, current market trends]"
+  "analysis": "CARD IDENTIFICATION:\\n[Driver name, team, card number verification, visual details]\\n\\nVARIANT & RARITY:\\n[Specific variant analysis, serial number details if present]\\n\\nVALUE ESTIMATES (2025 Topps Chrome F1 - from web search):\\nRaw: $X-Y\\nPSA 9: $X-Y\\nPSA 10: $X-Y\\n\\nVALUE SOURCES & DERIVATION:\\n[List 1-3 credible sources: eBay completed sales, PSA guide, major card sites]\\n[Include specific details: recent sales prices, average across sources, market condition factors]\\nExample: 'Values based on 5 recent eBay sales ($5-8 avg), PSA guide ($7-10), and TCGPlayer listings ($6-9)'\\n\\nCOLLECTIBILITY:\\n[Why collectors want this card, current market trends]"
 }`
                     });
                     
@@ -1370,7 +1387,7 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                         method: 'POST',
                         headers: getAuthHeaders(),
                         body: JSON.stringify({
-                            model: "claude-opus-4-20250514",
+                            model: "claude-opus-4-5-20251101",
                             max_tokens: 3000,
                             tools: [{
                                 type: "web_search_20250305",
@@ -1498,13 +1515,13 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                 try {
                     const imageBase64 = uploadedImages[0].split(',')[1];
                     
-                    const gradingPrompt = 'You are an expert trading card grader analyzing a 2025 Topps Chrome Formula 1 card for potential PSA grading.\n\nANALYZE THIS IMAGE FOR THE FOLLOWING CRITERIA:\n\n1. CENTERING (The Silent Killer)\n- Examine left/right border thickness (aim for 55/45 ratio or better for PSA 10)\n- Check top/bottom border thickness\n- Assess logo and text alignment\n- Note any visible border imbalance\n\n2. SURFACE (The Chrome Minefield)\n- Look for hairline scratches (tilt light detection)\n- Identify any print lines (horizontal streaks)\n- Check for dimples or "fish eyes"\n- Note roller marks or refractor scuffing\n- Examine back surface for scratches and gloss uniformity\n\n3. CORNERS (Microscopic but Merciless)\n- Check all four corners on BOTH front and back\n- Look for whitening, fraying, rounding\n- Identify any chrome chipping or silver flecks\n\n4. EDGES (The Sneaky Dropper)\n- Inspect long edges for whitening\n- Look for rough cuts or micro-chips\n- Note any edge flecks visible against borders\n\n5. PRINT QUALITY & REGISTRATION\n- Check for blur in text\n- Identify misregistration or shadowed text\n- Note off-color logos or background speckling\n\n6. SURFACE GLOSS & CLEANLINESS\n- Assess gloss uniformity under angled light\n- Look for fingerprints or dust\n- Distinguish sleeve artifacts from actual damage\n\n7. NUMBERING & FOIL AREAS\n- Inspect foil stamp indentation\n- Check for foil flaking\n- Assess numbering clarity\n\nPROVIDE YOUR ASSESSMENT IN THIS EXACT FORMAT:\n\nQUICK GRADE REPORT\n===================================================\n\nVISUAL CHECKLIST (5-Point System)\n[Check: Centering within 55/45]\n[Check: No visible surface lines]\n[Check: No corner whitening]\n[Check: No edge damage]\n[Check: Clean foil/stamp]\n\nFor each checkbox, mark with (PASS) or (FAIL) and explain.\n\nDETAILED FINDINGS\nCentering: [Assessment]\nSurface: [Findings]\nCorners: [All 4 corners front/back]\nEdges: [Edge condition]\nPrint Quality: [Observations]\nGloss & Cleanliness: [Assessment]\nFoil/Numbering: [Condition]\n\nGRADE PROBABILITY ESTIMATE\nPSA 10 Probability: [X]% - [Rationale]\nPSA 9 Probability: [X]% - [Rationale]\n\nSUMMARY ASSESSMENT\n[1-2 sentences on overall condition and recommendation]\n\nGRADING LOGIC:\n- 5/5 checklist = PSA 10 candidate (95%+)\n- 4/5 checklist = Likely PSA 9\n- 3/5 checklist = Probably 8-9\n- 2/5 or less = 8 or below\n\nFor 2025 Topps Chrome F1: Chrome cards are susceptible to surface damage. Centering is #1 reason for 9 vs 10. Surface flaws = instant 9 ceiling. One soft corner = probably 9. Two+ soft corners = prepare for 8.';
+                    const gradingPrompt = 'You are an expert trading card grader analyzing a 2025 Topps Chrome Formula 1 card for potential PSA grading.\n\nANALYZE THIS IMAGE FOR THE FOLLOWING CRITERIA:\n\n1. CENTERING (The Silent Killer)\n- Examine left/right border thickness (aim for 55/45 ratio or better for PSA 10)\n- Check top/bottom border thickness\n- Assess logo and text alignment\n- Note any visible border imbalance\n\n2. SURFACE (The Chrome Minefield)\n- Look for hairline scratches (tilt light detection)\n- Identify any print lines (horizontal streaks)\n- Check for dimples or "fish eyes"\n- Note roller marks or refractor scuffing\n- Examine back surface for scratches and gloss uniformity\n\n3. CORNERS (Microscopic but Merciless)\n- Check all four corners on BOTH front and back\n- Look for whitening, fraying, rounding\n- Identify any chrome chipping or silver flecks\n\n4. EDGES (The Sneaky Dropper)\n- Inspect long edges for whitening\n- Look for rough cuts or micro-chips\n- Note any edge flecks visible against borders\n\n5. PRINT QUALITY & REGISTRATION\n- Check for blur in text\n- Identify misregistration or shadowed text\n- Note off-color logos or background speckling\n\n6. SURFACE GLOSS & CLEANLINESS\n- Assess gloss uniformity under angled light\n- Look for fingerprints or dust\n- Distinguish sleeve artifacts from actual damage\n\n7. NUMBERING & FOIL AREAS\n- Inspect foil stamp indentation\n- Check for foil flaking\n- Assess numbering clarity\n\nPROVIDE YOUR ASSESSMENT IN THIS EXACT FORMAT:\n\nGRADE PROBABILITY ESTIMATE\nPSA 10 Probability: [X]% - [Rationale]\nPSA 9 Probability: [X]% - [Rationale]\n\nSUMMARY ASSESSMENT\n[1-2 sentences on overall condition and recommendation]\n\nVISUAL CHECKLIST\n[Check: Centering within 55/45] (PASS) or (FAIL)\n[Check: No visible surface lines] (PASS) or (FAIL)\n[Check: No corner whitening] (PASS) or (FAIL)\n[Check: No edge damage] (PASS) or (FAIL)\n[Check: Clean foil/stamp] (PASS) or (FAIL)\n\nDETAILED FINDINGS\nCentering: [Assessment]\nSurface: [Findings]\nCorners: [All 4 corners front/back assessment]\nEdges: [Edge condition]\nPrint Quality: [Observations]\nGloss & Cleanliness: [Assessment]\nFoil/Numbering: [Condition]\n\nGRADING LOGIC:\n- 5/5 checklist = PSA 10 candidate (95%+)\n- 4/5 checklist = Likely PSA 9\n- 3/5 checklist = Probably 8-9\n- 2/5 or less = 8 or below\n\nFor 2025 Topps Chrome F1: Chrome cards are susceptible to surface damage. Centering is #1 reason for 9 vs 10. Surface flaws = instant 9 ceiling. One soft corner = probably 9. Two+ soft corners = prepare for 8.';
 
                     const response = await fetch(API_URL, {
                         method: 'POST',
                         headers: getAuthHeaders(),
                         body: JSON.stringify({
-                            model: 'claude-opus-4-20250514',
+                            model: 'claude-opus-4-5-20251101',
                             max_tokens: 2000,
                             messages: [{
                                 role: 'user',
@@ -1527,24 +1544,32 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                     });
 
                     const data = await response.json();
+                    console.log('Grade API Response:', data);
+                    
                     if (data.content && data.content.length > 0) {
                         const gradeReport = data.content
                             .filter(block => block.type === 'text')
                             .map(block => block.text)
                             .join('\n\n');
                         
+                        console.log('Grade Report Generated:', gradeReport.substring(0, 200));
+                        
                         if (recognizedCard) {
                             setRecognizedCard(prev => ({
                                 ...prev,
                                 gradeReport: gradeReport
                             }));
+                            alert('✅ Grade Report Generated!\n\nScroll down to see full assessment.');
+                        } else {
+                            console.warn('recognizedCard not set, cannot store grade report');
+                            alert('⚠️ Grade report created but card not recognized. Please ensure card is analyzed first.');
                         }
-                        
-                        alert('Grade Report Generated!\n\nScroll down to see full assessment.');
+                    } else {
+                        alert('❌ No response from grading API');
                     }
                 } catch (error) {
                     console.error('Grade analysis error:', error);
-                    alert('Error generating grade report:\n' + error.message);
+                    alert('❌ Error generating grade report:\n' + error.message);
                 } finally {
                     setIsDeepAnalyzing(false);
                 }
@@ -1611,7 +1636,7 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
   "variant": "exact variant (Base, Refractor, Purple /299, Blue /150, Green /99, Gold /50, Orange /25, Red /5, SuperFractor 1/1, Black /10, Magenta /250, Gold Wave /75, Printing Plate 1/1)",
   "isRookie": true/false,
   "confidence": "high/medium/low",
-  "analysis": "CARD IDENTIFICATION:\\n[Back image card number and driver verification]\\n\\nWEB SEARCH FINDINGS:\\n[2025 Topps Chrome F1 market data for this card and variant]\\n\\nVARIANT & RARITY:\\n[Specific variant analysis]\\n\\nVALUE ESTIMATES (2025 Topps Chrome F1):\\nRaw: $X-Y\\nPSA 9: $X-Y\\nPSA 10: $X-Y\\n\\nCOLLECTIBILITY:\\n[Why collectors want this, market trends]"
+  "analysis": "CARD IDENTIFICATION:\\n[Back image card number and driver verification]\\n\\nWEB SEARCH FINDINGS:\\n[2025 Topps Chrome F1 market data for this card and variant]\\n\\nVARIANT & RARITY:\\n[Specific variant analysis]\\n\\nVALUE ESTIMATES (2025 Topps Chrome F1):\\nRaw: $X-Y\\nPSA 9: $X-Y\\nPSA 10: $X-Y\\n\\nVALUE SOURCES & DERIVATION:\\n[List 1-3 credible sources: eBay completed sales, PSA guide, major card sites]\\n[Include specific details: recent sales prices, average across sources, market condition factors]\\nExample: 'Values based on 5 recent eBay sales ($5-8 avg), PSA guide ($7-10), and TCGPlayer listings ($6-9)'\\n\\nCOLLECTIBILITY:\\n[Why collectors want this, market trends]"
 }`
                     });
                     
@@ -1619,7 +1644,7 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                         method: 'POST',
                         headers: getAuthHeaders(),
                         body: JSON.stringify({
-                            model: "claude-sonnet-4-20250514",
+                            model: "claude-sonnet-4-5-20250929",
                             max_tokens: 4000,
                             tools: [{
                                 type: "web_search_20250305",
@@ -3026,7 +3051,12 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                             {/* Show all uploaded images */}
                                             <div className={`grid ${isMobile ? 'grid-cols-1' : uploadedImages.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
                                                 {uploadedImages.map((img, idx) => (
-                                                    <div key={idx} className="relative group cursor-pointer" onClick={() => setShowImageViewer(true)}>
+                                                    <div key={idx} className="relative group cursor-pointer" onClick={() => {
+                                                        setCurrentImageIndex(idx);
+                                                        setImageViewerZoom(1);
+                                                        setImageViewerPosition({ x: 0, y: 0 });
+                                                        setShowImageViewer(true);
+                                                    }}>
                                                         <img src={img} alt={`Card image ${idx + 1}`} className="w-full max-h-96 object-contain bg-slate-900 rounded-xl" />
                                                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100">
                                                             <span className="text-white text-lg font-semibold">🔍 Click to enlarge</span>
@@ -3976,25 +4006,25 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                         )}
                         {showImageViewer && uploadedImages && uploadedImages.length > 0 && (
                             <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50">
-                                {/* Controls */}
-                                <div className={`absolute ${isMobile ? 'bottom-4 left-4 right-4 flex justify-between' : 'top-4 right-4 flex gap-2'} z-10`}>
+                                {/* Top Controls */}
+                                <div className="absolute top-4 right-4 flex gap-2 z-10">
                                     <button
                                         onClick={() => setImageViewerZoom(Math.max(0.5, imageViewerZoom - 0.25))}
-                                        className={`bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold ${isMobile ? 'flex-1 py-3 text-lg' : 'px-4 py-2'}`}
+                                        className="bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold px-4 py-2"
                                         title="Zoom Out"
                                     >
                                         −
                                     </button>
                                     <button
                                         onClick={() => setImageViewerZoom(1)}
-                                        className={`bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold ${isMobile ? 'flex-1 py-3 text-sm' : 'px-4 py-2'}`}
+                                        className="bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold px-4 py-2"
                                         title="Reset Zoom"
                                     >
                                         {Math.round(imageViewerZoom * 100)}%
                                     </button>
                                     <button
                                         onClick={() => setImageViewerZoom(Math.min(5, imageViewerZoom + 0.25))}
-                                        className={`bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold ${isMobile ? 'flex-1 py-3 text-lg' : 'px-4 py-2'}`}
+                                        className="bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold px-4 py-2"
                                         title="Zoom In"
                                     >
                                         +
@@ -4004,37 +4034,122 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                             setShowImageViewer(false);
                                             setImageViewerZoom(1);
                                             setImageViewerPosition({ x: 0, y: 0 });
+                                            setCurrentImageIndex(0);
                                         }}
-                                        className={`bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold ${isMobile ? 'flex-1 py-3 text-lg' : 'px-4 py-2'}`}
+                                        className="bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold px-4 py-2"
                                         title="Close"
                                     >
                                         ✕
                                     </button>
                                 </div>
 
-                                {/* Image Container - Show all images in grid if multiple */}
+                                {/* Image Counter */}
+                                {uploadedImages.length > 1 && (
+                                    <div className="absolute top-4 left-4 bg-slate-800/90 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                                        {uploadedImages.length === 2 ? (currentImageIndex === 0 ? '📷 Front' : '📷 Back') : `📷 Image ${currentImageIndex + 1}/${uploadedImages.length}`}
+                                    </div>
+                                )}
+
+                                {/* Main Image Container */}
                                 <div 
-                                    className={`w-full h-full flex items-center justify-center overflow-auto p-8 ${uploadedImages.length > 1 ? 'gap-4' : ''}`}
+                                    className="w-full h-full flex items-center justify-center overflow-hidden p-8 select-none"
+                                    onWheel={(e) => {
+                                        e.preventDefault();
+                                        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                                        setImageViewerZoom(Math.max(0.5, Math.min(5, imageViewerZoom + delta)));
+                                    }}
+                                    onTouchStart={(e) => {
+                                        if (e.touches.length === 2) {
+                                            const touch1 = e.touches[0];
+                                            const touch2 = e.touches[1];
+                                            const distance = Math.hypot(
+                                                touch2.clientX - touch1.clientX,
+                                                touch2.clientY - touch1.clientY
+                                            );
+                                            setImageViewerTouchStart({ x: 0, y: 0, distance });
+                                        } else if (e.touches.length === 1) {
+                                            setImageViewerTouchStart({ 
+                                                x: e.touches[0].clientX, 
+                                                y: e.touches[0].clientY, 
+                                                distance: 0 
+                                            });
+                                        }
+                                    }}
+                                    onTouchMove={(e) => {
+                                        if (e.touches.length === 2) {
+                                            const touch1 = e.touches[0];
+                                            const touch2 = e.touches[1];
+                                            const distance = Math.hypot(
+                                                touch2.clientX - touch1.clientX,
+                                                touch2.clientY - touch1.clientY
+                                            );
+                                            
+                                            if (imageViewerTouchStart.distance > 0) {
+                                                const scale = distance / imageViewerTouchStart.distance;
+                                                const newZoom = Math.max(0.5, Math.min(5, imageViewerZoom * scale));
+                                                setImageViewerZoom(newZoom);
+                                            }
+                                            setImageViewerTouchStart({ ...imageViewerTouchStart, distance });
+                                        } else if (e.touches.length === 1 && imageViewerZoom > 1) {
+                                            const deltaX = e.touches[0].clientX - imageViewerTouchStart.x;
+                                            const deltaY = e.touches[0].clientY - imageViewerTouchStart.y;
+                                            setImageViewerPosition({
+                                                x: imageViewerPosition.x + deltaX,
+                                                y: imageViewerPosition.y + deltaY
+                                            });
+                                            setImageViewerTouchStart({ 
+                                                x: e.touches[0].clientX, 
+                                                y: e.touches[0].clientY, 
+                                                distance: 0 
+                                            });
+                                        }
+                                    }}
                                 >
-                                    {uploadedImages.map((img, idx) => (
-                                        <img 
-                                            key={idx}
-                                            src={img} 
-                                            alt={`Card image ${idx + 1}`}
-                                            style={{
-                                                transform: `scale(${imageViewerZoom})`,
-                                                maxWidth: uploadedImages.length > 1 ? '45vw' : '90vw',
-                                                maxHeight: '90vh',
-                                                objectFit: 'contain'
-                                            }}
-                                            draggable={false}
-                                        />
-                                    ))}
+                                    <img 
+                                        src={uploadedImages[currentImageIndex]} 
+                                        alt={`Card image ${currentImageIndex + 1}`}
+                                        style={{
+                                            transform: `scale(${imageViewerZoom}) translate(${imageViewerPosition.x}px, ${imageViewerPosition.y}px)`,
+                                            maxWidth: '90vw',
+                                            maxHeight: '90vh',
+                                            objectFit: 'contain',
+                                            transition: imageViewerZoom === 1 ? 'transform 0.2s ease-out' : 'none'
+                                        }}
+                                        draggable={false}
+                                    />
                                 </div>
+
+                                {/* Navigation Buttons - Show only if multiple images */}
+                                {uploadedImages.length > 1 && (
+                                    <>
+                                        <button
+                                            onClick={() => {
+                                                setCurrentImageIndex((prev) => (prev === 0 ? uploadedImages.length - 1 : prev - 1));
+                                                setImageViewerZoom(1);
+                                                setImageViewerPosition({ x: 0, y: 0 });
+                                            }}
+                                            className="absolute left-4 top-1/2 -translate-y-1/2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-lg font-bold px-4 py-3 text-2xl transition-all"
+                                            title="Previous image"
+                                        >
+                                            ‹
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setCurrentImageIndex((prev) => (prev === uploadedImages.length - 1 ? 0 : prev + 1));
+                                                setImageViewerZoom(1);
+                                                setImageViewerPosition({ x: 0, y: 0 });
+                                            }}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-lg font-bold px-4 py-3 text-2xl transition-all"
+                                            title="Next image"
+                                        >
+                                            ›
+                                        </button>
+                                    </>
+                                )}
 
                                 {/* Instructions */}
                                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-800/90 text-white px-6 py-3 rounded-lg text-sm">
-                                    <p>🖱️ Drag to pan • 🖱️ Scroll to zoom • Click buttons to zoom</p>
+                                    <p>📱 Pinch to zoom • 👆 Drag to pan • 🖱️ Scroll to zoom • Buttons to zoom</p>
                                 </div>
                             </div>
                         )}
