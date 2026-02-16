@@ -534,6 +534,8 @@
             const [pendingCardToAdd, setPendingCardToAdd] = useState(null);  // {cardNum, variant, analysis}
             const [addCardCooldown, setAddCardCooldown] = useState(0);  // Rate limiting for adding cards
             const [isMobile, setIsMobile] = useState(window.innerWidth < 768);  // Mobile detection state
+            const [showAddCardManual, setShowAddCardManual] = useState(false);  // Manual card addition modal
+            const [manualCardData, setManualCardData] = useState({ cardNumber: '', variant: 'Base', serialNumber: '' });  // Card data being entered
 
             // Detect mobile device
             useEffect(() => {
@@ -2804,6 +2806,19 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                             })()}
                                         </div>
 
+                                        {/* Add a Card Button */}
+                                        <div className="mt-4 mb-2">
+                                            <button
+                                                onClick={() => {
+                                                    setManualCardData({ cardNumber: '', variant: 'Base', serialNumber: '' });
+                                                    setShowAddCardManual(true);
+                                                }}
+                                                className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-3 px-4 rounded-lg font-semibold text-sm transition-all shadow-lg"
+                                            >
+                                                ➕ Add a Card
+                                            </button>
+                                        </div>
+
                                         {/* Add New Variant Section */}
                                         <div className="mt-6 pt-6 border-t border-slate-700">
                                             <h4 className="text-sm font-semibold text-slate-300 mb-3">➕ Add New Card Variant</h4>
@@ -3568,6 +3583,95 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                             className={`flex-1 bg-red-600 hover:bg-red-700 rounded-lg font-semibold py-3 ${isMobile ? 'text-base' : 'px-4'}`}
                                         >
                                             Yes, Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Manual Card Addition Modal */}
+                        {showAddCardManual && (
+                            <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
+                                onClick={() => {
+                                    setShowAddCardManual(false);
+                                    setManualCardData({ cardNumber: '', variant: 'Base', serialNumber: '' });
+                                }}>
+                                <div className={`bg-slate-800 rounded-2xl p-6 ${isMobile ? 'w-full max-h-[95vh]' : 'max-w-2xl w-full max-h-[90vh]'} overflow-y-auto scrollbar-hide`} onClick={(e) => e.stopPropagation()}>
+                                    <h2 className="text-2xl font-bold mb-2">➕ Add a Card</h2>
+                                    <p className="text-slate-300 mb-6 text-sm">Enter card details below. Serial number is optional.</p>
+                                    
+                                    <div className="space-y-4">
+                                        {/* Card Number */}
+                                        <div>
+                                            <label className="text-sm font-semibold text-slate-300 block mb-2">Card Number *</label>
+                                            <input
+                                                type="text"
+                                                value={manualCardData.cardNumber}
+                                                onChange={(e) => setManualCardData({...manualCardData, cardNumber: e.target.value})}
+                                                placeholder="e.g., 1, 5, 25"
+                                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm focus:border-blue-500 focus:outline-none text-white"
+                                            />
+                                        </div>
+                                        
+                                        {/* Variant Selector */}
+                                        <div>
+                                            <label className="text-sm font-semibold text-slate-300 block mb-2">Variant</label>
+                                            <select
+                                                value={manualCardData.variant}
+                                                onChange={(e) => setManualCardData({...manualCardData, variant: e.target.value})}
+                                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm focus:border-blue-500 focus:outline-none text-white"
+                                            >
+                                                {OFFICIAL_VARIANTS.map(variant => (
+                                                    <option key={variant} value={variant}>{variant}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        
+                                        {/* Serial Number */}
+                                        <div>
+                                            <label className="text-sm font-semibold text-slate-300 block mb-2">Serial Number (Optional)</label>
+                                            <input
+                                                type="text"
+                                                value={manualCardData.serialNumber}
+                                                onChange={(e) => setManualCardData({...manualCardData, serialNumber: e.target.value})}
+                                                placeholder="e.g., 63/250, /99, N/A"
+                                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm focus:border-blue-500 focus:outline-none text-white"
+                                            />
+                                            <p className="text-xs text-slate-500 mt-1">The serial number helps identify the correct variant.</p>
+                                        </div>
+                                        
+                                        {/* Info box */}
+                                        <div className="bg-blue-900/20 border border-blue-500/30 rounded p-3 mt-4">
+                                            <p className="text-xs text-blue-300">
+                                                <strong>ℹ️ Tip:</strong> If you have the physical card, take a photo of the back to get the exact serial number.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Action Buttons */}
+                                    <div className="flex gap-3 mt-6">
+                                        <button
+                                            onClick={() => {
+                                                if (manualCardData.cardNumber.trim()) {
+                                                    addCard(manualCardData.cardNumber, manualCardData.variant, null, null);
+                                                    setShowAddCardManual(false);
+                                                    setManualCardData({ cardNumber: '', variant: 'Base', serialNumber: '' });
+                                                } else {
+                                                    alert('Please enter a card number');
+                                                }
+                                            }}
+                                            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-semibold text-sm transition-all"
+                                        >
+                                            ✓ Add Card
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setShowAddCardManual(false);
+                                                setManualCardData({ cardNumber: '', variant: 'Base', serialNumber: '' });
+                                            }}
+                                            className="flex-1 bg-slate-600 hover:bg-slate-700 text-white py-2 px-4 rounded-lg font-semibold text-sm transition-all"
+                                        >
+                                            ✕ Cancel
                                         </button>
                                     </div>
                                 </div>
