@@ -231,40 +231,35 @@
 
         const variants = OFFICIAL_VARIANTS;
 
-        // Helper function to format Quick Grade Report with detailed content and beautiful formatting
+        // Helper function to format Quick Grade Report with app-matching style and responsive design
         const formatQuickGradeReport = (gradeText) => {
             if (!gradeText) return gradeText;
             
             // Define all possible section headers
             const sectionHeaders = [
+                'FINAL ASSESSMENT',
+                'GRADE PROBABILITY',
+                'CONDITION CHECKLIST',
+                'DETAILED ANALYSIS',
+                'NOTES',
                 'GRADE PROBABILITY ESTIMATE',
                 'SUMMARY ASSESSMENT',
                 'VISUAL CHECKLIST',
-                'DETAILED FINDINGS',
-                'CENTERING',
-                'SURFACE',
-                'CORNERS',
-                'EDGES',
-                'PRINT QUALITY',
-                'GLOSS & CLEANLINESS',
-                'FOIL/NUMBERING',
-                'CARD CONDITION',
-                'COLOR',
-                'RECOMMENDATION'
+                'DETAILED FINDINGS'
             ];
             
             const sections = {};
             let currentSection = '';
             const lines = gradeText.split('\n');
             
-            // Parse sections - capture ALL content including bracketed items
+            // Parse sections - capture ALL content
             lines.forEach(line => {
                 const upperLine = line.toUpperCase().trim();
                 
                 // Check if this line is a section header
                 let foundHeader = false;
                 for (let header of sectionHeaders) {
-                    if (upperLine.includes(header)) {
+                    if (upperLine.startsWith(header)) {
                         currentSection = header;
                         sections[currentSection] = [];
                         foundHeader = true;
@@ -273,19 +268,20 @@
                 }
                 
                 if (!foundHeader && currentSection && line.trim()) {
-                    // Skip separator lines but keep everything else including brackets
+                    // Skip separator lines
                     if (line.trim() !== '===================================================' && 
-                        line.trim() !== '---') {
+                        line.trim() !== '---' && 
+                        line.trim() !== '====') {
                         sections[currentSection].push(line.trim());
                     }
                 }
             });
             
-            // Reorder sections: Priority sections first, then others
-            const prioritySections = ['GRADE PROBABILITY ESTIMATE', 'SUMMARY ASSESSMENT'];
+            // Reorder sections: FINAL ASSESSMENT first, then others in priority
+            const prioritySections = ['FINAL ASSESSMENT', 'GRADE PROBABILITY', 'CONDITION CHECKLIST', 'DETAILED ANALYSIS', 'NOTES'];
             const orderedSections = [];
             
-            // Add priority sections first
+            // Add priority sections first in order
             prioritySections.forEach(key => {
                 if (sections[key] && sections[key].length > 0) {
                     orderedSections.push({ key, content: sections[key] });
@@ -293,83 +289,108 @@
                 }
             });
             
-            // Add remaining sections in order
+            // Add remaining sections
             Object.keys(sections).forEach(key => {
                 if (sections[key] && sections[key].length > 0) {
                     orderedSections.push({ key, content: sections[key] });
                 }
             });
             
-            // Format as JSX with beautiful styling and full detail
+            // Format as JSX with app-matching style
             return (
-                <div className="space-y-4">
+                <div className="space-y-4 text-slate-300">
                     {orderedSections.map((section, idx) => (
                         <div key={idx} className="space-y-2">
-                            {/* Section header - clear and bold */}
-                            <div className="text-sm font-bold text-blue-300 pt-1 border-b border-blue-500/30 pb-1">
-                                {section.key.replace(/_/g, ' ')}
+                            {/* Section header - clean and simple */}
+                            <div className="text-sm font-semibold text-blue-400 border-b border-slate-700 pb-1">
+                                {section.key}
                             </div>
                             
-                            {/* Section content with smart parsing */}
-                            <div className="text-xs text-slate-300 space-y-2 pl-3">
+                            {/* Section content with smart parsing and responsive wrapping */}
+                            <div className="text-sm space-y-2 pl-0">
                                 {section.content.map((line, lineIdx) => {
-                                    // Handle bracketed checklist items: [Check: Something] (PASS)/(FAIL)
-                                    const checklistMatch = line.match(/\[Check:\s*([^\]]+)\]\s*(\(PASS\)|\(FAIL\))?/i);
+                                    // Handle checklist items: "Centering: PASS/FAIL"
+                                    const checklistMatch = line.match(/^([A-Za-z\s\/&]+?):\s*(PASS|FAIL|Yes|No)/i);
                                     if (checklistMatch) {
                                         const checkItem = checklistMatch[1].trim();
-                                        const status = checklistMatch[2] || '';
-                                        const isPass = status.includes('PASS');
+                                        const status = checklistMatch[2].toUpperCase();
+                                        const isPass = status === 'PASS' || status === 'YES';
+                                        const remainingText = line.substring(line.indexOf(':') + 1).trim();
                                         
                                         return (
-                                            <div key={lineIdx} className="space-y-0.5">
-                                                <div className="flex gap-3 justify-between items-start">
-                                                    <span className="text-slate-400 flex-shrink-0">✓</span>
-                                                    <span className="flex-1">{checkItem}</span>
-                                                    <span className={`font-bold flex-shrink-0 ${isPass ? 'text-green-400' : status ? 'text-red-400' : 'text-slate-400'}`}>
-                                                        {status.replace(/[\(\)]/g, '') || ''}
-                                                    </span>
-                                                </div>
+                                            <div key={lineIdx} className="flex gap-2 items-baseline flex-wrap">
+                                                <span className="font-semibold text-slate-300 flex-shrink-0">{checkItem}:</span>
+                                                <span className={`font-semibold flex-shrink-0 ${isPass ? 'text-green-400' : 'text-red-400'}`}>
+                                                    {status}
+                                                </span>
+                                                {remainingText && remainingText !== status && (
+                                                    <span className="text-slate-400 flex-grow">{remainingText.replace(status, '').trim()}</span>
+                                                )}
                                             </div>
                                         );
                                     }
                                     
-                                    // Handle key-value pairs (Criteria: Grade)
+                                    // Handle PSA percentage lines: "PSA 10: 85%"
+                                    const psaMatch = line.match(/^PSA\s+(\d+):\s*([\d.]+%)/i);
+                                    if (psaMatch) {
+                                        const grade = psaMatch[1];
+                                        const percentage = psaMatch[2];
+                                        const remainingText = line.substring(line.indexOf(':') + 1).trim();
+                                        
+                                        return (
+                                            <div key={lineIdx} className="flex gap-2 items-baseline flex-wrap">
+                                                <span className="font-semibold text-slate-300 flex-shrink-0">PSA {grade}:</span>
+                                                <span className="text-yellow-300 font-semibold flex-shrink-0">{percentage}</span>
+                                                {remainingText && remainingText !== percentage && (
+                                                    <span className="text-slate-400 flex-grow">{remainingText.replace(percentage, '').trim()}</span>
+                                                )}
+                                            </div>
+                                        );
+                                    }
+                                    
+                                    // Handle "Estimated PSA Grade: X with Y% confidence"
+                                    if (line.toLowerCase().includes('estimated psa grade') || 
+                                        line.toLowerCase().includes('recommended for grading')) {
+                                        const colonIdx = line.indexOf(':');
+                                        if (colonIdx > -1) {
+                                            const label = line.substring(0, colonIdx).trim();
+                                            const value = line.substring(colonIdx + 1).trim();
+                                            return (
+                                                <div key={lineIdx} className="flex gap-2 items-baseline flex-wrap">
+                                                    <span className="font-semibold text-slate-300">{label}:</span>
+                                                    <span className="text-blue-300 font-semibold">{value}</span>
+                                                </div>
+                                            );
+                                        }
+                                    }
+                                    
+                                    // Handle key-value pairs with colons (Centering: Assessment)
                                     const kvMatch = line.match(/^([^:]+?):\s*(.+)$/);
                                     if (kvMatch) {
                                         const label = kvMatch[1].trim();
                                         const value = kvMatch[2].trim();
                                         
-                                        // Check if value is a grade/status
-                                        const isGrade = /^(PASS|FAIL|Excellent|Good|Fair|Poor|Yes|No|[\d.]+%|PSA \d+|None|Minimal|Moderate|Significant)/.test(value);
-                                        
                                         return (
-                                            <div key={lineIdx} className={`flex gap-4 ${isGrade ? 'justify-between items-start' : ''}`}>
-                                                <span className="text-slate-300 min-w-fit font-semibold">{label}</span>
-                                                <span className={`text-slate-100 flex-1 ${
-                                                    value.includes('PASS') || value.includes('Excellent') || value.includes('Clean') ? 'text-green-200' :
-                                                    value.includes('FAIL') || value.includes('Poor') ? 'text-red-200' :
-                                                    value.includes('Probability') || value.includes('%') ? 'text-yellow-200 font-semibold' :
-                                                    ''
-                                                }`}>
-                                                    {value}
-                                                </span>
+                                            <div key={lineIdx} className="space-y-1">
+                                                <div className="font-semibold text-slate-300">{label}</div>
+                                                <div className="text-slate-400 ml-2 leading-relaxed break-words">{value}</div>
                                             </div>
                                         );
                                     }
                                     
-                                    // Handle explanation text in brackets [...]
+                                    // Handle bracketed text [...]
                                     if (line.startsWith('[') && line.endsWith(']')) {
                                         const content = line.slice(1, -1).trim();
                                         return (
-                                            <div key={lineIdx} className="text-slate-400 italic text-xs pl-2 border-l border-slate-600">
+                                            <div key={lineIdx} className="text-slate-400 italic text-sm break-words">
                                                 {content}
                                             </div>
                                         );
                                     }
                                     
-                                    // Regular text lines - preserve as is
+                                    // Regular text lines - preserve with wrapping
                                     return (
-                                        <div key={lineIdx} className="text-slate-300 leading-relaxed text-xs">
+                                        <div key={lineIdx} className="text-slate-300 leading-relaxed break-words">
                                             {line}
                                         </div>
                                     );
@@ -1504,9 +1525,93 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
 
                 setIsDeepAnalyzing(true);
                 try {
-                    const imageBase64 = uploadedImages[0].split(',')[1];
+                    const gradingPrompt = `You are an expert trading card grader analyzing 2025 Topps Chrome Formula 1 cards for potential PSA grading.
+
+IMPORTANT - PROTECTIVE CONTAINERS:
+If the card is in a penny sleeve, toploader, or other protective sleeve:
+- Assess the card condition THROUGH the protective sleeve
+- Make best effort to evaluate the card itself, not the container
+- Note in the assessment that protective container was present
+- Do NOT penalize the card for being in protective sleeve (it's standard practice)
+- Assess the visible portions of the card condition
+
+ANALYZE ALL PROVIDED IMAGES FOR COMPLETE ASSESSMENT:
+Look at front, back, and any detail shots to form comprehensive evaluation.
+
+ASSESSMENT CRITERIA:
+Centering: left/right and top/bottom border ratios (55/45 or better = 10 potential)
+Surface: scratches, print lines, dimples, roller marks, gloss uniformity
+Corners: all four corners front/back for whitening, rounding, chipping
+Edges: whitening, rough cuts, micro-chips
+Print Quality: blur, misregistration, shadow text, color issues
+Gloss & Cleanliness: uniformity, fingerprints, dust
+Foil/Numbering: indentation, flaking, clarity
+
+PROVIDE ASSESSMENT IN THIS FORMAT:
+
+FINAL ASSESSMENT
+[Driver/Card]: [Overall condition summary in 1-2 sentences]
+Estimated PSA Grade: [X] with [Y]% confidence
+Recommended for grading: Yes/No (only if 8+ probability)
+
+GRADE PROBABILITY
+PSA 10: [X]%
+PSA 9: [X]%
+PSA 8: [X]%
+PSA 7 or below: [X]%
+
+CONDITION CHECKLIST
+Centering: [PASS/FAIL]
+Surface: [PASS/FAIL]
+Corners: [PASS/FAIL]
+Edges: [PASS/FAIL]
+Foil/Stamp: [PASS/FAIL]
+
+DETAILED ANALYSIS
+Centering: [Assessment]
+Surface: [Findings]
+Corners: [All 4 corners evaluation]
+Edges: [Edge condition]
+Print Quality: [Observations]
+Gloss & Cleanliness: [Assessment]
+Foil/Numbering: [Condition]
+
+NOTES:
+[Any protective sleeves detected, handling marks, or other observations]
+
+GRADING SCALE FOR 2025 TOPPS CHROME F1:
+- 5/5 checklist PASS = PSA 10 (90%+ confidence)
+- 4/5 checklist PASS = PSA 9 (60-80% confidence)
+- 3/5 checklist PASS = PSA 8-9 (40-60% confidence)
+- 2/5 or less = PSA 8 or below
+
+KEY FACTORS:
+- Centering is primary PSA 9 vs 10 differentiator
+- Any surface flaw = PSA 9 ceiling
+- Chrome susceptibility to damage is factor
+- Protective sleeve does NOT reduce grade`;
+
+                    // Build content array with all images
+                    const contentArray = [];
                     
-                    const gradingPrompt = 'You are an expert trading card grader analyzing a 2025 Topps Chrome Formula 1 card for potential PSA grading.\n\nANALYZE THIS IMAGE FOR THE FOLLOWING CRITERIA:\n\n1. CENTERING (The Silent Killer)\n- Examine left/right border thickness (aim for 55/45 ratio or better for PSA 10)\n- Check top/bottom border thickness\n- Assess logo and text alignment\n- Note any visible border imbalance\n\n2. SURFACE (The Chrome Minefield)\n- Look for hairline scratches (tilt light detection)\n- Identify any print lines (horizontal streaks)\n- Check for dimples or "fish eyes"\n- Note roller marks or refractor scuffing\n- Examine back surface for scratches and gloss uniformity\n\n3. CORNERS (Microscopic but Merciless)\n- Check all four corners on BOTH front and back\n- Look for whitening, fraying, rounding\n- Identify any chrome chipping or silver flecks\n\n4. EDGES (The Sneaky Dropper)\n- Inspect long edges for whitening\n- Look for rough cuts or micro-chips\n- Note any edge flecks visible against borders\n\n5. PRINT QUALITY & REGISTRATION\n- Check for blur in text\n- Identify misregistration or shadowed text\n- Note off-color logos or background speckling\n\n6. SURFACE GLOSS & CLEANLINESS\n- Assess gloss uniformity under angled light\n- Look for fingerprints or dust\n- Distinguish sleeve artifacts from actual damage\n\n7. NUMBERING & FOIL AREAS\n- Inspect foil stamp indentation\n- Check for foil flaking\n- Assess numbering clarity\n\nPROVIDE YOUR ASSESSMENT IN THIS EXACT FORMAT:\n\nGRADE PROBABILITY ESTIMATE\nPSA 10 Probability: [X]% - [Rationale]\nPSA 9 Probability: [X]% - [Rationale]\n\nSUMMARY ASSESSMENT\n[1-2 sentences on overall condition and recommendation]\n\nVISUAL CHECKLIST\n[Check: Centering within 55/45] (PASS) or (FAIL)\n[Check: No visible surface lines] (PASS) or (FAIL)\n[Check: No corner whitening] (PASS) or (FAIL)\n[Check: No edge damage] (PASS) or (FAIL)\n[Check: Clean foil/stamp] (PASS) or (FAIL)\n\nDETAILED FINDINGS\nCentering: [Assessment]\nSurface: [Findings]\nCorners: [All 4 corners front/back assessment]\nEdges: [Edge condition]\nPrint Quality: [Observations]\nGloss & Cleanliness: [Assessment]\nFoil/Numbering: [Condition]\n\nGRADING LOGIC:\n- 5/5 checklist = PSA 10 candidate (95%+)\n- 4/5 checklist = Likely PSA 9\n- 3/5 checklist = Probably 8-9\n- 2/5 or less = 8 or below\n\nFor 2025 Topps Chrome F1: Chrome cards are susceptible to surface damage. Centering is #1 reason for 9 vs 10. Surface flaws = instant 9 ceiling. One soft corner = probably 9. Two+ soft corners = prepare for 8.';
+                    // Add all uploaded images
+                    uploadedImages.forEach((img, idx) => {
+                        const imageBase64 = img.split(',')[1];
+                        contentArray.push({
+                            type: 'image',
+                            source: {
+                                type: 'base64',
+                                media_type: 'image/jpeg',
+                                data: imageBase64
+                            }
+                        });
+                    });
+                    
+                    // Add the grading prompt
+                    contentArray.push({
+                        type: 'text',
+                        text: gradingPrompt
+                    });
 
                     const response = await fetch(API_URL, {
                         method: 'POST',
@@ -1516,20 +1621,7 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                             max_tokens: 2000,
                             messages: [{
                                 role: 'user',
-                                content: [
-                                    {
-                                        type: 'image',
-                                        source: {
-                                            type: 'base64',
-                                            media_type: 'image/jpeg',
-                                            data: imageBase64
-                                        }
-                                    },
-                                    {
-                                        type: 'text',
-                                        text: gradingPrompt
-                                    }
-                                ]
+                                content: contentArray
                             }]
                         })
                     });
