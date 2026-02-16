@@ -213,6 +213,48 @@
 
         const variants = OFFICIAL_VARIANTS;
 
+        // Helper function to infer variant from serial number
+        const inferVariantFromSerial = (serialNumber) => {
+            if (!serialNumber) return null;
+            
+            // Extract just the number from formats like "/140" or "140"
+            const match = serialNumber.toString().match(/(\d+)/);
+            if (!match) return null;
+            const serialNum = match[1];
+            
+            // Map serial numbers to possible variants (in order of preference for ambiguous cases)
+            const serialVariantMap = {
+                '299': ['Teal Refractor /299'],
+                '250': ['Pink RayWave /250', 'Pink Refractor /250', 'Pink Checker Flag /250'],
+                '199': ['Aqua RayWave /199', 'Aqua Refractor /199', 'Aqua Checker Flag /199'],
+                '150': ['Blue RayWave /150', 'Blue Refractor /150', 'Blue Checker Flag /150'],
+                '140': ['Forest Green RayWave /140'],  // Unique to this serial!
+                '99': ['Green RayWave /99', 'Green Refractor /99', 'Green Checker Flag /99'],
+                '75': ['F1 75th Anniversary Refractor /75'],
+                '50': ['Gold RayWave /50', 'Gold Refractor /50', 'Gold Checker Flag /50'],
+                '25': ['Orange RayWave /25', 'Orange Refractor /25', 'Orange Checker Flag /25'],
+                '10': ['Black RayWave /10', 'Black Refractor /10', 'Black Checker Flag /10'],
+                '5': ['Red RayWave /5', 'Red Refractor /5', 'Red Checker Flag /5']
+            };
+            
+            return serialVariantMap[serialNum] || null;
+        };
+
+        // Helper function to validate or correct variant based on serial number
+        const validateVariantWithSerial = (extractedVariant, serialNumber) => {
+            const possibleVariants = inferVariantFromSerial(serialNumber);
+            
+            if (!possibleVariants) return extractedVariant; // No mapping available
+            
+            // If extracted variant is in the list of valid variants for this serial, use it
+            if (possibleVariants.includes(extractedVariant)) {
+                return extractedVariant;
+            }
+            
+            // Otherwise, use the first (most probable) variant for this serial
+            return possibleVariants[0];
+        };
+
         const allSubsets = [...new Set(cardData.map(c => c.subset))].sort();
         const allCardNumbers = cardData.map(c => c.num);
 
@@ -1096,6 +1138,20 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                             console.warn('No JSON structure found in response');
                         }
                         
+                        // Validate/infer variant from serial number if present
+                        if (recognized.serialNumber) {
+                            const inferredVariants = inferVariantFromSerial(recognized.serialNumber);
+                            if (inferredVariants) {
+                                const originalVariant = recognized.variant;
+                                recognized.variant = validateVariantWithSerial(recognized.variant, recognized.serialNumber);
+                                if (originalVariant !== recognized.variant) {
+                                    console.log(`📊 Serial number /${recognized.serialNumber} corrected variant from "${originalVariant}" to "${recognized.variant}"`);
+                                } else {
+                                    console.log(`✓ Serial number /${recognized.serialNumber} confirms variant: ${recognized.variant}`);
+                                }
+                            }
+                        }
+                        
                         // Use the extracted analysis text if available
                         if (analysisText) {
                             recognized.analysis = analysisText;
@@ -1336,6 +1392,20 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                             }
                         } else {
                             console.warn('No JSON structure found in response');
+                        }
+                        
+                        // Validate/infer variant from serial number if present
+                        if (opusData.serialNumber) {
+                            const inferredVariants = inferVariantFromSerial(opusData.serialNumber);
+                            if (inferredVariants) {
+                                const originalVariant = opusData.variant;
+                                opusData.variant = validateVariantWithSerial(opusData.variant, opusData.serialNumber);
+                                if (originalVariant !== opusData.variant) {
+                                    console.log(`📊 Serial number /${opusData.serialNumber} corrected variant from "${originalVariant}" to "${opusData.variant}"`);
+                                } else {
+                                    console.log(`✓ Serial number /${opusData.serialNumber} confirms variant: ${opusData.variant}`);
+                                }
+                            }
                         }
                         
                         // Use the extracted analysis text if available
