@@ -27,7 +27,13 @@
     <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
     <style>
         body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-        .card-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.75rem; }
+        @media (min-width: 768px) {
+            .card-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+        @media (max-width: 767px) {
+            .card-grid { grid-template-columns: repeat(2, 1fr); }
+        }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         .analysis-text { white-space: pre-wrap; line-height: 1.6; }
@@ -56,6 +62,13 @@
             text-orientation: mixed;
             transform: rotate(180deg);
             margin-right: 1rem;
+            display: none;
+        }
+        @media (min-width: 768px) {
+            .page-number {
+                display: flex;
+                align-items: flex-start;
+            }
         }
         .page-divider {
             position: sticky;
@@ -74,6 +87,38 @@
         .dropdown-item:hover { background: #334155; }
         .dropdown-item-delete { padding: 8px 12px; cursor: pointer; color: #fca5a5; border: 2px solid #dc2626; border-radius: 6px; transition: all 0.2s; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.9rem; margin: 16px 8px 0 8px; width: calc(100% - 16px); }
         .dropdown-item-delete:hover { background: #7f1d1d; color: #fecaca; }
+        
+        /* Mobile-friendly touch targets */
+        @media (max-width: 767px) {
+            button, a { min-height: 44px; min-width: 44px; }
+            button:active, a:active { transform: scale(0.98); }
+            input, select, textarea { min-height: 44px; font-size: 16px; }
+        }
+        
+        /* Prevent zoom on input focus */
+        @media (max-width: 767px) {
+            input[type="text"],
+            input[type="number"],
+            select,
+            textarea {
+                font-size: 16px;
+            }
+        }
+        
+        /* Safe area inset for notch devices */
+        @media (max-width: 767px) {
+            .fixed { padding-left: max(0.5rem, env(safe-area-inset-left)); padding-right: max(0.5rem, env(safe-area-inset-right)); }
+            .sticky { padding-left: max(0.5rem, env(safe-area-inset-left)); padding-right: max(0.5rem, env(safe-area-inset-right)); }
+        }
+        
+        /* Smooth momentum scrolling on mobile */
+        @media (max-width: 767px) {
+            * { -webkit-tap-highlight-color: transparent; }
+            body, html { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+            input, textarea, select, button { -webkit-user-select: text; user-select: text; }
+            .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+            .scrollbar-hide::-webkit-scrollbar { display: none; }
+        }
     </style>
 </head>
 <body>
@@ -221,6 +266,18 @@
             const [variantValidationModal, setVariantValidationModal] = useState(null);  // {cardNum, aiVariant, suggestedVariant}
             const [pendingCardToAdd, setPendingCardToAdd] = useState(null);  // {cardNum, variant, analysis}
             const [addCardCooldown, setAddCardCooldown] = useState(0);  // Rate limiting for adding cards
+            const [isMobile, setIsMobile] = useState(window.innerWidth < 768);  // Mobile detection state
+
+            // Detect mobile device
+            useEffect(() => {
+                const handleResize = () => {
+                    setIsMobile(window.innerWidth < 768);
+                };
+                
+                window.addEventListener('resize', handleResize);
+                return () => window.removeEventListener('resize', handleResize);
+            }, []);
+            
             // Fuzzy string matching - returns similarity score 0-1
             const fuzzyMatch = (str1, str2) => {
                 const s1 = str1.toLowerCase();
@@ -1615,13 +1672,12 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                 <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
                     {/* Floating Header */}
                     <div className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-sm shadow-xl">
-                        <div className="max-w-7xl mx-auto p-3">
+                        <div className={`${isMobile ? 'p-2' : 'max-w-7xl mx-auto p-3'}`}>
                             {!serverOnline && (
                                 <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-2 mb-2">
-                                    <p className="font-semibold text-sm mb-1">⚠️ Server Offline - AI Scanner Disabled</p>
+                                    <p className={`font-semibold ${isMobile ? 'text-xs' : 'text-sm'} mb-1`}>⚠️ Server Offline - AI Scanner Disabled</p>
                                     <p className="text-xs text-red-200 mb-1">
-                                        The AI card scanner requires a local server. 
-                                        Start: <code className="bg-black/30 px-1 py-0.5 rounded text-xs">node server.js</code>
+                                        {isMobile ? 'Scanner disabled' : 'The AI card scanner requires a local server'}
                                     </p>
                                     <button onClick={checkServer} className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-xs">
                                         Check Again
@@ -1630,14 +1686,14 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                             )}
 
                             <div className="mb-2">
-                                <div className="flex justify-between items-start mb-1 relative">
+                                <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-start'} mb-1 relative`}>
                                     {/* Hamburger Menu + Title */}
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2 md:gap-3 w-full">
                                         {/* Hamburger Menu */}
-                                        <div ref={menuRef} className="relative">
+                                        <div ref={menuRef} className="relative flex-shrink-0">
                                             <button
                                                 onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-                                                className="hamburger text-white hover:text-blue-400 transition"
+                                                className="hamburger text-white hover:text-blue-400 transition text-2xl md:text-lg"
                                                 title="Open menu"
                                             >
                                                 ☰
@@ -1669,23 +1725,23 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                 </div>
                                             )}
                                         </div>
-                                        <h1 className="font-bold bg-gradient-to-r from-blue-400 via-red-500 to-yellow-400 bg-clip-text text-transparent pb-2" style={{fontSize: '3rem'}}>
-                                            2025 Topps Chrome F1 Collection
+                                        <h1 className={`font-bold bg-gradient-to-r from-blue-400 via-red-500 to-yellow-400 bg-clip-text text-transparent pb-2 ${isMobile ? 'text-lg' : 'text-5xl'}`}>
+                                            {isMobile ? '2025 Chrome F1' : '2025 Topps Chrome F1 Collection'}
                                         </h1>
                                     </div>
 
-                                    <div className="text-right flex flex-col gap-1">
+                                    <div className={`${isMobile ? 'flex gap-4 w-full' : 'text-right flex flex-col gap-1'}`}>
                                         <div className="flex items-baseline gap-2" title="Total number of cards in your collection (including duplicates)">
-                                            <span className="text-2xl font-bold text-green-400">{stats.totalCopies}</span>
-                                            <span className="text-xs text-slate-400">Total Cards</span>
+                                            <span className={`font-bold text-green-400 ${isMobile ? 'text-lg' : 'text-2xl'}`}>{stats.totalCopies}</span>
+                                            <span className="text-xs text-slate-400">Total</span>
                                         </div>
                                         <div className="flex items-baseline gap-2" title="Number of different cards you own out of total cards in set">
-                                            <span className="text-lg font-semibold text-blue-400">{stats.cardsOwned}/{stats.totalCards}</span>
-                                            <span className="text-xs text-slate-400">Unique Count</span>
+                                            <span className={`font-semibold text-blue-400 ${isMobile ? 'text-base' : 'text-lg'}`}>{stats.cardsOwned}/{stats.totalCards}</span>
+                                            <span className="text-xs text-slate-400">Unique</span>
                                         </div>
                                         <div className="flex items-baseline gap-2" title="Percentage of the complete set you own">
-                                            <span className="text-lg font-semibold text-purple-400">{((stats.cardsOwned/stats.totalCards)*100).toFixed(1)}%</span>
-                                            <span className="text-xs text-slate-400">Completion %</span>
+                                            <span className={`font-semibold text-purple-400 ${isMobile ? 'text-base' : 'text-lg'}`}>{((stats.cardsOwned/stats.totalCards)*100).toFixed(1)}%</span>
+                                            <span className="text-xs text-slate-400">%</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1694,7 +1750,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                 </p>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                            <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-5'} gap-2`}>
                                 <div className="relative">
                                     <input
                                         type="text"
@@ -1817,7 +1873,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                     </div>
 
                     {/* Main Content */}
-                    <div className="max-w-7xl mx-auto p-4">
+                    <div className={`${isMobile ? 'p-3 pb-24' : 'max-w-7xl mx-auto p-4'}`}>
                         <div className="mb-2 text-slate-400 text-sm">Showing {filteredCards.length} cards</div>
 
                         {/* Card Grid with page numbers and separators every 12 cards */}
@@ -2002,29 +2058,29 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                         />
 
                         {/* Right Sidebar - Fixed buttons */}
-                        {/* AI Scanner - Mid-Right (Green) */}
-                        <div className="fixed top-1/2 -translate-y-1/2 right-6 z-40 flex flex-col gap-4">
+                        {/* AI Scanner - Mid-Right (Green) on desktop, Bottom on mobile */}
+                        <div className={`fixed ${isMobile ? 'bottom-4 left-4 right-4' : 'top-1/2 -translate-y-1/2 right-6'} z-40 ${isMobile ? 'flex gap-2' : 'flex flex-col gap-4'}`}>
                             <button
                                 onClick={() => setShowImageUpload(true)}
                                 disabled={!serverOnline}
                                 title={serverOnline ? "Open AI Scanner to analyze card images (upload front and back)" : "Server offline - start server to enable AI scanning"}
-                                className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-4 rounded-lg font-semibold shadow-lg disabled:opacity-50 flex flex-col items-center justify-center gap-2"
-                                style={{width: '160px', height: '280px'}}
+                                className={`bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-semibold shadow-lg disabled:opacity-50 flex flex-col items-center justify-center gap-2 transition-all ${isMobile ? 'flex-1 py-3' : ''}`}
+                                style={isMobile ? {height: '60px'} : {width: '160px', height: '280px'}}
                             >
-                                <span className="text-6xl">📷</span>
-                                <span className="text-lg">AI Scanner</span>
+                                <span className={isMobile ? 'text-3xl' : 'text-6xl'}>📷</span>
+                                <span className={isMobile ? 'text-xs' : 'text-lg'}>Scanner</span>
                                 {!serverOnline && <span className="text-xs text-red-300">Offline</span>}
                             </button>
 
                             {/* Dashboard Button */}
                             <a 
                                 href="dashboard.html" 
-                                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-lg flex flex-col items-center justify-center gap-2 transition-all"
-                                style={{width: '160px', height: '100px'}}
+                                className={`bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-lg flex flex-col items-center justify-center gap-2 transition-all ${isMobile ? 'flex-1 py-3' : ''}`}
+                                style={isMobile ? {height: '60px'} : {width: '160px', height: '100px'}}
                                 title="View your collection dashboard and analytics"
                             >
-                                <span className="text-4xl">📊</span>
-                                <span className="text-sm">Collection<br/>Dashboard</span>
+                                <span className={isMobile ? 'text-2xl' : 'text-4xl'}>📊</span>
+                                <span className={isMobile ? 'text-xs' : 'text-sm'}>Dashboard</span>
                             </a>
                         </div>
 
@@ -2034,14 +2090,14 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                 setCardDetailEdit(null);
                                 setOriginalCardDetail(null);
                             }}>
-                                <div className="bg-slate-800 rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto scrollbar-hide" onClick={(e) => e.stopPropagation()}>
-                                    <div className="flex justify-between items-start mb-6">
+                                <div className={`bg-slate-800 rounded-2xl p-6 ${isMobile ? 'w-full max-h-[95vh]' : 'max-w-4xl w-full max-h-[90vh]'} overflow-y-auto scrollbar-hide`} onClick={(e) => e.stopPropagation()}>
+                                    <div className={`flex ${isMobile ? 'flex-col gap-4' : 'justify-between items-start'} mb-6`}>
                                         <div className="flex-1">
-                                            <h2 className="text-3xl font-bold mb-2">#{selectedCard.num} {selectedCard.name}</h2>
-                                            {selectedCard.team && <p className="text-slate-400">{selectedCard.team}</p>}
-                                            <p className="text-sm text-slate-500">{selectedCard.subset}</p>
+                                            <h2 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold mb-2`}>#{selectedCard.num} {selectedCard.name}</h2>
+                                            {selectedCard.team && <p className="text-slate-400 text-sm">{selectedCard.team}</p>}
+                                            <p className="text-xs text-slate-500">{selectedCard.subset}</p>
                                         </div>
-                                        <div className="flex gap-2 items-start">
+                                        <div className={`flex ${isMobile ? 'w-full gap-2' : 'gap-2 items-start'}`}>
                                             <button 
                                                 onClick={() => {
                                                     // Save changes
@@ -2053,7 +2109,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                     setSelectedCard(null);
                                                 }}
                                                 title="Save changes and close"
-                                                className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-semibold"
+                                                className={`bg-green-600 hover:bg-green-700 rounded-lg font-semibold ${isMobile ? 'flex-1 py-3 text-base' : 'px-4 py-2 text-sm'}`}
                                             >
                                                 ✓ Done
                                             </button>
@@ -2073,7 +2129,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                     setSelectedCard(null);
                                                 }}
                                                 title="Discard changes and close"
-                                                className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm font-semibold"
+                                                className={`bg-red-600 hover:bg-red-700 rounded-lg font-semibold ${isMobile ? 'flex-1 py-3 text-base' : 'px-4 py-2 text-sm'}`}
                                             >
                                                 ✕ Cancel
                                             </button>
@@ -2115,9 +2171,9 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                         }}
                                                                         disabled={count === 0}
                                                                         title="Remove one card from collection"
-                                                                        className="w-10 h-10 bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-30 font-bold"
+                                                                        className={`bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-30 font-bold ${isMobile ? 'w-12 h-12 text-lg' : 'w-10 h-10'}`}
                                                                     >−</button>
-                                                                    <span className="w-12 text-center text-lg font-bold text-green-400" title="Number of this variant in your collection">{count}</span>
+                                                                    <span className={`text-center font-bold text-green-400 ${isMobile ? 'text-xl' : 'text-lg'}`} title="Number of this variant in your collection">{count}</span>
                                                                     <button
                                                                         onClick={() => {
                                                                             // Track original state before first change
@@ -2129,7 +2185,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                             addCard(selectedCard.num, variant);
                                                                         }}
                                                                         title="Add one card to collection"
-                                                                        className="w-10 h-10 bg-green-600 hover:bg-green-700 rounded-lg font-bold"
+                                                                        className={`bg-green-600 hover:bg-green-700 rounded-lg font-bold ${isMobile ? 'w-12 h-12 text-lg' : 'w-10 h-10'}`}
                                                                     >+</button>
                                                                 </div>
                                                             </div>
@@ -2224,15 +2280,15 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                     setDeepAnalysis(null);
                                     setSelectedAnalysisSource('opus');
                                 }}>
-                                <div className="bg-slate-800 rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto scrollbar-hide" onClick={(e) => e.stopPropagation()}>
+                                <div className={`bg-slate-800 rounded-2xl p-6 ${isMobile ? 'w-full max-h-[95vh]' : 'max-w-4xl w-full max-h-[90vh]'} overflow-y-auto scrollbar-hide`} onClick={(e) => e.stopPropagation()}>
                                     <h2 className="text-2xl font-bold mb-6">📷 AI Scanner</h2>
                                     <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageUpload} multiple className="hidden" />
                                     
                                     <>
                                     {!uploadedImages || uploadedImages.length === 0 && !recognizedCard ? (
                                         <>
-                                            <button onClick={() => fileInputRef.current?.click()} className="w-full h-80 border-2 border-dashed border-slate-600 rounded-xl flex flex-col items-center justify-center hover:border-blue-500 transition-colors bg-slate-900/50">
-                                                <span className="text-slate-300 text-base mb-3 font-semibold">📸 Upload Card Images</span>
+                                            <button onClick={() => fileInputRef.current?.click()} className={`w-full border-2 border-dashed border-slate-600 rounded-xl flex flex-col items-center justify-center hover:border-blue-500 transition-colors bg-slate-900/50 ${isMobile ? 'h-48' : 'h-80'}`}>
+                                                <span className={`text-slate-300 mb-3 font-semibold ${isMobile ? 'text-sm' : 'text-base'}`}>📸 Upload Card Images</span>
                                                 <span className="text-7xl mb-3">📷</span>
                                                 <span className="text-slate-400 text-sm text-center px-4 font-semibold">Upload BOTH front and back images</span>
                                                 <span className="text-slate-500 text-xs text-center px-4 mt-2">The back image's card number guides AI analysis</span>
@@ -2268,7 +2324,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                     ) : uploadedImages && uploadedImages.length > 0 ? (
                                         <div className="space-y-4">
                                             {/* Show all uploaded images */}
-                                            <div className={`grid ${uploadedImages.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
+                                            <div className={`grid ${isMobile ? 'grid-cols-1' : uploadedImages.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
                                                 {uploadedImages.map((img, idx) => (
                                                     <div key={idx} className="relative group cursor-pointer" onClick={() => setShowImageViewer(true)}>
                                                         <img src={img} alt={`Card image ${idx + 1}`} className="w-full max-h-96 object-contain bg-slate-900 rounded-xl" />
@@ -2652,7 +2708,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                     return valuesToShow && (
                                                         <div className="bg-gradient-to-r from-green-900/20 to-blue-900/20 border border-green-500/30 rounded-lg p-4">
                                                             <h4 className="font-semibold text-green-400 mb-3 text-center">💰 Value Estimates (2025 Topps Chrome F1)</h4>
-                                                            <div className="grid grid-cols-3 gap-4">
+                                                            <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-3'} gap-4`}>
                                                                 <div className="text-center">
                                                                     <div className="text-xs text-slate-400 mb-1">Raw</div>
                                                                     <div className="text-xl font-bold text-green-400">{valuesToShow.raw}</div>
@@ -2705,7 +2761,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                 {/* Analysis Comparison */}
                                                 <div>
                                                     <h4 className="font-semibold text-slate-200 mb-3">📊 Analysis Comparison</h4>
-                                                    <div className={`grid ${deepAnalysis ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
+                                                    <div className={`grid ${isMobile ? 'grid-cols-1' : deepAnalysis ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
                                                         {/* Analysis (Opus) */}
                                                         {recognizedCard.analysis && (
                                                             <div className={`p-4 rounded-lg transition-all ${
@@ -2824,19 +2880,19 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                         {/* Export Before Delete Modal */}
                         {showExportBeforeDelete && (
                             <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-                                <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full">
-                                    <h2 className="text-2xl font-bold mb-4">📤 Backup Your Collection?</h2>
-                                    <p className="text-slate-300 mb-6">
+                                <div className={`bg-slate-800 rounded-2xl p-6 ${isMobile ? 'w-full' : 'max-w-md w-full'}`}>
+                                    <h2 className={`font-bold mb-4 ${isMobile ? 'text-xl' : 'text-2xl'} text-center`}>📤 Backup Your Collection?</h2>
+                                    <p className="text-slate-300 mb-6 text-sm text-center">
                                         Before deleting your collection, would you like to export a backup file? You can import it later to restore your cards.
                                     </p>
-                                    <div className="flex gap-3">
+                                    <div className={`flex ${isMobile ? 'flex-col' : 'gap-3'} gap-3`}>
                                         <button
                                             onClick={() => {
                                                 exportCollection();
                                                 setShowExportBeforeDelete(false);
                                                 setShowResetConfirm(true);
                                             }}
-                                            className="flex-1 bg-blue-600 hover:bg-blue-700 px-4 py-3 rounded-lg font-semibold"
+                                            className={`flex-1 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold py-3 ${isMobile ? 'text-base' : 'px-4'}`}
                                         >
                                             📥 Export First
                                         </button>
@@ -2845,7 +2901,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                 setShowExportBeforeDelete(false);
                                                 setShowResetConfirm(true);
                                             }}
-                                            className="flex-1 bg-slate-600 hover:bg-slate-700 px-4 py-3 rounded-lg font-semibold"
+                                            className={`flex-1 bg-slate-600 hover:bg-slate-700 rounded-lg font-semibold py-3 ${isMobile ? 'text-base' : 'px-4'}`}
                                         >
                                             Skip Export
                                         </button>
@@ -2856,21 +2912,21 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
 
                         {showResetConfirm && (
                             <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-                                <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full">
-                                    <h2 className="text-2xl font-bold mb-4 text-red-400">⚠️ Delete Collection?</h2>
-                                    <p className="text-slate-300 mb-6">
+                                <div className={`bg-slate-800 rounded-2xl p-6 ${isMobile ? 'w-full' : 'max-w-md w-full'}`}>
+                                    <h2 className={`font-bold mb-4 text-red-400 text-center ${isMobile ? 'text-xl' : 'text-2xl'}`}>⚠️ Delete Collection?</h2>
+                                    <p className="text-slate-300 mb-6 text-sm text-center">
                                         This will PERMANENTLY DELETE your entire collection. This action CANNOT be undone!
                                     </p>
-                                    <div className="flex gap-3">
+                                    <div className={`flex ${isMobile ? 'flex-col' : 'gap-3'} gap-3`}>
                                         <button
                                             onClick={() => setShowResetConfirm(false)}
-                                            className="flex-1 bg-slate-600 hover:bg-slate-700 px-4 py-3 rounded-lg font-semibold"
+                                            className={`flex-1 bg-slate-600 hover:bg-slate-700 rounded-lg font-semibold py-3 ${isMobile ? 'text-base' : 'px-4'}`}
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={resetCollection}
-                                            className="flex-1 bg-red-600 hover:bg-red-700 px-4 py-3 rounded-lg font-semibold"
+                                            className={`flex-1 bg-red-600 hover:bg-red-700 rounded-lg font-semibold py-3 ${isMobile ? 'text-base' : 'px-4'}`}
                                         >
                                             Yes, Delete
                                         </button>
@@ -2882,7 +2938,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                         {/* Variant Selection Modal */}
                         {variantValidationModal && (
                             <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-                                <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full max-h-96 overflow-y-auto">
+                                <div className={`bg-slate-800 rounded-2xl p-6 ${isMobile ? 'w-full max-h-[90vh]' : 'max-w-md w-full max-h-96'} overflow-y-auto`}>
                                     <h2 className="text-2xl font-bold mb-2">⚠️ Confirm Card Variant</h2>
                                     <p className="text-slate-300 mb-4 text-sm">
                                         The AI detected "<span className="font-semibold text-blue-300">{variantValidationModal.aiVariant}</span>" but this doesn't match our official variants list.
@@ -3023,24 +3079,24 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                         {showImageViewer && uploadedImages && uploadedImages.length > 0 && (
                             <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50">
                                 {/* Controls */}
-                                <div className="absolute top-4 right-4 flex gap-2 z-10">
+                                <div className={`absolute ${isMobile ? 'bottom-4 left-4 right-4 flex justify-between' : 'top-4 right-4 flex gap-2'} z-10`}>
                                     <button
                                         onClick={() => setImageViewerZoom(Math.max(0.5, imageViewerZoom - 0.25))}
-                                        className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg font-semibold"
+                                        className={`bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold ${isMobile ? 'flex-1 py-3 text-lg' : 'px-4 py-2'}`}
                                         title="Zoom Out"
                                     >
                                         −
                                     </button>
                                     <button
                                         onClick={() => setImageViewerZoom(1)}
-                                        className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg font-semibold"
+                                        className={`bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold ${isMobile ? 'flex-1 py-3 text-sm' : 'px-4 py-2'}`}
                                         title="Reset Zoom"
                                     >
                                         {Math.round(imageViewerZoom * 100)}%
                                     </button>
                                     <button
                                         onClick={() => setImageViewerZoom(Math.min(5, imageViewerZoom + 0.25))}
-                                        className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg font-semibold"
+                                        className={`bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold ${isMobile ? 'flex-1 py-3 text-lg' : 'px-4 py-2'}`}
                                         title="Zoom In"
                                     >
                                         +
@@ -3051,7 +3107,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                             setImageViewerZoom(1);
                                             setImageViewerPosition({ x: 0, y: 0 });
                                         }}
-                                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold"
+                                        className={`bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold ${isMobile ? 'flex-1 py-3 text-lg' : 'px-4 py-2'}`}
                                         title="Close"
                                     >
                                         ✕
