@@ -233,7 +233,13 @@
 
         // Helper function to format Quick Grade Report with app-matching style and responsive design
         const formatQuickGradeReport = (gradeText) => {
-            if (!gradeText) return gradeText;
+            if (!gradeText) {
+                console.log('QGA: No grade text provided');
+                return <div className="text-slate-400">No assessment available</div>;
+            }
+            
+            console.log('QGA: Formatting grade report, text length:', gradeText.length);
+            console.log('QGA: First 200 chars:', gradeText.substring(0, 200));
             
             // Define all possible section headers
             const sectionHeaders = [
@@ -252,8 +258,10 @@
             let currentSection = '';
             const lines = gradeText.split('\n');
             
+            console.log('QGA: Total lines:', lines.length);
+            
             // Parse sections - capture ALL content
-            lines.forEach(line => {
+            lines.forEach((line, idx) => {
                 const upperLine = line.toUpperCase().trim();
                 
                 // Check if this line is a section header
@@ -262,6 +270,7 @@
                     if (upperLine.startsWith(header)) {
                         currentSection = header;
                         sections[currentSection] = [];
+                        console.log('QGA: Found section header at line', idx, ':', header);
                         foundHeader = true;
                         break;
                     }
@@ -271,11 +280,26 @@
                     // Skip separator lines
                     if (line.trim() !== '===================================================' && 
                         line.trim() !== '---' && 
-                        line.trim() !== '====') {
+                        line.trim() !== '====' &&
+                        !line.trim().startsWith('=')) {
                         sections[currentSection].push(line.trim());
                     }
                 }
             });
+            
+            console.log('QGA: Sections found:', Object.keys(sections));
+            
+            // Fallback: if no sections found, treat entire text as content
+            if (Object.keys(sections).length === 0) {
+                console.log('QGA: No sections found, using full text as fallback');
+                return (
+                    <div className="text-sm space-y-2 text-slate-300 break-words leading-relaxed">
+                        {lines.filter(l => l.trim()).map((line, idx) => (
+                            <div key={idx}>{line}</div>
+                        ))}
+                    </div>
+                );
+            }
             
             // Reorder sections: FINAL ASSESSMENT first, then others in priority
             const prioritySections = ['FINAL ASSESSMENT', 'GRADE PROBABILITY', 'CONDITION CHECKLIST', 'DETAILED ANALYSIS', 'NOTES'];
@@ -296,105 +320,111 @@
                 }
             });
             
+            console.log('QGA: Ordered sections:', orderedSections.length, 'sections');
+            
             // Format as JSX with app-matching style
             return (
-                <div className="space-y-4 text-slate-300">
+                <div className="space-y-3 text-slate-300 text-sm">
                     {orderedSections.map((section, idx) => (
-                        <div key={idx} className="space-y-2">
+                        <div key={idx} className="space-y-1.5">
                             {/* Section header - clean and simple */}
-                            <div className="text-sm font-semibold text-blue-400 border-b border-slate-700 pb-1">
+                            <div className="text-sm font-semibold text-blue-400 border-b border-slate-700 pb-0.5">
                                 {section.key}
                             </div>
                             
                             {/* Section content with smart parsing and responsive wrapping */}
-                            <div className="text-sm space-y-2 pl-0">
-                                {section.content.map((line, lineIdx) => {
-                                    // Handle checklist items: "Centering: PASS/FAIL"
-                                    const checklistMatch = line.match(/^([A-Za-z\s\/&]+?):\s*(PASS|FAIL|Yes|No)/i);
-                                    if (checklistMatch) {
-                                        const checkItem = checklistMatch[1].trim();
-                                        const status = checklistMatch[2].toUpperCase();
-                                        const isPass = status === 'PASS' || status === 'YES';
-                                        const remainingText = line.substring(line.indexOf(':') + 1).trim();
-                                        
-                                        return (
-                                            <div key={lineIdx} className="flex gap-2 items-baseline flex-wrap">
-                                                <span className="font-semibold text-slate-300 flex-shrink-0">{checkItem}:</span>
-                                                <span className={`font-semibold flex-shrink-0 ${isPass ? 'text-green-400' : 'text-red-400'}`}>
-                                                    {status}
-                                                </span>
-                                                {remainingText && remainingText !== status && (
-                                                    <span className="text-slate-400 flex-grow">{remainingText.replace(status, '').trim()}</span>
-                                                )}
-                                            </div>
-                                        );
-                                    }
-                                    
-                                    // Handle PSA percentage lines: "PSA 10: 85%"
-                                    const psaMatch = line.match(/^PSA\s+(\d+):\s*([\d.]+%)/i);
-                                    if (psaMatch) {
-                                        const grade = psaMatch[1];
-                                        const percentage = psaMatch[2];
-                                        const remainingText = line.substring(line.indexOf(':') + 1).trim();
-                                        
-                                        return (
-                                            <div key={lineIdx} className="flex gap-2 items-baseline flex-wrap">
-                                                <span className="font-semibold text-slate-300 flex-shrink-0">PSA {grade}:</span>
-                                                <span className="text-yellow-300 font-semibold flex-shrink-0">{percentage}</span>
-                                                {remainingText && remainingText !== percentage && (
-                                                    <span className="text-slate-400 flex-grow">{remainingText.replace(percentage, '').trim()}</span>
-                                                )}
-                                            </div>
-                                        );
-                                    }
-                                    
-                                    // Handle "Estimated PSA Grade: X with Y% confidence"
-                                    if (line.toLowerCase().includes('estimated psa grade') || 
-                                        line.toLowerCase().includes('recommended for grading')) {
-                                        const colonIdx = line.indexOf(':');
-                                        if (colonIdx > -1) {
-                                            const label = line.substring(0, colonIdx).trim();
-                                            const value = line.substring(colonIdx + 1).trim();
+                            <div className="space-y-1">
+                                {section.content.length === 0 ? (
+                                    <div className="text-slate-500 italic text-xs">No content</div>
+                                ) : (
+                                    section.content.map((line, lineIdx) => {
+                                        // Handle checklist items: "Centering: PASS/FAIL"
+                                        const checklistMatch = line.match(/^([A-Za-z\s\/&]+?):\s*(PASS|FAIL|Yes|No)/i);
+                                        if (checklistMatch) {
+                                            const checkItem = checklistMatch[1].trim();
+                                            const status = checklistMatch[2].toUpperCase();
+                                            const isPass = status === 'PASS' || status === 'YES';
+                                            const remainingText = line.substring(line.indexOf(':') + 1).trim();
+                                            
                                             return (
-                                                <div key={lineIdx} className="flex gap-2 items-baseline flex-wrap">
-                                                    <span className="font-semibold text-slate-300">{label}:</span>
-                                                    <span className="text-blue-300 font-semibold">{value}</span>
+                                                <div key={lineIdx} className="flex gap-2 items-baseline flex-wrap text-sm">
+                                                    <span className="font-semibold text-slate-300 flex-shrink-0">{checkItem}:</span>
+                                                    <span className={`font-semibold flex-shrink-0 ${isPass ? 'text-green-400' : 'text-red-400'}`}>
+                                                        {status}
+                                                    </span>
+                                                    {remainingText && remainingText !== status && (
+                                                        <span className="text-slate-400 flex-grow">{remainingText.replace(status, '').trim()}</span>
+                                                    )}
                                                 </div>
                                             );
                                         }
-                                    }
-                                    
-                                    // Handle key-value pairs with colons (Centering: Assessment)
-                                    const kvMatch = line.match(/^([^:]+?):\s*(.+)$/);
-                                    if (kvMatch) {
-                                        const label = kvMatch[1].trim();
-                                        const value = kvMatch[2].trim();
                                         
+                                        // Handle PSA percentage lines: "PSA 10: 85%"
+                                        const psaMatch = line.match(/^PSA\s+(\d+):\s*([\d.]+%)/i);
+                                        if (psaMatch) {
+                                            const grade = psaMatch[1];
+                                            const percentage = psaMatch[2];
+                                            const remainingText = line.substring(line.indexOf(':') + 1).trim();
+                                            
+                                            return (
+                                                <div key={lineIdx} className="flex gap-2 items-baseline flex-wrap text-sm">
+                                                    <span className="font-semibold text-slate-300 flex-shrink-0">PSA {grade}:</span>
+                                                    <span className="text-yellow-300 font-semibold flex-shrink-0">{percentage}</span>
+                                                    {remainingText && remainingText !== percentage && (
+                                                        <span className="text-slate-400 flex-grow">{remainingText.replace(percentage, '').trim()}</span>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+                                        
+                                        // Handle "Estimated PSA Grade: X with Y% confidence"
+                                        if (line.toLowerCase().includes('estimated psa grade') || 
+                                            line.toLowerCase().includes('recommended for grading')) {
+                                            const colonIdx = line.indexOf(':');
+                                            if (colonIdx > -1) {
+                                                const label = line.substring(0, colonIdx).trim();
+                                                const value = line.substring(colonIdx + 1).trim();
+                                                return (
+                                                    <div key={lineIdx} className="flex gap-2 items-baseline flex-wrap text-sm">
+                                                        <span className="font-semibold text-slate-300">{label}:</span>
+                                                        <span className="text-blue-300 font-semibold">{value}</span>
+                                                    </div>
+                                                );
+                                            }
+                                        }
+                                        
+                                        // Handle key-value pairs with colons (Centering: Assessment)
+                                        const kvMatch = line.match(/^([^:]+?):\s*(.+)$/);
+                                        if (kvMatch) {
+                                            const label = kvMatch[1].trim();
+                                            const value = kvMatch[2].trim();
+                                            
+                                            return (
+                                                <div key={lineIdx} className="space-y-0.5 text-sm">
+                                                    <div className="font-semibold text-slate-300">{label}</div>
+                                                    <div className="text-slate-400 ml-2 leading-relaxed break-words">{value}</div>
+                                                </div>
+                                            );
+                                        }
+                                        
+                                        // Handle bracketed text [...]
+                                        if (line.startsWith('[') && line.endsWith(']')) {
+                                            const content = line.slice(1, -1).trim();
+                                            return (
+                                                <div key={lineIdx} className="text-slate-400 italic text-sm break-words">
+                                                    {content}
+                                                </div>
+                                            );
+                                        }
+                                        
+                                        // Regular text lines - preserve with wrapping
                                         return (
-                                            <div key={lineIdx} className="space-y-1">
-                                                <div className="font-semibold text-slate-300">{label}</div>
-                                                <div className="text-slate-400 ml-2 leading-relaxed break-words">{value}</div>
+                                            <div key={lineIdx} className="text-slate-300 leading-relaxed break-words text-sm">
+                                                {line}
                                             </div>
                                         );
-                                    }
-                                    
-                                    // Handle bracketed text [...]
-                                    if (line.startsWith('[') && line.endsWith(']')) {
-                                        const content = line.slice(1, -1).trim();
-                                        return (
-                                            <div key={lineIdx} className="text-slate-400 italic text-sm break-words">
-                                                {content}
-                                            </div>
-                                        );
-                                    }
-                                    
-                                    // Regular text lines - preserve with wrapping
-                                    return (
-                                        <div key={lineIdx} className="text-slate-300 leading-relaxed break-words">
-                                            {line}
-                                        </div>
-                                    );
-                                })}
+                                    })
+                                )}
                             </div>
                         </div>
                     ))}
@@ -2968,7 +2998,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                 <div className="flex justify-between items-center mb-3">
                                                                     <div className="font-semibold text-blue-400 text-sm">📊 Quick Grade Assessment</div>
                                                                 </div>
-                                                                <div className="text-xs text-slate-300 leading-relaxed font-mono">
+                                                                <div className="text-slate-300 leading-relaxed">
                                                                     {formatQuickGradeReport(collection[getCardKey(selectedCard.num)]._gradeReports[variant])}
                                                                 </div>
                                                             </div>
@@ -3652,7 +3682,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                             <div className="flex items-center justify-between mb-3">
                                                                 <h5 className="font-semibold text-blue-400 text-sm">📊 Quick Grade Assessment</h5>
                                                             </div>
-                                                            <div className="text-xs text-slate-300 leading-relaxed font-mono">
+                                                            <div className="text-slate-300 leading-relaxed">
                                                                 {formatQuickGradeReport(recognizedCard.gradeReport)}
                                                             </div>
                                                         </div>
