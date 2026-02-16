@@ -2293,13 +2293,6 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                 // MOBILE: Search + Filters button
                                 <div className="space-y-2">
                                     <div className="flex gap-2">
-                                        <button
-                                            onClick={() => setShowFiltersDropdown(!showFiltersDropdown)}
-                                            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-700 transition-colors flex items-center gap-2 whitespace-nowrap flex-shrink-0"
-                                            title="Open filters menu"
-                                        >
-                                            🔽 Filters
-                                        </button>
                                         <div className="relative flex-1">
                                             <input
                                                 type="text"
@@ -2321,23 +2314,18 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                 </button>
                                             )}
                                         </div>
+                                        <button
+                                            onClick={() => setShowFiltersDropdown(!showFiltersDropdown)}
+                                            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-700 transition-colors flex items-center gap-2 whitespace-nowrap"
+                                            title="Open filters menu"
+                                        >
+                                            🔽 Filters
+                                        </button>
                                     </div>
                                     {showFiltersDropdown && (
                                         <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 space-y-3">
-                                            {/* Subset Filter - Now First (Left) */}
-                                            <div>
-                                                <label className="text-xs font-semibold text-slate-400 block mb-2">Subset</label>
-                                                <select
-                                                    className="w-full px-2 py-2 bg-slate-700 border border-slate-600 rounded text-sm"
-                                                    title="Filter cards by subset (F1® Drivers, Inserts, etc.)"
-                                                    value={filterSubset}
-                                                    onChange={(e) => setFilterSubset(e.target.value)}
-                                                >
-                                                    <option value="all">All Subsets</option>
-                                                    {allSubsets.map(s => <option key={s} value={s}>{s}</option>)}
-                                                </select>
-                                            </div>
-                                            {/* Variant Filter - Now Second (Right) */}
+                                            {/* Subset Filter - Now First */}
+                                            {/* Variant Filter - Now First */}
                                             <div>
                                                 <label className="text-xs font-semibold text-slate-400 block mb-2">Variant Type</label>
                                                 <select
@@ -2403,6 +2391,19 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                     </optgroup>
                                                 </select>
                                             </div>
+                                            {/* Subset Filter - Now Second */}
+                                            <div>
+                                                <label className="text-xs font-semibold text-slate-400 block mb-2">Subset</label>
+                                                <select
+                                                    className="w-full px-2 py-2 bg-slate-700 border border-slate-600 rounded text-sm"
+                                                    title="Filter cards by subset (F1® Drivers, Inserts, etc.)"
+                                                    value={filterSubset}
+                                                    onChange={(e) => setFilterSubset(e.target.value)}
+                                                >
+                                                    <option value="all">All Subsets</option>
+                                                    {allSubsets.map(s => <option key={s} value={s}>{s}</option>)}
+                                                </select>
+                                            </div>
                                             {/* Rookies Filter */}
                                             <div>
                                                 <label className="text-xs font-semibold text-slate-400 block mb-2">Card Type</label>
@@ -2442,27 +2443,15 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                             ) : (
                                 // DESKTOP: All filters in grid
                                 <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            placeholder="Search..."
-                                            title="Search by driver name or card number"
-                                            className="px-3 py-2 pr-10 bg-slate-800 border border-slate-700 rounded-lg focus:border-blue-500 focus:outline-none text-sm w-full"
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                        />
-                                        {searchTerm && (
-                                            <button
-                                                onClick={() => setSearchTerm('')}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
-                                                title="Clear search"
-                                            >
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
-                                            </button>
-                                        )}
-                                    </div>
+                                    <select
+                                        className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm"
+                                        title="Filter cards by subset (F1® Drivers, Inserts, etc.)"
+                                        value={filterSubset}
+                                        onChange={(e) => setFilterSubset(e.target.value)}
+                                    >
+                                        <option value="all">All Subsets</option>
+                                        {allSubsets.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
                                     <select
                                         className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm"
                                         title="Filter by variant type"
@@ -2527,15 +2516,6 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                     </select>
                                     <select
                                         className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm"
-                                        title="Filter cards by subset (F1® Drivers, Inserts, etc.)"
-                                        value={filterSubset}
-                                        onChange={(e) => setFilterSubset(e.target.value)}
-                                    >
-                                        <option value="all">All Subsets</option>
-                                        {allSubsets.map(s => <option key={s} value={s}>{s}</option>)}
-                                    </select>
-                                    <select
-                                        className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm"
                                         title="Show all cards or only rookies/veterans"
                                         value={filterRookie}
                                         onChange={(e) => setFilterRookie(e.target.value)}
@@ -2559,6 +2539,27 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                         <option value="$$">$$ ($5-$40)</option>
                                         <option value="$">$ (&lt;$5)</option>
                                     </select>
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            placeholder="Search..."
+                                            title="Search by driver name or card number"
+                                            className="px-3 py-2 pr-10 bg-slate-800 border border-slate-700 rounded-lg focus:border-blue-500 focus:outline-none text-sm w-full"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                        {searchTerm && (
+                                            <button
+                                                onClick={() => setSearchTerm('')}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                                                title="Clear search"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -2867,16 +2868,16 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                         />
 
                         {/* Right Sidebar - Fixed buttons at bottom */}
-                        {/* AI Scanner & Dashboard - Bottom Right, Stacked Vertically */}
+                        {/* AI Scanner & Dashboard - Bottom Right */}
                         <div className={`fixed ${isMobile ? 'bottom-4 left-4 right-4' : 'bottom-6 right-6'} z-40 ${isMobile ? 'flex gap-2' : 'flex flex-col gap-3'}`}>
                             <button
                                 onClick={() => setShowImageUpload(true)}
                                 disabled={!serverOnline}
                                 title={serverOnline ? "Open AI Scanner to analyze card images (upload front and back)" : "Server offline - start server to enable AI scanning"}
-                                className={`bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-semibold shadow-lg disabled:opacity-50 flex flex-col items-center justify-center gap-2 transition-all ${isMobile ? 'flex-1 py-3' : ''}`}
-                                style={isMobile ? {height: '60px'} : {width: '120px', height: '120px'}}
+                                className={`bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-semibold shadow-lg disabled:opacity-50 flex flex-col items-center justify-center gap-2 transition-all ${isMobile ? 'flex-1 py-3' : 'px-4 py-3 w-24'}`}
+                                style={isMobile ? {height: '60px'} : {height: '60px'}}
                             >
-                                <span className={isMobile ? 'text-3xl' : 'text-3xl'}>📷</span>
+                                <span className={isMobile ? 'text-3xl' : 'text-2xl'}>📷</span>
                                 <span className={isMobile ? 'text-xs' : 'text-sm'}>Scanner</span>
                                 {!serverOnline && <span className="text-xs text-red-300">Offline</span>}
                             </button>
@@ -2884,11 +2885,11 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                             {/* Dashboard Button */}
                             <a 
                                 href="dashboard.html" 
-                                className={`bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-lg flex flex-col items-center justify-center gap-2 transition-all ${isMobile ? 'flex-1 py-3' : ''}`}
-                                style={isMobile ? {height: '60px'} : {width: '120px', height: '120px'}}
+                                className={`bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-lg flex flex-col items-center justify-center gap-2 transition-all ${isMobile ? 'flex-1 py-3' : 'px-4 py-3 w-24'}`}
+                                style={isMobile ? {height: '60px'} : {height: '60px'}}
                                 title="View your collection dashboard and analytics"
                             >
-                                <span className={isMobile ? 'text-2xl' : 'text-3xl'}>📊</span>
+                                <span className={isMobile ? 'text-2xl' : 'text-2xl'}>📊</span>
                                 <span className={isMobile ? 'text-xs' : 'text-sm'}>Dashboard</span>
                             </a>
                         </div>
