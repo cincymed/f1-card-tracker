@@ -241,6 +241,7 @@
             const [filterRookie, setFilterRookie] = useState("all");
             const [filterVariants, setFilterVariants] = useState([]); // Multi-select variant filter
             const [filterValues, setFilterValues] = useState([]); // Multi-select value filter
+            const [showOwnedOnly, setShowOwnedOnly] = useState(false);  // Toggle to show only owned cards
             const [showImageUpload, setShowImageUpload] = useState(false);
             const [showMenuDropdown, setShowMenuDropdown] = useState(false);
             const [showFiltersDropdown, setShowFiltersDropdown] = useState(false);  // Mobile filters dropdown
@@ -1626,6 +1627,9 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                     (filterRookie === 'rookie' && card.rookie) ||
                     (filterRookie === 'veteran' && !card.rookie);
                 
+                // Owned only filter
+                const matchesOwned = !showOwnedOnly || getTotalCount(card.num) > 0;
+                
                 // Variant filtering (multi-select)
                 const matchesVariant = filterVariants.length === 0 || (() => {
                     const cardKey = getCardKey(card.num);
@@ -1655,7 +1659,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                     return tier && filterValues.includes(tier);
                 })();
                 
-                return matchesSearch && matchesSubset && matchesRookie && matchesVariant && matchesValue;
+                return matchesSearch && matchesSubset && matchesRookie && matchesVariant && matchesValue && matchesOwned;
             });
 
             const stats = {
@@ -1726,16 +1730,16 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                         </h1>
                                     </div>
 
-                                    <div className={`${isMobile ? 'flex gap-4 w-full' : 'text-right flex flex-col gap-1'}`}>
-                                        <div className="flex items-baseline gap-2" title="Total number of cards in your collection (including duplicates)">
+                                    <div className={`${isMobile ? 'flex gap-4 w-full' : 'flex gap-8 ml-auto justify-end'}`}>
+                                        <div className={`flex ${isMobile ? 'items-baseline gap-2' : 'items-baseline gap-2'}`} title="Total number of cards in your collection (including duplicates)">
                                             <span className={`font-bold text-green-400 ${isMobile ? 'text-lg' : 'text-2xl'}`}>{stats.totalCopies}</span>
-                                            <span className="text-xs text-slate-400">Total</span>
+                                            <span className="text-xs text-slate-400">Total Cards</span>
                                         </div>
-                                        <div className="flex items-baseline gap-2" title="Number of different cards you own out of total cards in set">
+                                        <div className={`flex ${isMobile ? 'items-baseline gap-2' : 'items-baseline gap-2'}`} title="Number of different cards you own out of total cards in set">
                                             <span className={`font-semibold text-blue-400 ${isMobile ? 'text-base' : 'text-lg'}`}>{stats.cardsOwned}/{stats.totalCards}</span>
-                                            <span className="text-xs text-slate-400">Unique</span>
+                                            <span className="text-xs text-slate-400">Unique Cards</span>
                                         </div>
-                                        <div className="flex items-baseline gap-2" title="Percentage of the complete set you own">
+                                        <div className={`flex ${isMobile ? 'items-baseline gap-2' : 'items-baseline gap-2'}`} title="Percentage of the complete set you own">
                                             <span className={`font-semibold text-purple-400 ${isMobile ? 'text-base' : 'text-lg'}`}>{((stats.cardsOwned/stats.totalCards)*100).toFixed(1)}%</span>
                                             <span className="text-xs text-slate-400">Complete Set</span>
                                         </div>
@@ -2023,7 +2027,65 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
 
                     {/* Main Content */}
                     <div className={`${isMobile ? 'p-3 pb-24' : 'max-w-7xl mx-auto p-4 pt-96'}`}>
-                        <div className="mb-2 text-slate-400 text-sm">Showing {filteredCards.length} cards</div>
+                        <div className="flex justify-between items-center mb-4">
+                            <div className="text-slate-400 text-sm">
+                                {showOwnedOnly 
+                                    ? `Showing ${filteredCards.length} owned cards` 
+                                    : `Showing ${filteredCards.length} of ${cardData.filter(c => {
+                                        const matchesSearch = !searchTerm || 
+                                            c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            c.num.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            (c.team && c.team.toLowerCase().includes(searchTerm.toLowerCase()));
+                                        const matchesSubset = filterSubset === 'all' || c.subset === filterSubset;
+                                        const matchesRookie = filterRookie === 'all' || 
+                                            (filterRookie === 'rookie' && c.rookie) ||
+                                            (filterRookie === 'veteran' && !c.rookie);
+                                        const matchesVariant = filterVariants.length === 0 || (() => {
+                                            const cardKey = getCardKey(c.num);
+                                            const cardInventory = collection[cardKey];
+                                            if (!cardInventory) return false;
+                                            const cardVariants = Object.keys(cardInventory)
+                                                .filter(key => key !== '_analyses')
+                                                .map(variant => {
+                                                    if (variant.includes('Chrome') && !variant.includes('Refractor')) {
+                                                        return 'Base';
+                                                    }
+                                                    return variant;
+                                                });
+                                            return cardVariants.some(variant => filterVariants.includes(variant));
+                                        })();
+                                        const matchesValue = filterValues.length === 0 || (() => {
+                                            const totalCount = getTotalCount(c.num);
+                                            if (totalCount === 0) return false;
+                                            const tier = getCardValueTier(c.num);
+                                            return tier && filterValues.includes(tier);
+                                        })();
+                                        return matchesSearch && matchesSubset && matchesRookie && matchesVariant && matchesValue;
+                                    }).length} cards`}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setShowOwnedOnly(false)}
+                                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                                        !showOwnedOnly 
+                                            ? 'bg-blue-600 text-white' 
+                                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                    }`}
+                                >
+                                    All
+                                </button>
+                                <button
+                                    onClick={() => setShowOwnedOnly(true)}
+                                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                                        showOwnedOnly 
+                                            ? 'bg-blue-600 text-white' 
+                                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                    }`}
+                                >
+                                    Owned
+                                </button>
+                            </div>
+                        </div>
 
                         {/* Card Grid with page numbers and separators every 12 cards */}
                         <div className="space-y-6">
@@ -2075,6 +2137,37 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                             {hasCard && (
                                                                 <div className="mb-2">
                                                                     {(() => {
+                                                                        // Sort variants by PSA 10 max value in ascending order (highest value first)
+                                                                        const sortedVariants = [...variantBreakdown].sort((a, b) => {
+                                                                            const aAnalyses = analyses[a.variant] || [];
+                                                                            const bAnalyses = analyses[b.variant] || [];
+                                                                            
+                                                                            let aValue = 0;
+                                                                            let bValue = 0;
+                                                                            
+                                                                            if (aAnalyses.length > 0) {
+                                                                                const aValues = extractValueEstimates(aAnalyses[aAnalyses.length - 1].analysis);
+                                                                                if (aValues && aValues.psa10 !== 'N/A') {
+                                                                                    const aMatch = aValues.psa10.match(/\$?([\d,]+)-\$?([\d,]+)/);
+                                                                                    if (aMatch) {
+                                                                                        aValue = parseInt(aMatch[2].replace(/,/g, ''));
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                            
+                                                                            if (bAnalyses.length > 0) {
+                                                                                const bValues = extractValueEstimates(bAnalyses[bAnalyses.length - 1].analysis);
+                                                                                if (bValues && bValues.psa10 !== 'N/A') {
+                                                                                    const bMatch = bValues.psa10.match(/\$?([\d,]+)-\$?([\d,]+)/);
+                                                                                    if (bMatch) {
+                                                                                        bValue = parseInt(bMatch[2].replace(/,/g, ''));
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                            
+                                                                            return bValue - aValue; // Descending (highest value first)
+                                                                        });
+                                                                        
                                                                         // Find the most expensive variant by Raw max value
                                                                         let mostExpensiveVariant = null;
                                                                         let maxRawValue = 0;
@@ -2097,7 +2190,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                             }
                                                                         });
                                                                         
-                                                                        return variantBreakdown.map((v, idx) => {
+                                                                        return sortedVariants.map((v, idx) => {
                                                                             const isExpensive = v.variant === mostExpensiveVariant;
                                                                             
                                                                             return (
@@ -2558,70 +2651,131 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                     
                                     {recognizedCard && (
                                         <div className="space-y-4">
+                                            {/* Action Buttons - Above Card Analyzed Section */}
+                                            <div className={isMobile ? 'space-y-2' : 'flex gap-2 flex-wrap'}>
+                                                {/* Row 1: Re-analyze + Quick Grade */}
+                                                <div className={`flex gap-2 ${isMobile ? 'w-full' : ''}`}>
+                                                    <button
+                                                        onClick={performDeepAnalysis}
+                                                        disabled={isDeepAnalyzing}
+                                                        className={`rounded-lg font-semibold bg-purple-600 hover:bg-purple-700 disabled:opacity-50 ${isMobile ? 'flex-1 py-2 text-sm' : 'px-4 py-2 text-sm'}`}
+                                                    >
+                                                        {isDeepAnalyzing ? '⟳ Analyzing...' : '🔍 Re-analyze'}
+                                                    </button>
+                                                    <button
+                                                        onClick={performQuickGrade}
+                                                        disabled={isDeepAnalyzing}
+                                                        className={`rounded-lg font-semibold bg-amber-600 hover:bg-amber-700 disabled:opacity-50 ${isMobile ? 'flex-1 py-2 text-sm' : 'px-4 py-2 text-sm'}`}
+                                                    >
+                                                        {isDeepAnalyzing ? '⟳ Grading...' : '📊 Grade'}
+                                                    </button>
+                                                </div>
+                                                
+                                                {/* Row 2: Edit, Cancel, Add */}
+                                                {isMobile && (
+                                                    <div className="flex gap-2 w-full">
+                                                        <button
+                                                            onClick={() => {
+                                                                if (isEditing) {
+                                                                    handleDoneEditing();
+                                                                } else {
+                                                                    setIsEditing(true);
+                                                                    setEditedCard({...recognizedCard});
+                                                                }
+                                                            }}
+                                                            className={`flex-1 py-2 rounded-lg text-sm font-semibold ${
+                                                                isEditing ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
+                                                            }`}
+                                                        >
+                                                            {isEditing ? '✓ Done' : '✎ Edit'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setShowImageUpload(false);
+                                                                setUploadedImages([]);
+                                                                setPendingImages([]);
+                                                                setShowSecondImagePrompt(false);
+                                                                setRecognizedCard(null);
+                                                                setEditedCard(null);
+                                                                setIsEditing(false);
+                                                                setRecognitionError(null);
+                                                                setDeepAnalysis(null);
+                                                                setSelectedAnalysisSource('opus');
+                                                            }}
+                                                            className="flex-1 py-2 rounded-lg text-sm font-semibold bg-slate-600 hover:bg-slate-700"
+                                                        >
+                                                            ✕ Cancel
+                                                        </button>
+                                                        <button
+                                                            onClick={handleAddRecognizedCard}
+                                                            disabled={addCardCooldown > 0}
+                                                            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                                                                addCardCooldown > 0 
+                                                                    ? 'bg-gray-600 text-gray-300 cursor-not-allowed opacity-50' 
+                                                                    : 'bg-green-600 hover:bg-green-700'
+                                                            }`}
+                                                            title={addCardCooldown > 0 ? `Wait ${addCardCooldown}s before adding another card` : 'Add card to collection'}
+                                                        >
+                                                            {addCardCooldown > 0 ? `⏱️ ${addCardCooldown}s` : '✓ Add'}
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* Desktop buttons - single row */}
+                                                {!isMobile && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => {
+                                                                if (isEditing) {
+                                                                    handleDoneEditing();
+                                                                } else {
+                                                                    setIsEditing(true);
+                                                                    setEditedCard({...recognizedCard});
+                                                                }
+                                                            }}
+                                                            className={`px-4 py-2 rounded-lg text-sm font-semibold ${
+                                                                isEditing ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
+                                                            }`}
+                                                        >
+                                                            {isEditing ? '✓ Done' : '✎ Edit'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setShowImageUpload(false);
+                                                                setUploadedImages([]);
+                                                                setPendingImages([]);
+                                                                setShowSecondImagePrompt(false);
+                                                                setRecognizedCard(null);
+                                                                setEditedCard(null);
+                                                                setIsEditing(false);
+                                                                setRecognitionError(null);
+                                                                setDeepAnalysis(null);
+                                                                setSelectedAnalysisSource('opus');
+                                                            }}
+                                                            className="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-600 hover:bg-slate-700"
+                                                        >
+                                                            ✕ Cancel
+                                                        </button>
+                                                        <button
+                                                            onClick={handleAddRecognizedCard}
+                                                            disabled={addCardCooldown > 0}
+                                                            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                                                                addCardCooldown > 0 
+                                                                    ? 'bg-gray-600 text-gray-300 cursor-not-allowed opacity-50' 
+                                                                    : 'bg-green-600 hover:bg-green-700'
+                                                            }`}
+                                                            title={addCardCooldown > 0 ? `Wait ${addCardCooldown}s before adding another card` : 'Add card to collection'}
+                                                        >
+                                                            {addCardCooldown > 0 ? `⏱️ Wait ${addCardCooldown}s` : '✓ Done'}
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                            
                                             <div className="bg-gradient-to-br from-green-900/20 to-blue-900/20 border border-green-500/30 rounded-xl p-5">
                                                 <div className="flex justify-between items-center mb-4">
-                                            <h3 className="font-semibold text-lg">✨ Card Analyzed</h3>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={performDeepAnalysis}
-                                                    disabled={isDeepAnalyzing}
-                                                    className="px-4 py-2 rounded-lg text-sm font-semibold bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
-                                                >
-                                                    {isDeepAnalyzing ? '⟳ Analyzing...' : '🔍 Re-analyze (Sonnet)'}
-                                                </button>
-                                                <button
-                                                    onClick={performQuickGrade}
-                                                    disabled={isDeepAnalyzing}
-                                                    className="px-4 py-2 rounded-lg text-sm font-semibold bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
-                                                >
-                                                    {isDeepAnalyzing ? '⟳ Grading...' : '📊 Quick Grade'}
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        if (isEditing) {
-                                                            handleDoneEditing();
-                                                        } else {
-                                                            setIsEditing(true);
-                                                            setEditedCard({...recognizedCard});
-                                                        }
-                                                    }}
-                                                    className={`px-4 py-2 rounded-lg text-sm font-semibold ${
-                                                        isEditing ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
-                                                    }`}
-                                                >
-                                                    {isEditing ? '✓ Done' : '✎ Edit'}
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setShowImageUpload(false);
-                                                        setUploadedImages([]);
-                                                        setPendingImages([]);
-                                                        setShowSecondImagePrompt(false);
-                                                        setRecognizedCard(null);
-                                                        setEditedCard(null);
-                                                        setIsEditing(false);
-                                                        setRecognitionError(null);
-                                                        setDeepAnalysis(null);
-                                                        setSelectedAnalysisSource('opus');
-                                                    }}
-                                                    className="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-600 hover:bg-slate-700"
-                                                >
-                                                    ✕ Cancel
-                                                </button>
-                                                <button
-                                                    onClick={handleAddRecognizedCard}
-                                                    disabled={addCardCooldown > 0}
-                                                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                                                        addCardCooldown > 0 
-                                                            ? 'bg-gray-600 text-gray-300 cursor-not-allowed opacity-50' 
-                                                            : 'bg-green-600 hover:bg-green-700'
-                                                    }`}
-                                                    title={addCardCooldown > 0 ? `Wait ${addCardCooldown}s before adding another card` : 'Add card to collection'}
-                                                >
-                                                    {addCardCooldown > 0 ? `⏱️ Wait ${addCardCooldown}s` : '✓ Done'}
-                                                </button>
-                                            </div>
-                                        </div>
+                                                    <h3 className="font-semibold text-lg">✨ Card Analyzed</h3>
+                                                </div>
                                         
                                         <div className="grid grid-cols-2 gap-3 p-4 bg-slate-900/50 rounded-lg">
                                             <div className={needsVerification(recognizedCard.cardNumberConfidence) ? 'needs-verification rounded p-2' : ''}>
