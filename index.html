@@ -231,7 +231,7 @@
 
         const variants = OFFICIAL_VARIANTS;
 
-        // Helper function to format Quick Grade Report for better readability
+        // Helper function to format Quick Grade Report with detailed content and beautiful formatting
         const formatQuickGradeReport = (gradeText) => {
             if (!gradeText) return gradeText;
             
@@ -257,7 +257,7 @@
             let currentSection = '';
             const lines = gradeText.split('\n');
             
-            // Parse sections
+            // Parse sections - capture ALL content including bracketed items
             lines.forEach(line => {
                 const upperLine = line.toUpperCase().trim();
                 
@@ -273,10 +273,9 @@
                 }
                 
                 if (!foundHeader && currentSection && line.trim()) {
-                    // Skip separator lines and empty content
+                    // Skip separator lines but keep everything else including brackets
                     if (line.trim() !== '===================================================' && 
-                        line.trim() !== '---' &&
-                        !line.trim().startsWith('[') ) {
+                        line.trim() !== '---') {
                         sections[currentSection].push(line.trim());
                     }
                 }
@@ -301,60 +300,85 @@
                 }
             });
             
-            // Format as JSX with better styling
+            // Format as JSX with beautiful styling and full detail
             return (
                 <div className="space-y-4">
                     {orderedSections.map((section, idx) => (
-                        <div key={idx} className="space-y-1">
-                            {/* Section header - large, bold, with top margin */}
+                        <div key={idx} className="space-y-2">
+                            {/* Section header - bold with underline */}
                             <div className="text-sm font-bold text-blue-200 pt-1 border-b border-blue-500/40 pb-1">
                                 {section.key.replace(/_/g, ' ')}
                             </div>
                             
-                            {/* Section content */}
-                            <div className="text-xs text-slate-300 space-y-1.5 pl-3">
+                            {/* Section content with smart parsing */}
+                            <div className="text-xs text-slate-300 space-y-2 pl-3">
                                 {section.content.map((line, lineIdx) => {
+                                    // Handle bracketed checklist items: [Check: Something] (PASS)/(FAIL)
+                                    const checklistMatch = line.match(/\[Check:\s*([^\]]+)\]\s*(\(PASS\)|\(FAIL\))?/i);
+                                    if (checklistMatch) {
+                                        const checkItem = checklistMatch[1].trim();
+                                        const status = checklistMatch[2] || '';
+                                        const isPass = status.includes('PASS');
+                                        
+                                        return (
+                                            <div key={lineIdx} className="space-y-0.5">
+                                                <div className="flex gap-3 justify-between items-start">
+                                                    <span className="text-slate-400 flex-shrink-0">✓</span>
+                                                    <span className="flex-1">{checkItem}</span>
+                                                    <span className={`font-bold flex-shrink-0 ${isPass ? 'text-green-300' : status ? 'text-red-300' : 'text-slate-400'}`}>
+                                                        {status || ''}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    
                                     // Handle key-value pairs (Criteria: Grade)
                                     const kvMatch = line.match(/^([^:]+?):\s*(.+)$/);
                                     if (kvMatch) {
                                         const label = kvMatch[1].trim();
                                         const value = kvMatch[2].trim();
                                         
-                                        // Check if value is a grade/status (PASS/FAIL, Excellent, etc)
-                                        const isGrade = /^(PASS|FAIL|Excellent|Good|Fair|Poor|Yes|No|[\d.]+%|PSA \d+)/.test(value);
+                                        // Check if value is a grade/status
+                                        const isGrade = /^(PASS|FAIL|Excellent|Good|Fair|Poor|Yes|No|[\d.]+%|PSA \d+|None|Minimal|Moderate|Significant)/.test(value);
                                         
                                         return (
                                             <div key={lineIdx} className={`flex gap-4 ${isGrade ? 'justify-between items-start' : ''}`}>
-                                                <span className="text-slate-400 min-w-fit">{label}:</span>
-                                                <span className={`font-semibold ${
-                                                    value.includes('PASS') || value.includes('Excellent') ? 'text-green-300' :
-                                                    value.includes('FAIL') || value.includes('Poor') ? 'text-red-300' :
-                                                    'text-slate-100'
-                                                }`}>{value}</span>
+                                                <span className="text-slate-400 min-w-fit font-medium">{label}:</span>
+                                                <span className={`text-slate-100 flex-1 ${
+                                                    value.includes('PASS') || value.includes('Excellent') || value.includes('Clean') ? 'text-green-200' :
+                                                    value.includes('FAIL') || value.includes('Poor') ? 'text-red-200' :
+                                                    value.includes('Probability') || value.includes('%') ? 'text-yellow-200 font-semibold' :
+                                                    ''
+                                                }`}>
+                                                    {value}
+                                                </span>
                                             </div>
                                         );
                                     }
                                     
-                                    // Handle checklist items [Check: ...]
-                                    if (line.includes('[Check:') || line.includes('(PASS)') || line.includes('(FAIL)')) {
-                                        const checkMatch = line.match(/\[Check:\s*([^\]]+)\]\s*(\(PASS\)|\(FAIL\))?/);
-                                        if (checkMatch) {
-                                            const checkItem = checkMatch[1].trim();
-                                            const status = checkMatch[2] || '...';
-                                            const isPass = status.includes('PASS');
-                                            
-                                            return (
-                                                <div key={lineIdx} className="flex gap-4 justify-between items-start">
-                                                    <span className="text-slate-400">✓ {checkItem}</span>
-                                                    <span className={`font-semibold ${isPass ? 'text-green-300' : 'text-red-300'}`}>{status}</span>
-                                                </div>
-                                            );
-                                        }
+                                    // Handle explanation text in brackets [...]
+                                    if (line.startsWith('[') && line.endsWith(']')) {
+                                        const content = line.slice(1, -1).trim();
+                                        return (
+                                            <div key={lineIdx} className="text-slate-400 italic text-xs pl-2 border-l border-slate-600">
+                                                {content}
+                                            </div>
+                                        );
                                     }
                                     
-                                    // Regular text lines
+                                    // Handle "For each checkbox, mark with..." type instructions
+                                    if (line.toLowerCase().includes('for each') || line.toLowerCase().includes('note') || line.toLowerCase().includes('check')) {
+                                        return (
+                                            <div key={lineIdx} className="text-slate-500 italic text-xs">
+                                                {line}
+                                            </div>
+                                        );
+                                    }
+                                    
+                                    // Regular text lines - preserve as is
                                     return (
-                                        <div key={lineIdx} className="text-slate-300 leading-relaxed">
+                                        <div key={lineIdx} className="text-slate-300 leading-relaxed text-xs">
                                             {line}
                                         </div>
                                     );
