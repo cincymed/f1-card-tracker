@@ -119,6 +119,24 @@
             input, textarea, select, button { -webkit-user-select: text; user-select: text; }
             .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
             .scrollbar-hide::-webkit-scrollbar { display: none; }
+            
+            /* Checkered pattern badge styles */
+            .checker-badge {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 100%;
+                height: 100%;
+                border-radius: 9999px;
+                font-weight: bold;
+                box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1);
+            }
+            
+            .checker-badge svg {
+                width: 100%;
+                height: 100%;
+                border-radius: 9999px;
+            }
         }
     </style>
 </head>
@@ -213,7 +231,35 @@
 
         const variants = OFFICIAL_VARIANTS;
 
-        // Helper function to infer variant from serial number
+        // Helper function to render cross-hatch pattern SVG for Checker Flag variants
+        const renderCheckerBadge = (style, text) => {
+            const color1 = style.color1 || '#475569';
+            const color2 = style.color2 || '#1e293b';
+            const patternId = `cross-hatch-${text}`;
+            
+            return (
+                <svg className="checker-badge" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        {/* Cross-hatch pattern with diagonal lines */}
+                        <pattern id={patternId} x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
+                            {/* Background color */}
+                            <rect width="8" height="8" fill={color1} />
+                            {/* Diagonal lines for cross-hatch effect */}
+                            <line x1="0" y1="0" x2="8" y2="8" stroke={color2} strokeWidth="2" />
+                            <line x1="8" y1="0" x2="0" y2="8" stroke={color2} strokeWidth="2" />
+                        </pattern>
+                    </defs>
+                    {/* Background with pattern */}
+                    <rect width="100" height="100" fill={`url(#${patternId})`} />
+                    {/* Text overlay */}
+                    <text x="50" y="55" textAnchor="middle" dominantBaseline="middle" 
+                        fontSize="28" fontWeight="bold" fill="white" 
+                        style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)', stroke: 'rgba(0,0,0,0.3)', strokeWidth: '0.5' }}>
+                        {text}
+                    </text>
+                </svg>
+            );
+        };
         const inferVariantFromSerial = (serialNumber) => {
             if (!serialNumber) return null;
             
@@ -272,7 +318,50 @@
             "Printing Plate 1/1": { bg: "bg-slate-700", text: "PP", color: "#334155" },
             "Black Refractor /10": { bg: "bg-black", text: "BK", color: "#000000" },
             "Magenta/Pink Refractor /250": { bg: "bg-pink-500", text: "PK", color: "#ec4899" },
-            "Gold Wave /75": { bg: "bg-yellow-600", text: "GW", color: "#ca8a04" }
+            "Gold Wave /75": { bg: "bg-yellow-600", text: "GW", color: "#ca8a04" },
+            
+            // Checker Flag variants with cross-hatch patterns
+            "Checker Flag": { bg: "bg-gradient-to-br from-slate-600 to-slate-800", text: "CF", svg: true, color1: "#475569", color2: "#1e293b" },
+            "Pink Checker Flag /250": { bg: "bg-gradient-to-br from-pink-600 to-pink-800", text: "PC", svg: true, color1: "#ec4899", color2: "#831843" },
+            "Aqua Checker Flag /199": { bg: "bg-gradient-to-br from-cyan-600 to-cyan-800", text: "AC", svg: true, color1: "#06b6d4", color2: "#164e63" },
+            "Blue Checker Flag /150": { bg: "bg-gradient-to-br from-blue-600 to-blue-800", text: "BC", svg: true, color1: "#2563eb", color2: "#1e3a8a" },
+            "Green Checker Flag /99": { bg: "bg-gradient-to-br from-green-600 to-green-800", text: "GC", svg: true, color1: "#16a34a", color2: "#15803d" },
+            "Gold Checker Flag /50": { bg: "bg-gradient-to-br from-yellow-600 to-yellow-800", text: "GD", svg: true, color1: "#ca8a04", color2: "#713f12" },
+            "Orange Checker Flag /25": { bg: "bg-gradient-to-br from-orange-600 to-orange-800", text: "OC", svg: true, color1: "#ea580c", color2: "#7c2d12" },
+            "Black Checker Flag /10": { bg: "bg-gradient-to-br from-gray-700 to-gray-900", text: "BK", svg: true, color1: "#374151", color2: "#111827" },
+            "Red Checker Flag /5": { bg: "bg-gradient-to-br from-red-600 to-red-800", text: "RC", svg: true, color1: "#dc2626", color2: "#7f1d1d" },
+            
+            // Teal and other numbered refractors
+            "Teal Refractor /299": { bg: "bg-teal-500", text: "TE", color: "#14b8a6" },
+            "Pink Refractor /250": { bg: "bg-pink-500", text: "PK", color: "#ec4899" },
+            "Aqua Refractor /199": { bg: "bg-cyan-500", text: "AQ", color: "#06b6d4" },
+            
+            // Lazer
+            "B&W Lazer": { bg: "bg-gradient-to-r from-white to-gray-800", text: "LZ", color: "#ffffff" },
+            
+            // RayWave
+            "B&W RayWave": { bg: "bg-gradient-to-r from-gray-400 to-gray-800", text: "RW", color: "#9ca3af" },
+            "Pink RayWave /250": { bg: "bg-pink-600", text: "RW", color: "#be185d" },
+            "Aqua RayWave /199": { bg: "bg-cyan-600", text: "RW", color: "#0891b2" },
+            "Blue RayWave /150": { bg: "bg-blue-600", text: "RW", color: "#1d4ed8" },
+            "Forest Green RayWave /140": { bg: "bg-emerald-700", text: "RW", color: "#046857" },
+            "Green RayWave /99": { bg: "bg-green-600", text: "RW", color: "#15803d" },
+            "Gold RayWave /50": { bg: "bg-yellow-600", text: "RW", color: "#ca8a04" },
+            "Orange RayWave /25": { bg: "bg-orange-600", text: "RW", color: "#9a3412" },
+            "Black RayWave /10": { bg: "bg-black", text: "RW", color: "#000000" },
+            "Red RayWave /5": { bg: "bg-red-600", text: "RW", color: "#991b1b" },
+            
+            // Special editions
+            "F1 75th Anniversary Refractor /75": { bg: "bg-gradient-to-r from-gold-400 to-purple-500", text: "F1", color: "#fbbf24" },
+            "Logofractor": { bg: "bg-gradient-to-r from-blue-500 to-cyan-500", text: "LF", color: "#06b6d4" },
+            "Sapphire Edition": { bg: "bg-blue-600", text: "SA", color: "#1d4ed8" },
+            "Padparadscha Sapphire 1/1": { bg: "bg-gradient-to-r from-orange-400 to-pink-400", text: "PS", color: "#fb7185" },
+            
+            // Printing plates
+            "Printing Plate Cyan 1/1": { bg: "bg-cyan-500", text: "C", color: "#06b6d4" },
+            "Printing Plate Magenta 1/1": { bg: "bg-fuchsia-500", text: "M", color: "#d946ef" },
+            "Printing Plate Yellow 1/1": { bg: "bg-yellow-400", text: "Y", color: "#facc15" },
+            "Printing Plate Black 1/1": { bg: "bg-slate-900", text: "K", color: "#0f172a" }
         };
 
         function App() {
@@ -2268,10 +2357,16 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                                     <div className={`flex items-center justify-between bg-slate-900/30 rounded px-2 py-1 ${isExpensive ? 'ring-2 ring-green-700' : ''}`}>
                                                                                         <div className="flex items-center gap-2">
                                                                                             <div
-                                                                                                className={`${v.style.bg} text-white text-xs px-2 py-1 rounded-full font-bold shadow-sm`}
+                                                                                                className={`relative w-7 h-7 rounded-full shadow-sm overflow-hidden ${!v.style.svg ? v.style.bg : ''}`}
                                                                                                 title={v.variant}
                                                                                             >
-                                                                                                {v.style.text}
+                                                                                                {v.style.svg ? (
+                                                                                                    renderCheckerBadge(v.style, v.style.text)
+                                                                                                ) : (
+                                                                                                    <div className="flex items-center justify-center w-full h-full text-white text-xs font-bold">
+                                                                                                        {v.style.text}
+                                                                                                    </div>
+                                                                                                )}
                                                                                             </div>
                                                                                             <span className="text-xs text-slate-300">{v.variant}</span>
                                                                                         </div>
