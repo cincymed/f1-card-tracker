@@ -559,7 +559,8 @@
             const [addCardCooldown, setAddCardCooldown] = useState(0);  // Rate limiting for adding cards
             const [isMobile, setIsMobile] = useState(window.innerWidth < 768);  // Mobile detection state
             const [showAddCardManual, setShowAddCardManual] = useState(false);  // Manual card addition modal
-            const [manualCardData, setManualCardData] = useState({ cardNumber: '', variant: 'Base', serialNumber: '' });  // Card data being entered
+            const [manualCardData, setManualCardData] = useState({ cardNumber: '', variant: 'Base', serialNumber: '', cardTitle: '', driverName: '', value: '' });  // Card data being entered
+            const [loadingCardDetails, setLoadingCardDetails] = useState(false);  // Loading state for card details
 
             // Detect mobile device
             useEffect(() => {
@@ -970,6 +971,71 @@ Base your analysis on current 2025 market data from web search.`
                 } catch (error) {
                     console.error('Reanalysis error:', error);
                     return null;
+                }
+            };
+
+            // Lookup card details (driver name, card title, value) from web search
+            const lookupCardDetails = async (cardNum) => {
+                try {
+                    setLoadingCardDetails(true);
+                    
+                    // Use Claude API with web search to find card details
+                    const response = await fetch('https://api.anthropic.com/v1/messages', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            model: 'claude-opus-4-5-20251101',
+                            max_tokens: 500,
+                            tools: [
+                                {
+                                    type: 'web_search',
+                                    name: 'web_search'
+                                }
+                            ],
+                            messages: [{
+                                role: 'user',
+                                content: `Find information about 2025 Topps Chrome F1 card #${cardNum}. Respond ONLY with JSON in this format:
+{
+  "cardTitle": "Card title or driver name",
+  "driverName": "Driver name if applicable",
+  "value": "Current market value estimate e.g. $5-10"
+}
+
+If you cannot find the exact card, provide your best estimate based on similar cards in the set.`
+                            }]
+                        })
+                    });
+
+                    const data = await response.json();
+                    let details = { cardTitle: '', driverName: '', value: '' };
+                    
+                    if (data.content) {
+                        const fullText = data.content
+                            .map(block => {
+                                if (block.type === 'text') return block.text;
+                                return '';
+                            })
+                            .join('');
+                        
+                        // Extract JSON from response
+                        const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+                        if (jsonMatch) {
+                            try {
+                                details = JSON.parse(jsonMatch[0]);
+                            } catch (e) {
+                                console.warn('Could not parse card details JSON');
+                            }
+                        }
+                    }
+                    
+                    setLoadingCardDetails(false);
+                    return details;
+                } catch (error) {
+                    console.error('Card details lookup error:', error);
+                    setLoadingCardDetails(false);
+                    return { cardTitle: '', driverName: '', value: '' };
                 }
             };
 
@@ -2833,9 +2899,28 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                         {/* Add a Card Button */}
                                         <div className="mt-4 mb-2">
                                             <button
-                                                onClick={() => {
-                                                    setManualCardData({ cardNumber: '', variant: 'Base', serialNumber: '' });
+                                                onClick={async () => {
+                                                    const cardNum = selectedCard.num.toString();
+                                                    setManualCardData({ 
+                                                        cardNumber: cardNum, 
+                                                        variant: 'Base', 
+                                                        serialNumber: '',
+                                                        cardTitle: '',
+                                                        driverName: '',
+                                                        value: ''
+                                                    });
                                                     setShowAddCardManual(true);
+                                                    
+                                                    // Fetch card details in the background
+                                                    const details = await lookupCardDetails(cardNum);
+                                                    if (details) {
+                                                        setManualCardData(prev => ({
+                                                            ...prev,
+                                                            cardTitle: details.cardTitle || '',
+                                                            driverName: details.driverName || '',
+                                                            value: details.value || ''
+                                                        }));
+                                                    }
                                                 }}
                                                 className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-3 px-4 rounded-lg font-semibold text-sm transition-all shadow-lg"
                                             >
@@ -3618,7 +3703,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                             <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
                                 onClick={() => {
                                     setShowAddCardManual(false);
-                                    setManualCardData({ cardNumber: '', variant: 'Base', serialNumber: '' });
+                                    setManualCardData({ cardNumber: '', variant: 'Base', serialNumber: '', cardTitle: '', driverName: '', value: '' });
                                 }}>
                                 <div className={`bg-slate-800 rounded-2xl p-6 ${isMobile ? 'w-full max-h-[95vh]' : 'max-w-2xl w-full max-h-[90vh]'} overflow-y-auto scrollbar-hide`} onClick={(e) => e.stopPropagation()}>
                                     <h2 className="text-2xl font-bold mb-2">➕ Add a Card</h2>
@@ -3664,6 +3749,52 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                             <p className="text-xs text-slate-500 mt-1">The serial number helps identify the correct variant.</p>
                                         </div>
                                         
+                                        {/* Driver/Card Title Section */}
+                                        {loadingCardDetails && (
+                                            <div className="bg-blue-900/20 border border-blue-500/30 rounded p-3">
+                                                <p className="text-xs text-blue-300">
+                                                    🔍 Looking up card details...
+                                                </p>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Driver Name */}
+                                        <div>
+                                            <label className="text-sm font-semibold text-slate-300 block mb-2">Driver Name (Optional)</label>
+                                            <input
+                                                type="text"
+                                                value={manualCardData.driverName}
+                                                onChange={(e) => setManualCardData({...manualCardData, driverName: e.target.value})}
+                                                placeholder="e.g., Max Verstappen, Lewis Hamilton"
+                                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm focus:border-blue-500 focus:outline-none text-white"
+                                            />
+                                        </div>
+                                        
+                                        {/* Card Title */}
+                                        <div>
+                                            <label className="text-sm font-semibold text-slate-300 block mb-2">Card Title (Optional)</label>
+                                            <input
+                                                type="text"
+                                                value={manualCardData.cardTitle}
+                                                onChange={(e) => setManualCardData({...manualCardData, cardTitle: e.target.value})}
+                                                placeholder="e.g., F1 Drivers, F2 Drivers, F1 Cars"
+                                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm focus:border-blue-500 focus:outline-none text-white"
+                                            />
+                                        </div>
+                                        
+                                        {/* Card Value */}
+                                        <div>
+                                            <label className="text-sm font-semibold text-slate-300 block mb-2">Estimated Value (Optional)</label>
+                                            <input
+                                                type="text"
+                                                value={manualCardData.value}
+                                                onChange={(e) => setManualCardData({...manualCardData, value: e.target.value})}
+                                                placeholder="e.g., $2-5, $10-15"
+                                                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm focus:border-blue-500 focus:outline-none text-white"
+                                            />
+                                            <p className="text-xs text-slate-500 mt-1">Market value estimate for reference.</p>
+                                        </div>
+                                        
                                         {/* Info box */}
                                         <div className="bg-blue-900/20 border border-blue-500/30 rounded p-3 mt-4">
                                             <p className="text-xs text-blue-300">
@@ -3679,7 +3810,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                 if (manualCardData.cardNumber.trim()) {
                                                     addCard(manualCardData.cardNumber, manualCardData.variant, null, null);
                                                     setShowAddCardManual(false);
-                                                    setManualCardData({ cardNumber: '', variant: 'Base', serialNumber: '' });
+                                                    setManualCardData({ cardNumber: '', variant: 'Base', serialNumber: '', cardTitle: '', driverName: '', value: '' });
                                                 } else {
                                                     alert('Please enter a card number');
                                                 }
@@ -3691,7 +3822,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                         <button
                                             onClick={() => {
                                                 setShowAddCardManual(false);
-                                                setManualCardData({ cardNumber: '', variant: 'Base', serialNumber: '' });
+                                                setManualCardData({ cardNumber: '', variant: 'Base', serialNumber: '', cardTitle: '', driverName: '', value: '' });
                                             }}
                                             className="flex-1 bg-slate-600 hover:bg-slate-700 text-white py-2 px-4 rounded-lg font-semibold text-sm transition-all"
                                         >
