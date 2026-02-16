@@ -1666,8 +1666,8 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
 
             return (
                 <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
-                    {/* Floating Header */}
-                    <div className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-sm shadow-xl">
+                    {/* Anchored Header - Fixed at Top on Desktop */}
+                    <div className={`${isMobile ? 'sticky' : 'fixed'} top-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-sm shadow-xl`}>
                         <div className={`${isMobile ? 'p-2' : 'max-w-7xl mx-auto p-3'}`}>
                             {!serverOnline && (
                                 <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-2 mb-2">
@@ -1737,7 +1737,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                         </div>
                                         <div className="flex items-baseline gap-2" title="Percentage of the complete set you own">
                                             <span className={`font-semibold text-purple-400 ${isMobile ? 'text-base' : 'text-lg'}`}>{((stats.cardsOwned/stats.totalCards)*100).toFixed(1)}%</span>
-                                            <span className="text-xs text-slate-400">%</span>
+                                            <span className="text-xs text-slate-400">Complete Set</span>
                                         </div>
                                     </div>
                                 </div>
@@ -2022,7 +2022,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                     </div>
 
                     {/* Main Content */}
-                    <div className={`${isMobile ? 'p-3 pb-24' : 'max-w-7xl mx-auto p-4'}`}>
+                    <div className={`${isMobile ? 'p-3 pb-24' : 'max-w-7xl mx-auto p-4 pt-96'}`}>
                         <div className="mb-2 text-slate-400 text-sm">Showing {filteredCards.length} cards</div>
 
                         {/* Card Grid with page numbers and separators every 12 cards */}
