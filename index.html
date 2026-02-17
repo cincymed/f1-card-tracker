@@ -2562,49 +2562,53 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                     </div>
                                 </div>
                             )}
+                            
+                            {/* All/Owned Toggles - Always Visible at Bottom of Header */}
+                            <div className={`flex items-center justify-between ${isMobile ? 'mt-3 pt-2 border-t border-slate-700' : 'mt-4 pt-3 border-t border-slate-700'}`}>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setShowOwnedOnly(false)}
+                                        className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                                            !showOwnedOnly 
+                                                ? 'bg-blue-600 text-white' 
+                                                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                        }`}
+                                    >
+                                        All
+                                    </button>
+                                    <button
+                                        onClick={() => setShowOwnedOnly(true)}
+                                        className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                                            showOwnedOnly 
+                                                ? 'bg-blue-600 text-white' 
+                                                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                        }`}
+                                    >
+                                        Owned
+                                    </button>
+                                </div>
+
+                                {/* Card Count Text */}
+                                <div className="text-slate-400 text-sm">
+                                    {showOwnedOnly ? (
+                                        (() => {
+                                            const ownedInSubset = filteredCards.filter(card => getTotalCount(card.num) > 0).length;
+                                            // Calculate total unique cards in selected subset (or entire collection if "all")
+                                            const totalInSubset = filterSubset === 'all' 
+                                                ? cardData.length  // Total unique cards in entire collection
+                                                : cardData.filter(card => card.subset === filterSubset).length;  // Total unique cards in selected subset
+                                            return `Showing ${ownedInSubset} of ${totalInSubset} cards`;
+                                        })()
+                                    ) : (
+                                        `Showing ${filteredCards.length} cards`
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     {/* Main Content */}
-                    <div className={`${isMobile ? 'p-3 pb-24' : 'max-w-7xl mx-auto p-4 pt-96'}`}>
-                        <div className="flex items-center gap-4 mb-4">
-                            {/* All/Owned Buttons on the Left */}
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => setShowOwnedOnly(false)}
-                                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
-                                        !showOwnedOnly 
-                                            ? 'bg-blue-600 text-white' 
-                                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                                    }`}
-                                >
-                                    All
-                                </button>
-                                <button
-                                    onClick={() => setShowOwnedOnly(true)}
-                                    className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
-                                        showOwnedOnly 
-                                            ? 'bg-blue-600 text-white' 
-                                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                                    }`}
-                                >
-                                    Owned
-                                </button>
-                            </div>
-
-                            {/* Card Count Text to the Right of Buttons */}
-                            <div className="text-slate-400 text-sm">
-                                {showOwnedOnly ? (
-                                    (() => {
-                                        const ownedInSubset = filteredCards.filter(card => getTotalCount(card.num) > 0).length;
-                                        return `Showing ${ownedInSubset} of ${filteredCards.length} cards`;
-                                    })()
-                                ) : (
-                                    `Showing ${filteredCards.length} cards`
-                                )}
-                            </div>
-                        </div>
-
+                    <div className={`${isMobile ? 'p-3 pb-24' : 'max-w-7xl mx-auto p-4'}`}>
                         {/* Card Grid with page numbers and separators every 12 cards */}
                         <div className="space-y-6">
                             {Array.from({ length: Math.ceil(filteredCards.length / 12) }).map((_, groupIndex) => {
