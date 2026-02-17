@@ -59,11 +59,11 @@ window.sendChatMessage = async function(message) {
             "You are an AI assistant integrated into an F1 card collection tracking application. Be helpful and knowledgeable about F1 cards, collecting, grading, and card values. Keep responses concise and relevant.";
 
         const requestBody = {
-            model: 'claude-sonnet-4-5-20250929', // Use the same model as other working functions
+            model: 'claude-sonnet-4-5-20250929',
             max_tokens: 1500,
+            system: contextInfo, // System message as top-level parameter
             messages: [
-                { role: 'system', content: contextInfo },
-                ...window.chatbotState.chatMessages.slice(-11, -1), // Keep last 10 messages for context
+                ...window.chatbotState.chatMessages.slice(-10).filter(msg => msg.role !== 'system'), // Exclude system messages from history
                 { role: 'user', content: message }
             ]
         };
@@ -105,9 +105,10 @@ window.sendChatMessage = async function(message) {
                 const simpleRequestBody = {
                     model: 'claude-sonnet-4-5-20250929',
                     max_tokens: 1500,
+                    system: contextInfo, // System as top-level parameter
                     messages: [{
                         role: 'user',
-                        content: contextInfo + '\n\nUser: ' + message
+                        content: message
                     }]
                 };
                 
@@ -299,11 +300,6 @@ function updateChatbotInterface() {
                         <div class="text-center text-slate-400 text-sm py-8">
                             <span class="text-2xl mb-2 block">👋</span>
                             Hi! I'm your F1 card collection assistant. I can help you with card values, collecting tips, and questions about your collection.
-                            <div class="mt-3 text-xs text-slate-500 bg-slate-700/50 rounded p-2">
-                                <div>Debug Info:</div>
-                                <div>API: ${window.API_URL || window.API_BASE + '/api/recognize' || 'Not Found'}</div>
-                                <div>Token: ${localStorage.getItem('f1-token') ? 'Present' : 'Missing'}</div>
-                            </div>
                         </div>
                     ` : ''}
                     
