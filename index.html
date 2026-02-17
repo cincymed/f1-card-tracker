@@ -2232,7 +2232,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                         <div ref={menuRef} className="relative flex-shrink-0">
                                             <button
                                                 onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-                                                className="hamburger text-white hover:text-blue-400 transition text-2xl md:text-lg"
+                                                className="hamburger text-white hover:text-blue-400 transition text-4xl md:text-3xl"
                                                 title="Open menu"
                                             >
                                                 ☰
@@ -2608,7 +2608,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                     </div>
 
                     {/* Main Content */}
-                    <div className={`${isMobile ? 'p-3 pb-24' : 'max-w-7xl mx-auto p-4'}`}>
+                    <div className={`${isMobile ? 'p-3 pb-24 pt-4' : 'max-w-7xl mx-auto p-4 pt-8'}`}>
                         {/* Card Grid with page numbers and separators every 12 cards */}
                         <div className="space-y-6">
                             {Array.from({ length: Math.ceil(filteredCards.length / 12) }).map((_, groupIndex) => {
@@ -3163,7 +3163,27 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                     setSelectedAnalysisSource('opus');
                                 }}>
                                 <div className={`bg-slate-800 rounded-2xl p-6 ${isMobile ? 'w-full max-h-[95vh]' : 'max-w-4xl w-full max-h-[90vh]'} overflow-y-auto scrollbar-hide`} onClick={(e) => e.stopPropagation()}>
-                                    <h2 className="text-2xl font-bold mb-6">📷 AI Scanner</h2>
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h2 className="text-2xl font-bold">📷 AI Scanner</h2>
+                                        <button
+                                            onClick={() => {
+                                                setShowImageUpload(false);
+                                                setUploadedImages([]);
+                                                setPendingImages([]);
+                                                setShowSecondImagePrompt(false);
+                                                setRecognizedCard(null);
+                                                setEditedCard(null);
+                                                setIsEditing(false);
+                                                setRecognitionError(null);
+                                                setDeepAnalysis(null);
+                                                setSelectedAnalysisSource('opus');
+                                            }}
+                                            className="bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold px-4 py-2 text-sm"
+                                            title="Close scanner"
+                                        >
+                                            ✕ Cancel
+                                        </button>
+                                    </div>
                                     <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageUpload} multiple className="hidden" />
                                     
                                     <>
