@@ -31,6 +31,20 @@ window.initializeChatbot = function(contextProvider) {
 window.sendChatMessage = async function(message) {
     if (!message.trim() || window.chatbotState.chatLoading) return;
 
+    // Check if we have a valid token
+    const token = localStorage.getItem('f1-token');
+    if (!token) {
+        const errorMessage = {
+            role: 'assistant',
+            content: 'Authentication error: No valid token found. Please refresh the page and log in again.',
+            timestamp: Date.now(),
+            error: true
+        };
+        window.chatbotState.chatMessages.push(errorMessage);
+        updateChatbotInterface();
+        return;
+    }
+
     // Add user message to chat
     const userMessage = { role: 'user', content: message, timestamp: Date.now() };
     window.chatbotState.chatMessages.push(userMessage);
@@ -45,7 +59,7 @@ window.sendChatMessage = async function(message) {
             "You are an AI assistant integrated into an F1 card collection tracking application. Be helpful and knowledgeable about F1 cards, collecting, grading, and card values. Keep responses concise and relevant.";
 
         const requestBody = {
-            model: 'claude-3-haiku-20240307',
+            model: 'claude-sonnet-4-5-20250929', // Use the same model as other working functions
             max_tokens: 1500,
             messages: [
                 { role: 'system', content: contextInfo },
@@ -66,22 +80,61 @@ window.sendChatMessage = async function(message) {
             };
         };
 
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(requestBody)
-        });
+        console.log('Using API URL:', API_URL);
+        console.log('Auth headers:', getAuthHeaders());
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('API Error Response:', errorText);
-            throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+        let response;
+        let data;
+
+        try {
+            // Try the standard approach first
+            response = await fetch(API_URL, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify(requestBody)
+            });
+
+            console.log('Response status:', response.status);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('API Error Response:', errorText);
+                
+                // Try a simpler format as fallback
+                console.log('Trying simpler format as fallback...');
+                const simpleRequestBody = {
+                    model: 'claude-sonnet-4-5-20250929',
+                    max_tokens: 1500,
+                    messages: [{
+                        role: 'user',
+                        content: contextInfo + '\n\nUser: ' + message
+                    }]
+                };
+                
+                const fallbackResponse = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(simpleRequestBody)
+                });
+                
+                if (!fallbackResponse.ok) {
+                    const fallbackErrorText = await fallbackResponse.text();
+                    console.error('Fallback API Error Response:', fallbackErrorText);
+                    throw new Error(`HTTP ${fallbackResponse.status}: ${fallbackResponse.statusText} - ${fallbackErrorText}`);
+                }
+                
+                response = fallbackResponse;
+            }
+
+            data = await response.json();
+            console.log('Universal Chat API Response:', data);
+        } catch (fetchError) {
+            console.error('Fetch error:', fetchError);
+            throw fetchError;
         }
-
-        const data = await response.json();
-        console.log('Universal Chat API Response:', data);
         
         if (data.content && data.content.length > 0) {
+            // Standard Anthropic API response format
             const assistantMessage = {
                 role: 'assistant',
                 content: data.content.filter(block => block.type === 'text').map(block => block.text).join('\n'),
@@ -89,27 +142,63 @@ window.sendChatMessage = async function(message) {
             };
             window.chatbotState.chatMessages.push(assistantMessage);
         } else if (data.analysis) {
-            // Handle backend format
+            // Backend-specific format (like used in card analysis)
             const assistantMessage = {
                 role: 'assistant',
                 content: data.analysis,
                 timestamp: Date.now()
             };
             window.chatbotState.chatMessages.push(assistantMessage);
+        } else if (data.message) {
+            // Simple message format
+            const assistantMessage = {
+                role: 'assistant',
+                content: data.message,
+                timestamp: Date.now()
+            };
+            window.chatbotState.chatMessages.push(assistantMessage);
+        } else if (typeof data === 'string') {
+            // Direct string response
+            const assistantMessage = {
+                role: 'assistant',
+                content: data,
+                timestamp: Date.now()
+            };
+            window.chatbotState.chatMessages.push(assistantMessage);
         } else {
-            throw new Error('No response content received');
+            console.error('Unexpected response format:', data);
+            throw new Error('Unexpected response format: ' + JSON.stringify(data));
         }
     } catch (error) {
         console.error('Universal Chat error:', error);
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        });
         
         let errorMsg = 'Sorry, I encountered an error. Please try again.';
+        
+        // Provide more specific error messages
         if (error.message.includes('401')) {
-            errorMsg = 'Authentication error. Please check your API key.';
+            errorMsg = 'Authentication error. Please refresh the page and try again.';
         } else if (error.message.includes('429')) {
             errorMsg = 'Rate limit exceeded. Please wait a moment and try again.';
         } else if (error.message.includes('fetch')) {
             errorMsg = 'Network error. Please check your connection and try again.';
+        } else if (error.message.includes('404')) {
+            errorMsg = 'Service unavailable. Please try again in a few moments.';
+        } else if (error.message.includes('500')) {
+            errorMsg = 'Server error. The service may be temporarily unavailable.';
         }
+        
+        // Add the actual error to console for debugging
+        console.error('Chatbot API call failed:', {
+            url: API_URL || 'undefined',
+            headers: getAuthHeaders ? getAuthHeaders() : 'undefined',
+            requestBody: requestBody,
+            error: error.message
+        });
         
         const errorMessage = {
             role: 'assistant',
@@ -210,6 +299,11 @@ function updateChatbotInterface() {
                         <div class="text-center text-slate-400 text-sm py-8">
                             <span class="text-2xl mb-2 block">👋</span>
                             Hi! I'm your F1 card collection assistant. I can help you with card values, collecting tips, and questions about your collection.
+                            <div class="mt-3 text-xs text-slate-500 bg-slate-700/50 rounded p-2">
+                                <div>Debug Info:</div>
+                                <div>API: ${window.API_URL || window.API_BASE + '/api/recognize' || 'Not Found'}</div>
+                                <div>Token: ${localStorage.getItem('f1-token') ? 'Present' : 'Missing'}</div>
+                            </div>
                         </div>
                     ` : ''}
                     

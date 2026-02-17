@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white p-8">
+    <div class="max-w-2xl mx-auto">
+        <h1 class="text-2xl font-bold mb-4">🤖 Chatbot Debug Test</h1>
+        
+        <div class="bg-slate-800 rounded-lg p-4 mb-4">
+            <h2 class="font-semibold mb-2">Environment Check:</h2>
+            <div id="debug-info" class="text-sm space-y-1"></div>
+        </div>
+
+        <div class="bg-slate-800 rounded-lg p-4 mb-4">
+            <h2 class="font-semibold mb-2">API Test:</h2>
+            <input type="text" id="test-input" placeholder="Type a test message..." 
+                   class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white mb-2">
+            <button onclick="testAPI()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-semibold">
+                Test API Call
+            </button>
+        </div>
+
+        <div class="bg-slate-800 rounded-lg p-4">
+            <h2 class="font-semibold mb-2">Response:</h2>
+            <div id="response-area" class="text-sm bg-slate-700 rounded p-3 min-h-[100px] whitespace-pre-wrap">
+                No test run yet...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set up environment
+        const API_BASE = 'https://f1-card-tracker-backend-1.onrender.com';
+        const API_URL = API_BASE + '/api/recognize';
+        const token = localStorage.getItem('f1-token');
+
+        function getAuthHeaders() {
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
+        }
+
+        // Display debug info
+        function showDebugInfo() {
+            const debugDiv = document.getElementById('debug-info');
+            debugDiv.innerHTML = `
+                <div>Token: ${token ? '✅ Present (' + token.substring(0, 10) + '...)' : '❌ Missing'}</div>
+                <div>API URL: ${API_URL}</div>
+                <div>API Base: ${API_BASE}</div>
+                <div>User Agent: ${navigator.userAgent}</div>
+                <div>Page Location: ${window.location.href}</div>
+            `;
+        }
+
+        // Test the API
+        async function testAPI() {
+            const input = document.getElementById('test-input').value || 'Hello, can you help me with my F1 cards?';
+            const responseArea = document.getElementById('response-area');
+            
+            responseArea.textContent = 'Testing API call...\n\n';
+
+            try {
+                const requestBody = {
+                    model: 'claude-sonnet-4-5-20250929',
+                    max_tokens: 500,
+                    messages: [
+                        { 
+                            role: 'system', 
+                            content: 'You are an AI assistant for an F1 card collection app. Be helpful and concise.' 
+                        },
+                        { role: 'user', content: input }
+                    ]
+                };
+
+                responseArea.textContent += 'Request Body:\n' + JSON.stringify(requestBody, null, 2) + '\n\n';
+                responseArea.textContent += 'Headers:\n' + JSON.stringify(getAuthHeaders(), null, 2) + '\n\n';
+                responseArea.textContent += 'Sending request...\n\n';
+
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(requestBody)
+                });
+
+                responseArea.textContent += `Response Status: ${response.status} ${response.statusText}\n\n`;
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    responseArea.textContent += 'Error Response:\n' + errorText + '\n\n';
+                    
+                    // Try alternative format
+                    responseArea.textContent += 'Trying alternative format...\n\n';
+                    
+                    const altRequestBody = {
+                        model: 'claude-3-haiku-20240307',
+                        max_tokens: 500,
+                        messages: [{ role: 'user', content: input }]
+                    };
+
+                    const altResponse = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify(altRequestBody)
+                    });
+
+                    responseArea.textContent += `Alt Response Status: ${altResponse.status} ${altResponse.statusText}\n\n`;
+
+                    if (!altResponse.ok) {
+                        const altErrorText = await altResponse.text();
+                        responseArea.textContent += 'Alt Error Response:\n' + altErrorText;
+                        return;
+                    }
+
+                    const altData = await altResponse.json();
+                    responseArea.textContent += 'Alt Success Response:\n' + JSON.stringify(altData, null, 2);
+                    return;
+                }
+
+                const data = await response.json();
+                responseArea.textContent += 'Success Response:\n' + JSON.stringify(data, null, 2);
+
+            } catch (error) {
+                responseArea.textContent += 'JavaScript Error:\n' + error.message + '\n\n' + error.stack;
+            }
+        }
+
+        // Initialize
+        showDebugInfo();
+    </script>
+</body>
+</html>
