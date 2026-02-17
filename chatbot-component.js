@@ -52,6 +52,36 @@ window.initializeChatbot = function(contextProvider) {
     updateChatbotInterface();
 };
 
+// Update context status indicator
+window.updateContextStatus = function() {
+    const statusEl = document.getElementById('status-text');
+    if (statusEl) {
+        console.log('🔄 Updating context status...');
+        const state = window.currentAppState || {};
+        console.log('🔍 Current app state for status:', state);
+        
+        if (state.selectedCard) {
+            statusEl.textContent = 'Card: #' + state.selectedCard.num + ' ' + state.selectedCard.name;
+            statusEl.className = 'text-green-400';
+            console.log('✅ Status: Selected card found');
+        } else if (Object.keys(state.collection || {}).length > 0) {
+            statusEl.textContent = 'Collection: ' + Object.keys(state.collection || {}).length + ' cards';
+            statusEl.className = 'text-blue-400';
+            console.log('✅ Status: Collection found');
+        } else {
+            statusEl.textContent = 'No context available';
+            statusEl.className = 'text-red-400';
+            console.log('❌ Status: No context found');
+        }
+    }
+};
+
+// Test function - defined globally
+window.testChatbotMessage = function() {
+    console.log('🧪 Test message triggered');
+    window.sendChatMessage('What card am I currently viewing?');
+};
+
 // Send chat message
 window.sendChatMessage = async function(message) {
     if (!message.trim() || window.chatbotState.chatLoading) return;
@@ -361,37 +391,13 @@ function updateChatbotInterface() {
                             <span class="text-2xl mb-2 block">👋</span>
                             Hi! I'm your F1 card collection assistant. I can help you with card values, collecting tips, and questions about your collection.
                             <div class="mt-3 text-xs bg-slate-700/50 rounded p-2" id="context-status">
-                                <div>Context Status: <span class="text-green-400" id="status-text">Checking...</span></div>
+                                <div>Context Status: <span class="text-yellow-400" id="status-text">Checking...</span></div>
                                 <div class="mt-2 flex gap-2 justify-center">
                                     <button onclick="debugChatbotContext()" class="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs">Debug Context</button>
                                     <button onclick="testChatbotMessage()" class="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs">Test Message</button>
                                 </div>
                             </div>
                         </div>
-                        <script>
-                            // Update context status in real-time
-                            setTimeout(() => {
-                                const state = window.currentAppState || {};
-                                const statusEl = document.getElementById('status-text');
-                                if (statusEl) {
-                                    if (state.selectedCard) {
-                                        statusEl.textContent = 'Card: #' + state.selectedCard.num + ' ' + state.selectedCard.name;
-                                        statusEl.className = 'text-green-400';
-                                    } else if (Object.keys(state.collection || {}).length > 0) {
-                                        statusEl.textContent = 'Collection: ' + Object.keys(state.collection || {}).length + ' cards';
-                                        statusEl.className = 'text-blue-400';
-                                    } else {
-                                        statusEl.textContent = 'No context available';
-                                        statusEl.className = 'text-red-400';
-                                    }
-                                }
-                            }, 100);
-                            
-                            // Test function
-                            window.testChatbotMessage = function() {
-                                window.sendChatMessage('What card am I currently viewing?');
-                            };
-                        </script>
                     ` : ''}
                     
                     ${window.chatbotState.chatMessages.map((message, index) => `
@@ -464,6 +470,11 @@ function updateChatbotInterface() {
             const messagesContainer = document.querySelector('.universal-chat-messages');
             if (messagesContainer) {
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            // Update status if present
+            if (window.updateContextStatus) {
+                window.updateContextStatus();
             }
         }, 100);
     }

@@ -666,12 +666,15 @@
 
             // Make current state accessible to chatbot with debugging
             useEffect(() => {
-                console.log('🔧 Updating global app state:', {
+                console.log('🔧 React useEffect triggered - updating global app state');
+                console.log('🔧 Current React state:', {
                     selectedCard: selectedCard ? { num: selectedCard.num, name: selectedCard.name } : null,
                     collectionKeys: Object.keys(collection).length,
-                    showImageUpload
+                    showImageUpload,
+                    cardDataLength: cardData?.length || 0
                 });
                 
+                // Set global state immediately
                 window.currentAppState = {
                     selectedCard,
                     collection,
@@ -679,16 +682,35 @@
                     cardData
                 };
                 
-                // Force chatbot to acknowledge state update
-                if (window.updateChatbotInterface) {
-                    console.log('🔧 Forcing chatbot interface update');
-                    window.updateChatbotInterface();
-                }
-            }, [selectedCard, collection, showImageUpload]);
+                console.log('🔧 Global state set:', window.currentAppState);
+                
+                // Force status update
+                setTimeout(() => {
+                    if (window.updateContextStatus) {
+                        console.log('🔧 Forcing status update...');
+                        window.updateContextStatus();
+                    }
+                    
+                    // Also update chatbot interface if it exists
+                    if (window.updateChatbotInterface) {
+                        console.log('🔧 Forcing chatbot interface update');
+                        window.updateChatbotInterface();
+                    }
+                }, 200);
+                
+            }, [selectedCard, collection, showImageUpload, cardData]);
 
-            // Initialize universal chatbot with context provider
+            // Initialize universal chatbot with context provider  
             useEffect(() => {
-                console.log('🤖 Initializing chatbot system');
+                console.log('🤖 Chatbot initialization useEffect triggered');
+                
+                // Set initial global state
+                window.currentAppState = {
+                    selectedCard,
+                    collection,
+                    showImageUpload,
+                    cardData
+                };
                 
                 // Function to generate fresh context info using global state
                 window.generateContextInfo = () => {
