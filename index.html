@@ -623,6 +623,28 @@
             const [manualCardData, setManualCardData] = useState({ cardNumber: '', variant: 'Base', serialNumber: '', cardTitle: '', driverName: '', value: '' });  // Card data being entered
             const [loadingCardDetails, setLoadingCardDetails] = useState(false);  // Loading state for card details
 
+            // Check for card to open from dashboard
+            useEffect(() => {
+                const openCardData = localStorage.getItem('openCardOnLoad');
+                if (openCardData) {
+                    try {
+                        const { cardNum, card, timestamp } = JSON.parse(openCardData);
+                        // Only auto-open if timestamp is recent (within 5 seconds)
+                        if (Date.now() - timestamp < 5000) {
+                            const cardFromDatabase = cardData.find(c => c.num === cardNum);
+                            if (cardFromDatabase) {
+                                setSelectedCard(cardFromDatabase);
+                            }
+                        }
+                        // Clear the localStorage item
+                        localStorage.removeItem('openCardOnLoad');
+                    } catch (error) {
+                        console.error('Error parsing openCardOnLoad data:', error);
+                        localStorage.removeItem('openCardOnLoad');
+                    }
+                }
+            }, [cardData]);
+
             // Detect mobile device
             useEffect(() => {
                 const handleResize = () => {
@@ -2608,7 +2630,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                     </div>
 
                     {/* Main Content */}
-                    <div className={`${isMobile ? 'p-3 pb-24 pt-4' : 'max-w-7xl mx-auto p-4 pt-48'}`}>
+                    <div className={`${isMobile ? 'p-3 pb-24 pt-4' : 'max-w-7xl mx-auto p-4 pt-64'}`}>
                         {/* Card Grid with page numbers and separators every 12 cards */}
                         <div className="space-y-6">
                             {Array.from({ length: Math.ceil(filteredCards.length / 12) }).map((_, groupIndex) => {
