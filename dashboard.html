@@ -11,22 +11,14 @@
         .card-table { width: 100%; border-collapse: collapse; }
         .card-table th, .card-table td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
         .card-table th { background: #0f172a; font-weight: bold; }
-        .card-table tbody tr { cursor: pointer; transition: background-color 0.2s; }
-        .card-table tbody tr:hover { background: #1e293b; }
-        .sortable { user-select: none; position: relative; }
-        .sortable:hover { background: #1e293b !important; }
-        .sort-indicator { 
-            font-size: 0.8em; 
-            color: #94a3b8; 
-            margin-left: 4px; 
-            display: inline-block;
-            width: 12px;
-            text-align: center;
-        }
+        .card-table tr:hover { background: #1e293b; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
     <div id="root"></div>
+
+    <script src="card-database.js"></script>
+    <script src="chatbot-component.js"></script>
 
     <script>
         const MONGODB_API = 'https://f1-card-tracker-backend-1.onrender.com/api/collection';
@@ -60,6 +52,27 @@
                 const stats = calculateStats(collection);
                 
                 renderDashboard(collection, stats, priceHistory);
+                
+                // Initialize universal chatbot with dashboard context
+                window.initializeChatbot(() => {
+                    let contextInfo = "You are an AI assistant integrated into an F1 card collection dashboard. ";
+                    contextInfo += `The user is currently viewing their collection dashboard. `;
+                    contextInfo += `Their collection contains ${stats.uniqueCards} unique cards and ${stats.totalCards} total cards from the 2025 Topps Chrome F1 set (${stats.totalSetCards} total cards in the set). `;
+                    contextInfo += `Collection completion: ${((stats.uniqueCards / stats.totalSetCards) * 100).toFixed(1)}%. `;
+                    
+                    const topVariants = Object.entries(stats.cardsByVariant)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 3)
+                        .map(([variant, count]) => `${variant} (${count})`)
+                        .join(', ');
+                    
+                    if (topVariants) {
+                        contextInfo += `Top variants owned: ${topVariants}. `;
+                    }
+                    
+                    contextInfo += `Be helpful and knowledgeable about F1 cards, collecting, dashboard analytics, and collection building strategies. Keep responses concise and relevant.`;
+                    return contextInfo;
+                });
             } catch (error) {
                 console.error('Error loading dashboard:', error);
                 document.getElementById('root').innerHTML = '<div class="p-8"><p class="text-red-400">Failed to load collection</p></div>';
@@ -153,27 +166,7 @@
 
                         <!-- Valuation History -->
                         <div class="bg-slate-800 rounded-lg p-6 border border-slate-700 mb-8">
-                            <h2 class="text-xl font-bold mb-4">💰 Collection Values</h2>
-                            
-                            <!-- Current Values Display -->
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                <div class="bg-slate-700 rounded p-4">
-                                    <div class="text-slate-400 text-sm mb-2">PSA 10 Value</div>
-                                    <div class="text-3xl font-bold text-green-400" id="psa10-value">$0</div>
-                                    <div class="text-xs text-slate-500 mt-1">Perfect condition</div>
-                                </div>
-                                <div class="bg-slate-700 rounded p-4">
-                                    <div class="text-slate-400 text-sm mb-2">PSA 9 Value</div>
-                                    <div class="text-3xl font-bold text-blue-400" id="psa9-value">$0</div>
-                                    <div class="text-xs text-slate-500 mt-1">Near mint condition</div>
-                                </div>
-                                <div class="bg-slate-700 rounded p-4">
-                                    <div class="text-slate-400 text-sm mb-2">Raw Value</div>
-                                    <div class="text-3xl font-bold text-yellow-400" id="raw-value">$0</div>
-                                    <div class="text-xs text-slate-500 mt-1">Ungraded condition</div>
-                                </div>
-                            </div>
-
+                            <h2 class="text-xl font-bold mb-4">💰 Valuation History</h2>
                             ${priceHistory.length > 0 ? `
                                 <div class="space-y-4">
                                     <div class="text-sm text-slate-400 mb-4">
@@ -181,12 +174,12 @@
                                     </div>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div class="bg-slate-700 rounded p-4">
-                                            <div class="text-slate-400 text-sm mb-2">Latest Snapshot</div>
-                                            <div class="text-lg font-semibold">${new Date(priceHistory[priceHistory.length - 1]?.date).toLocaleDateString()}</div>
+                                            <div class="text-slate-400 text-sm mb-2">Current Value</div>
+                                            <div class="text-3xl font-bold text-green-400">$${priceHistory[priceHistory.length - 1]?.totalValue || 0}</div>
                                         </div>
                                         <div class="bg-slate-700 rounded p-4">
-                                            <div class="text-slate-400 text-sm mb-2">Cards Tracked</div>
-                                            <div class="text-lg font-semibold">${priceHistory[priceHistory.length - 1]?.cardCount || 0}</div>
+                                            <div class="text-slate-400 text-sm mb-2">Latest Snapshot</div>
+                                            <div class="text-lg font-semibold">${new Date(priceHistory[priceHistory.length - 1]?.date).toLocaleDateString()}</div>
                                         </div>
                                     </div>
                                     <div class="mt-4">
@@ -209,21 +202,19 @@
 
                         <!-- Collection Table -->
                         <div class="bg-slate-800 rounded-lg p-6 border border-slate-700 mb-8">
-                            <h2 class="text-xl font-bold mb-2">Your Cards</h2>
-                            <p class="text-slate-400 text-sm mb-4">Click on any row to view card details • Click column headers to sort</p>
+                            <h2 class="text-xl font-bold mb-4">Your Cards</h2>
                             <div class="overflow-x-auto">
-                                <table class="card-table" id="cards-table">
+                                <table class="card-table">
                                     <thead>
                                         <tr>
-                                            <th class="sortable cursor-pointer hover:bg-slate-700 transition-colors" onclick="sortTable(0)"># <span class="sort-indicator">↕</span></th>
-                                            <th class="sortable cursor-pointer hover:bg-slate-700 transition-colors" onclick="sortTable(1)">Driver <span class="sort-indicator">↕</span></th>
-                                            <th class="sortable cursor-pointer hover:bg-slate-700 transition-colors" onclick="sortTable(2)">Team <span class="sort-indicator">↕</span></th>
-                                            <th class="sortable cursor-pointer hover:bg-slate-700 transition-colors" onclick="sortTable(3)">Variants <span class="sort-indicator">↕</span></th>
-                                            <th class="sortable cursor-pointer hover:bg-slate-700 transition-colors" onclick="sortTable(4)">Total <span class="sort-indicator">↕</span></th>
-                                            <th class="sortable cursor-pointer hover:bg-slate-700 transition-colors" onclick="sortTable(5)">Value <span class="sort-indicator">↕</span></th>
+                                            <th>#</th>
+                                            <th>Driver</th>
+                                            <th>Team</th>
+                                            <th>Variants</th>
+                                            <th>Total</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="cards-table-body">
+                                    <tbody>
                                         ${getCardsInCollection(collection)
                                             .map(cardNum => {
                                                 const card = cardDatabase.find(c => c.num === cardNum);
@@ -240,17 +231,13 @@
                                                     .map(v => `${v} (${variants[v]})`)
                                                     .join(', ');
 
-                                                // Calculate card value tier
-                                                const valueTier = calculateCardValueTier(cardKey, collection);
-
                                                 return `
-                                                    <tr class="cursor-pointer hover:bg-slate-700 transition-colors" onclick="openCardDetail('${card.num}', ${JSON.stringify(card).replace(/"/g, '&quot;')}, ${JSON.stringify(variants).replace(/"/g, '&quot;')})">
-                                                        <td class="font-bold" data-sort="${parseInt(card.num)}">#${card.num}</td>
-                                                        <td data-sort="${card.name}">${card.name}</td>
-                                                        <td class="text-sm text-slate-400" data-sort="${card.team || ''}">${card.team || 'N/A'}</td>
-                                                        <td class="text-sm" data-sort="${Object.keys(variants).filter(k => !k.startsWith('_') && variants[k] > 0).length}">${variantList}</td>
-                                                        <td class="font-bold text-green-400" data-sort="${totalCount}">${totalCount}</td>
-                                                        <td class="font-bold text-yellow-400" data-sort="${valueTier.sortValue}">${valueTier.display}</td>
+                                                    <tr>
+                                                        <td class="font-bold">#${card.num}</td>
+                                                        <td>${card.name}</td>
+                                                        <td class="text-sm text-slate-400">${card.team || 'N/A'}</td>
+                                                        <td class="text-sm">${variantList}</td>
+                                                        <td class="font-bold text-green-400">${totalCount}</td>
                                                     </tr>
                                                 `;
                                             }).join('')
@@ -277,230 +264,6 @@
             `;
 
             document.getElementById('root').innerHTML = html;
-            
-            // Calculate and display collection values
-            calculateCollectionValues(collection);
-        }
-
-        function calculateCollectionValues(collection) {
-            let psa10Value = 0;
-            let psa9Value = 0;
-            let rawValue = 0;
-
-            Object.keys(collection).forEach(cardKey => {
-                const cardNum = cardKey.replace('card-', '');
-                const card = cardDatabase.find(c => c.num === cardNum);
-                if (!card) return;
-
-                const variants = collection[cardKey];
-                const analyses = variants._analyses || {};
-
-                Object.keys(variants).forEach(variant => {
-                    if (variant === '_analyses' || variant.startsWith('_')) return;
-                    
-                    const count = variants[variant] || 0;
-                    if (count === 0) return;
-
-                    // Get latest analysis for this variant
-                    const variantAnalyses = analyses[variant] || [];
-                    if (variantAnalyses.length === 0) return;
-
-                    const latestAnalysis = variantAnalyses[variantAnalyses.length - 1];
-                    if (!latestAnalysis.analysis) return;
-
-                    // Parse PSA 10 value
-                    const psa10Match = latestAnalysis.analysis.match(/PSA 10[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
-                    if (psa10Match) {
-                        const maxPsa10 = parseInt(psa10Match[2].replace(/,/g, ''));
-                        psa10Value += maxPsa10 * count;
-                    }
-
-                    // Parse PSA 9 value
-                    const psa9Match = latestAnalysis.analysis.match(/PSA 9[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
-                    if (psa9Match) {
-                        const maxPsa9 = parseInt(psa9Match[2].replace(/,/g, ''));
-                        psa9Value += maxPsa9 * count;
-                    }
-
-                    // Parse Raw value
-                    const rawMatch = latestAnalysis.analysis.match(/Raw[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
-                    if (rawMatch) {
-                        const maxRaw = parseInt(rawMatch[2].replace(/,/g, ''));
-                        rawValue += maxRaw * count;
-                    }
-                });
-            });
-
-            // Update the display
-            const psa10Element = document.getElementById('psa10-value');
-            const psa9Element = document.getElementById('psa9-value');
-            const rawElement = document.getElementById('raw-value');
-
-            if (psa10Element) psa10Element.textContent = `$${psa10Value.toLocaleString()}`;
-            if (psa9Element) psa9Element.textContent = `$${psa9Value.toLocaleString()}`;
-            if (rawElement) rawElement.textContent = `$${rawValue.toLocaleString()}`;
-        }
-
-        function calculateCardValueTier(cardKey, collection) {
-            const variants = collection[cardKey];
-            const analyses = variants._analyses || {};
-            let totalMaxValue = 0;
-
-            // Calculate total max value for all variants of this card
-            Object.keys(variants).forEach(variant => {
-                if (variant === '_analyses' || variant.startsWith('_')) return;
-                
-                const count = variants[variant];
-                if (count === 0) return;
-                
-                // Get latest analysis for this variant
-                const variantAnalyses = analyses[variant] || [];
-                if (variantAnalyses.length === 0) return;
-                
-                const latestAnalysis = variantAnalyses[variantAnalyses.length - 1];
-                
-                // Parse Raw value (using maximum)
-                const rawMatch = latestAnalysis.analysis.match(/Raw[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
-                
-                if (rawMatch) {
-                    const maxValue = parseInt(rawMatch[2].replace(/,/g, ''));
-                    totalMaxValue += maxValue * count;
-                }
-            });
-            
-            // Return tier based on total value
-            if (totalMaxValue === 0) return { display: '-', sortValue: 0 };
-            if (totalMaxValue < 5) return { display: '$', sortValue: 1 };
-            if (totalMaxValue <= 40) return { display: '$$', sortValue: 2 };
-            if (totalMaxValue <= 100) return { display: '$$$', sortValue: 3 };
-            if (totalMaxValue <= 500) return { display: '$$$$', sortValue: 4 };
-            return { display: '$$$$$', sortValue: 5 };
-        }
-
-        let currentSortColumn = -1;
-        let currentSortDirection = 'asc';
-
-        function sortTable(columnIndex) {
-            const table = document.getElementById('cards-table');
-            const tbody = document.getElementById('cards-table-body');
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-            
-            // Toggle sort direction if same column, otherwise default to ascending
-            if (currentSortColumn === columnIndex) {
-                currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                currentSortDirection = 'asc';
-                currentSortColumn = columnIndex;
-            }
-
-            // Clear all sort indicators
-            document.querySelectorAll('.sort-indicator').forEach(indicator => {
-                indicator.textContent = '↕';
-            });
-
-            // Set current sort indicator
-            const currentIndicator = table.querySelectorAll('.sort-indicator')[columnIndex];
-            currentIndicator.textContent = currentSortDirection === 'asc' ? '↑' : '↓';
-
-            // Sort rows
-            rows.sort((a, b) => {
-                const cellA = a.cells[columnIndex];
-                const cellB = b.cells[columnIndex];
-                
-                let valueA = cellA.getAttribute('data-sort') || cellA.textContent.trim();
-                let valueB = cellB.getAttribute('data-sort') || cellB.textContent.trim();
-                
-                // Convert to numbers if numeric
-                if (!isNaN(valueA) && !isNaN(valueB)) {
-                    valueA = parseFloat(valueA);
-                    valueB = parseFloat(valueB);
-                } else {
-                    valueA = valueA.toString().toLowerCase();
-                    valueB = valueB.toString().toLowerCase();
-                }
-
-                let comparison = 0;
-                if (valueA > valueB) comparison = 1;
-                if (valueA < valueB) comparison = -1;
-                
-                return currentSortDirection === 'asc' ? comparison : -comparison;
-            });
-
-            // Re-append sorted rows
-            rows.forEach(row => tbody.appendChild(row));
-        }
-
-        function openCardDetail(cardNum, card, variants) {
-            const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50';
-            modal.onclick = () => modal.remove();
-
-            const totalCount = Object.keys(variants)
-                .filter(k => !k.startsWith('_'))
-                .reduce((sum, v) => sum + (variants[v] || 0), 0);
-
-            const variantBreakdown = Object.keys(variants)
-                .filter(k => !k.startsWith('_') && variants[k] > 0)
-                .map(variant => {
-                    const count = variants[variant];
-                    return `
-                        <div class="flex items-center justify-between bg-slate-700 rounded px-3 py-2">
-                            <span class="text-sm font-medium">${variant}</span>
-                            <span class="font-bold text-green-400">${count}</span>
-                        </div>
-                    `;
-                }).join('');
-
-            modal.innerHTML = `
-                <div class="bg-slate-800 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
-                    <div class="flex justify-between items-start mb-6">
-                        <div>
-                            <h2 class="text-3xl font-bold mb-2">#${card.num} ${card.name}</h2>
-                            ${card.team ? `<p class="text-slate-400 text-sm">${card.team}</p>` : ''}
-                            <p class="text-xs text-slate-500">${card.subset || 'Unknown Subset'}</p>
-                        </div>
-                        <button onclick="this.closest('.fixed').remove()" class="text-slate-400 hover:text-white text-2xl font-bold">×</button>
-                    </div>
-                    
-                    <div class="mb-6">
-                        <div class="flex items-center gap-4 mb-4">
-                            <div class="text-center">
-                                <div class="text-2xl font-bold text-green-400">${totalCount}</div>
-                                <div class="text-xs text-slate-400">Total Cards</div>
-                            </div>
-                            ${card.rookie ? '<span class="bg-yellow-500 text-black text-xs px-2 py-0.5 rounded-full font-bold">RC</span>' : ''}
-                        </div>
-                        
-                        <div class="space-y-2">
-                            <h3 class="font-semibold text-slate-300 mb-3">Variant Breakdown:</h3>
-                            ${variantBreakdown}
-                        </div>
-                    </div>
-                    
-                    <div class="flex gap-3">
-                        <button onclick="this.closest('.fixed').remove()" class="flex-1 bg-slate-600 hover:bg-slate-700 px-4 py-2 rounded-lg font-semibold">
-                            Close
-                        </button>
-                        <button onclick="viewInMain('${card.num}', ${JSON.stringify(card).replace(/"/g, '&quot;')})" class="flex-1 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-semibold">
-                            View in Main
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            document.body.appendChild(modal);
-        }
-
-        function viewInMain(cardNum, card) {
-            // Store the card to be opened in localStorage
-            localStorage.setItem('openCardOnLoad', JSON.stringify({
-                cardNum: cardNum,
-                card: card,
-                timestamp: Date.now()
-            }));
-            
-            // Navigate to main page
-            window.location.href = 'index.html';
         }
 
         function getCardsInCollection(collection) {
