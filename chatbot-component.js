@@ -149,6 +149,12 @@ window.sendChatMessage = async function(message) {
             ]
         };
 
+        console.log('📤 FULL API REQUEST BEING SENT:');
+        console.log('🔸 Model:', requestBody.model);
+        console.log('🔸 System Context:', requestBody.system);
+        console.log('🔸 Messages:', requestBody.messages);
+        console.log('🔸 Full Request Body:', requestBody);
+
         console.log('Sending universal chat request:', requestBody);
 
         // Get API configuration from the current page
@@ -182,34 +188,62 @@ window.sendChatMessage = async function(message) {
                 console.error('API Error Response:', errorText);
                 
                 // Try a simpler format as fallback
-                console.log('Trying simpler format as fallback...');
-                const simpleRequestBody = {
-                    model: window.chatbotState.selectedModel, // Use selected model
+                console.log('Trying alternative format with system message in messages array...');
+                const altRequestBody = {
+                    model: window.chatbotState.selectedModel,
                     max_tokens: 1500,
-                    system: contextInfo, // System as top-level parameter
-                    messages: [{
-                        role: 'user',
-                        content: message
-                    }]
+                    messages: [
+                        { role: 'system', content: contextInfo }, // System message in messages array
+                        { role: 'user', content: message }
+                    ]
                 };
+                
+                console.log('📤 FALLBACK REQUEST:');
+                console.log('🔸 Alternative Request Body:', altRequestBody);
                 
                 const fallbackResponse = await fetch(API_URL, {
                     method: 'POST',
                     headers: getAuthHeaders(),
-                    body: JSON.stringify(simpleRequestBody)
+                    body: JSON.stringify(altRequestBody)
                 });
                 
                 if (!fallbackResponse.ok) {
-                    const fallbackErrorText = await fallbackResponse.text();
-                    console.error('Fallback API Error Response:', fallbackErrorText);
-                    throw new Error(`HTTP ${fallbackResponse.status}: ${fallbackResponse.statusText} - ${fallbackErrorText}`);
+                    // Try embedding context directly in user message as final fallback
+                    console.log('Trying final fallback with context embedded in user message...');
+                    const contextEmbeddedRequestBody = {
+                        model: window.chatbotState.selectedModel,
+                        max_tokens: 1500,
+                        messages: [{
+                            role: 'user',
+                            content: `Context: ${contextInfo}\n\nUser Question: ${message}`
+                        }]
+                    };
+                    
+                    console.log('📤 CONTEXT EMBEDDED REQUEST:');
+                    console.log('🔸 Context Embedded Request Body:', contextEmbeddedRequestBody);
+                    
+                    const finalResponse = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify(contextEmbeddedRequestBody)
+                    });
+                    
+                    if (!finalResponse.ok) {
+                        const finalErrorText = await finalResponse.text();
+                        console.error('Final fallback API Error Response:', finalErrorText);
+                        throw new Error(`All formats failed. Last error - HTTP ${finalResponse.status}: ${finalResponse.statusText} - ${finalErrorText}`);
+                    }
+                    
+                    response = finalResponse;
+                } else {
+                    response = fallbackResponse;
                 }
-                
-                response = fallbackResponse;
             }
 
             data = await response.json();
-            console.log('Universal Chat API Response:', data);
+            console.log('📥 FULL API RESPONSE:');
+            console.log('🔸 Response Status:', response.status);
+            console.log('🔸 Response Data:', data);
         } catch (fetchError) {
             console.error('Fetch error:', fetchError);
             throw fetchError;
@@ -217,9 +251,20 @@ window.sendChatMessage = async function(message) {
         
         if (data.content && data.content.length > 0) {
             // Standard Anthropic API response format
+            const responseText = data.content.filter(block => block.type === 'text').map(block => block.text).join('\n');
+            console.log('🔸 Extracted Response Text:', responseText);
+            
+            // Check if response shows awareness of context
+            if (responseText.includes('Card #') || responseText.includes('currently viewing') || responseText.includes('collection contains')) {
+                console.log('✅ Response shows context awareness!');
+            } else {
+                console.log('❌ Response lacks context awareness - Claude may not be using system context');
+                console.log('🔍 Checking if context was sent correctly...');
+            }
+            
             const assistantMessage = {
                 role: 'assistant',
-                content: data.content.filter(block => block.type === 'text').map(block => block.text).join('\n'),
+                content: responseText,
                 timestamp: Date.now()
             };
             window.chatbotState.chatMessages.push(assistantMessage);
