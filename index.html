@@ -252,12 +252,8 @@
         // Helper function to format Quick Grade Report with app-matching style and responsive design
         const formatQuickGradeReport = (gradeText) => {
             if (!gradeText) {
-                console.log('QGA: No grade text provided');
                 return <div className="text-slate-400">No assessment available</div>;
             }
-            
-            console.log('QGA: Formatting grade report, text length:', gradeText.length);
-            console.log('QGA: First 200 chars:', gradeText.substring(0, 200));
             
             // Define all possible section headers
             const sectionHeaders = [
@@ -276,8 +272,6 @@
             let currentSection = '';
             const lines = gradeText.split('\n');
             
-            console.log('QGA: Total lines:', lines.length);
-            
             // Parse sections - capture ALL content
             lines.forEach((line, idx) => {
                 const upperLine = line.toUpperCase().trim();
@@ -288,7 +282,6 @@
                     if (upperLine.startsWith(header)) {
                         currentSection = header;
                         sections[currentSection] = [];
-                        console.log('QGA: Found section header at line', idx, ':', header);
                         foundHeader = true;
                         break;
                     }
@@ -309,11 +302,8 @@
                 }
             });
             
-            console.log('QGA: Sections found:', Object.keys(sections));
-            
             // Fallback: if no sections found, treat entire text as content
             if (Object.keys(sections).length === 0) {
-                console.log('QGA: No sections found, using full text as fallback');
                 return (
                     <div className="text-sm space-y-2 text-slate-300 break-words leading-relaxed">
                         {lines.filter(l => l.trim()).map((line, idx) => {
@@ -343,8 +333,6 @@
                     orderedSections.push({ key, content: sections[key] });
                 }
             });
-            
-            console.log('QGA: Ordered sections:', orderedSections.length, 'sections');
             
             // Helper function to extract and left-align emojis
             const formatLineWithEmojis = (line) => {
@@ -666,14 +654,6 @@
 
             // Make current state accessible to chatbot with debugging
             useEffect(() => {
-                console.log('🔧 React useEffect triggered - updating global app state');
-                console.log('🔧 Current React state:', {
-                    selectedCard: selectedCard ? { num: selectedCard.num, name: selectedCard.name } : null,
-                    collectionKeys: Object.keys(collection).length,
-                    showImageUpload,
-                    cardDataLength: cardData?.length || 0
-                });
-                
                 // Set global state immediately
                 window.currentAppState = {
                     selectedCard,
@@ -682,18 +662,10 @@
                     cardData
                 };
                 
-                console.log('🔧 Global state set:', window.currentAppState);
-                
                 // Force status update
                 setTimeout(() => {
-                    if (window.updateContextStatus) {
-                        console.log('🔧 Forcing status update...');
-                        window.updateContextStatus();
-                    }
-                    
                     // Also update chatbot interface if it exists
                     if (window.updateChatbotInterface) {
-                        console.log('🔧 Forcing chatbot interface update');
                         window.updateChatbotInterface();
                     }
                 }, 200);
@@ -702,8 +674,6 @@
 
             // Initialize universal chatbot with context provider  
             useEffect(() => {
-                console.log('🤖 Chatbot initialization useEffect triggered');
-                
                 // Set initial global state
                 window.currentAppState = {
                     selectedCard,
@@ -715,18 +685,11 @@
                 // Function to generate fresh context info using global state
                 window.generateContextInfo = () => {
                     const state = window.currentAppState || {};
-                    console.log('🔍 generateContextInfo called with state:', {
-                        hasSelectedCard: !!state.selectedCard,
-                        selectedCardNum: state.selectedCard?.num,
-                        collectionSize: Object.keys(state.collection || {}).length,
-                        hasCardData: !!state.cardData
-                    });
                     
                     let contextInfo = "You are an AI assistant integrated into an F1 card collection tracking application. ";
                     
                     // Add current card context if available
                     if (state.selectedCard) {
-                        console.log('📋 Adding selected card context for:', state.selectedCard.num);
                         const cardKey = `card-${state.selectedCard.num}`;
                         const cardData = (state.collection || {})[cardKey] || {};
                         const totalCount = Object.keys(cardData).filter(k => !k.startsWith('_')).reduce((sum, v) => sum + (cardData[v] || 0), 0);
@@ -750,7 +713,6 @@
                             contextInfo += ` This is a rookie card.`;
                         }
                     } else {
-                        console.log('⚠️ No selected card in state');
                         contextInfo += `The user is browsing their collection but hasn't selected a specific card yet. `;
                     }
 
@@ -787,25 +749,13 @@
                     
                     contextInfo += ` IMPORTANT: You can see their collection data and current card. Do not say you cannot see what they're looking at. Provide specific help based on what you know about their collection and current selection.`;
                     
-                    console.log('✅ Generated context preview:', contextInfo.substring(0, 300) + '...');
-                    console.log('✅ Full context length:', contextInfo.length);
                     return contextInfo;
                 };
 
-                // Test context generation immediately
-                console.log('🧪 Testing initial context generation...');
-                if (window.generateContextInfo) {
-                    const testContext = window.generateContextInfo();
-                    console.log('🧪 Initial context test result:', testContext.substring(0, 200));
-                }
-
                 // Initialize chatbot only once
                 if (!window.chatbotInitialized) {
-                    console.log('🚀 Initializing chatbot for first time');
                     window.initializeChatbot();
                     window.chatbotInitialized = true;
-                } else {
-                    console.log('🔄 Chatbot already initialized, context updated');
                 }
             }, []); // Only run once on mount
 
@@ -1897,7 +1847,30 @@ KEY FACTORS:
                                 ...prev,
                                 gradeReport: gradeReport
                             }));
-                            alert('✅ Grade Report Generated!\n\nScroll down to see full assessment.');
+                            
+                            // Create custom alert that scrolls to QGA
+                            if (window.confirm('✅ Grade Report Generated!\n\nClick OK to view the Quick Grade Assessment.')) {
+                                // Scroll to the Quick Grade Assessment section
+                                setTimeout(() => {
+                                    const qgaElement = document.querySelector('[data-testid="quick-grade-assessment"]') || 
+                                                      document.querySelector('.bg-blue-900\\/20') ||
+                                                      Array.from(document.querySelectorAll('*')).find(el => 
+                                                          el.textContent && el.textContent.includes('Quick Grade Assessment'));
+                                    
+                                    if (qgaElement) {
+                                        qgaElement.scrollIntoView({ 
+                                            behavior: 'smooth', 
+                                            block: 'center',
+                                            inline: 'nearest'
+                                        });
+                                        // Add a subtle highlight effect
+                                        qgaElement.style.boxShadow = '0 0 20px rgba(59, 130, 246, 0.5)';
+                                        setTimeout(() => {
+                                            qgaElement.style.boxShadow = '';
+                                        }, 2000);
+                                    }
+                                }, 500);
+                            }
                         } else {
                             console.warn('recognizedCard not set, cannot store grade report');
                             alert('⚠️ Grade report created but card not recognized. Please ensure card is analyzed first.');
@@ -1985,15 +1958,12 @@ Be thorough and specific in your assessment.`;
                     });
 
                     const data = await response.json();
-                    console.log('QGA: Quick grade response received for variant', variant);
                     
                     if (data.content && data.content.length > 0) {
                         const gradeReport = data.content
                             .filter(block => block.type === 'text')
                             .map(block => block.text)
                             .join('\n\n');
-                        
-                        console.log('QGA: Grade report generated for variant', variant);
                         
                         // Save the grade report for this specific variant
                         const key = getCardKey(cardNum);
@@ -2007,7 +1977,6 @@ Be thorough and specific in your assessment.`;
                         setCollection(updatedCollection);
                         saveCollection(updatedCollection);
                         
-                        console.log('QGA: Grade report saved for variant', variant);
                     } else {
                         console.error('QGA: No response from grading API');
                     }
@@ -3453,7 +3422,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
 
                                                         {/* Quick Grade Assessment Section */}
                                                         {variant && collection[getCardKey(selectedCard.num)]?._gradeReports?.[variant] && (
-                                                            <div className="mt-2 bg-blue-900/20 border border-blue-500/30 rounded p-3">
+                                                            <div className="mt-2 bg-blue-900/20 border border-blue-500/30 rounded p-3" data-testid="quick-grade-assessment">
                                                                 <div className="flex justify-between items-center mb-3">
                                                                     <button 
                                                                         onClick={(e) => {
@@ -4169,7 +4138,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
 
                                                     {/* Quick Grade Report */}
                                                     {recognizedCard?.gradeReport && (
-                                                        <div className="mt-2 bg-blue-900/20 border border-blue-500/30 rounded p-3">
+                                                        <div className="mt-2 bg-blue-900/20 border border-blue-500/30 rounded p-3" data-testid="quick-grade-assessment">
                                                             <div className="flex items-center justify-between mb-3">
                                                                 <button 
                                                                     onClick={(e) => {

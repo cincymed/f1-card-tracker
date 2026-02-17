@@ -15,7 +15,6 @@ window.chatbotState = {
 // Change model
 window.changeModel = function(model) {
     window.chatbotState.selectedModel = model;
-    console.log('Changed model to:', model);
     
     // Add a system message indicating the model change
     const modelNames = {
@@ -40,46 +39,15 @@ window.initializeChatbot = function(contextProvider) {
     // Add chatbot container to page if it doesn't exist
     if (!document.querySelector('.universal-chatbot-container')) {
         const chatbotContainer = document.createElement('div');
-        chatbotContainer.className = 'fixed left-6 bottom-6 z-30 universal-chatbot-container';
+        chatbotContainer.className = 'fixed left-6 z-30 universal-chatbot-container';
+        chatbotContainer.style.bottom = window.innerWidth < 768 ? '33vh' : '6rem'; // 1/3 up on mobile, normal on desktop
         document.body.appendChild(chatbotContainer);
     }
     
     // Store context provider function (allow updates)
     window.chatbotContextProvider = contextProvider;
-    console.log('Chatbot initialized');
-    
     // Render initial state
     updateChatbotInterface();
-};
-
-// Update context status indicator
-window.updateContextStatus = function() {
-    const statusEl = document.getElementById('status-text');
-    if (statusEl) {
-        console.log('🔄 Updating context status...');
-        const state = window.currentAppState || {};
-        console.log('🔍 Current app state for status:', state);
-        
-        if (state.selectedCard) {
-            statusEl.textContent = 'Card: #' + state.selectedCard.num + ' ' + state.selectedCard.name;
-            statusEl.className = 'text-green-400';
-            console.log('✅ Status: Selected card found');
-        } else if (Object.keys(state.collection || {}).length > 0) {
-            statusEl.textContent = 'Collection: ' + Object.keys(state.collection || {}).length + ' cards';
-            statusEl.className = 'text-blue-400';
-            console.log('✅ Status: Collection found');
-        } else {
-            statusEl.textContent = 'No context available';
-            statusEl.className = 'text-red-400';
-            console.log('❌ Status: No context found');
-        }
-    }
-};
-
-// Test function - defined globally
-window.testChatbotMessage = function() {
-    console.log('🧪 Test message triggered');
-    window.sendChatMessage('What card am I currently viewing?');
 };
 
 // Send chat message
@@ -114,24 +82,11 @@ window.sendChatMessage = async function(message) {
         if (window.generateContextInfo) {
             try {
                 contextInfo = window.generateContextInfo();
-                console.log('📤 FULL CONTEXT BEING SENT TO API:');
-                console.log('=' .repeat(80));
-                console.log(contextInfo);
-                console.log('=' .repeat(80));
-                
-                // Validate that we have meaningful context
-                if (contextInfo.includes("user is currently viewing Card") || contextInfo.includes("collection contains")) {
-                    console.log('✅ Context has collection/card data');
-                } else {
-                    console.warn('⚠️ Context lacks specific collection data');
-                    console.log('🔍 Current app state:', window.currentAppState);
-                }
             } catch (error) {
                 console.error('Context generation error:', error);
                 contextInfo = "You are an AI assistant integrated into an F1 card collection tracking application. Be helpful and knowledgeable about F1 cards, collecting, grading, and card values. Keep responses concise and relevant.";
             }
         } else {
-            console.error('❌ No generateContextInfo function found');
             contextInfo = "You are an AI assistant integrated into an F1 card collection tracking application. Be helpful and knowledgeable about F1 cards, collecting, grading, and card values. Keep responses concise and relevant.";
         }
 
@@ -148,12 +103,6 @@ window.sendChatMessage = async function(message) {
                 { role: 'user', content: message }
             ]
         };
-
-        console.log('📤 FULL API REQUEST BEING SENT:');
-        console.log('🔸 Model:', requestBody.model);
-        console.log('🔸 System Context:', requestBody.system);
-        console.log('🔸 Messages:', requestBody.messages);
-        console.log('🔸 Full Request Body:', requestBody);
 
         console.log('Sending universal chat request:', requestBody);
 
@@ -176,7 +125,6 @@ window.sendChatMessage = async function(message) {
         try {
             // Skip standard approach since your backend ignores system parameter
             // Use context-embedded format directly
-            console.log('🔧 Using context-embedded format (backend doesn\'t support system parameter)');
             const contextEmbeddedRequestBody = {
                 model: window.chatbotState.selectedModel,
                 max_tokens: 1500,
@@ -189,17 +137,12 @@ USER QUESTION: ${message}
 Please respond based on the context information above. Reference the specific card and collection details mentioned.`
                 }]
             };
-            
-            console.log('📤 CONTEXT EMBEDDED REQUEST:');
-            console.log('🔸 Context Embedded Request Body:', contextEmbeddedRequestBody);
 
             response = await fetch(API_URL, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify(contextEmbeddedRequestBody)
             });
-
-            console.log('Response status:', response.status);
             
             if (!response.ok) {
                 const errorText = await response.text();
@@ -208,9 +151,6 @@ Please respond based on the context information above. Reference the specific ca
             }
 
             data = await response.json();
-            console.log('📥 FULL API RESPONSE:');
-            console.log('🔸 Response Status:', response.status);
-            console.log('🔸 Response Data:', data);
         } catch (fetchError) {
             console.error('Fetch error:', fetchError);
             throw fetchError;
@@ -219,20 +159,6 @@ Please respond based on the context information above. Reference the specific ca
         if (data.content && data.content.length > 0) {
             // Standard Anthropic API response format
             const responseText = data.content.filter(block => block.type === 'text').map(block => block.text).join('\n');
-            console.log('🔸 Extracted Response Text:', responseText);
-            
-            // Check if response shows awareness of context
-            if (responseText.toLowerCase().includes('card #') || 
-                responseText.toLowerCase().includes('oscar piastri') || 
-                responseText.toLowerCase().includes('currently viewing') || 
-                responseText.toLowerCase().includes('collection contains') ||
-                responseText.toLowerCase().includes('you own') ||
-                responseText.toLowerCase().includes('your collection')) {
-                console.log('✅ Response shows context awareness!');
-            } else {
-                console.log('❌ Response lacks context awareness - Claude ignored the system context');
-                console.log('🔍 This means the backend is not properly forwarding the system parameter to Claude');
-            }
             
             const assistantMessage = {
                 role: 'assistant',
@@ -366,7 +292,7 @@ function updateChatbotInterface() {
         `;
     } else {
         chatbotContainer.innerHTML = `
-            <div class="${isMobile ? 'w-80 h-96' : 'w-96 h-[500px]'} bg-slate-800 rounded-2xl border border-slate-600 shadow-2xl flex flex-col">
+            <div class="${isMobile ? 'w-80' : 'w-96'} bg-slate-800 rounded-2xl border border-slate-600 shadow-2xl flex flex-col" style="height: 67vh;">
                 <!-- Chat Header -->
                 <div class="flex items-center justify-between p-4 border-b border-slate-600">
                     <div class="flex items-center gap-2">
@@ -407,13 +333,6 @@ function updateChatbotInterface() {
                         <div class="text-center text-slate-400 text-sm py-8">
                             <span class="text-2xl mb-2 block">👋</span>
                             Hi! I'm your F1 card collection assistant. I can help you with card values, collecting tips, and questions about your collection.
-                            <div class="mt-3 text-xs bg-slate-700/50 rounded p-2" id="context-status">
-                                <div>Context Status: <span class="text-yellow-400" id="status-text">Checking...</span></div>
-                                <div class="mt-2 flex gap-2 justify-center">
-                                    <button onclick="debugChatbotContext()" class="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs">Debug Context</button>
-                                    <button onclick="testChatbotMessage()" class="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs">Test Message</button>
-                                </div>
-                            </div>
                         </div>
                     ` : ''}
                     
@@ -488,11 +407,6 @@ function updateChatbotInterface() {
             if (messagesContainer) {
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
-            
-            // Update status if present
-            if (window.updateContextStatus) {
-                window.updateContextStatus();
-            }
         }, 100);
     }
 }
@@ -508,16 +422,3 @@ if (!document.querySelector('#universal-chatbot-styles')) {
     `;
     document.head.appendChild(style);
 }
-
-// Debug helper function - type debugChatbotContext() in console
-window.debugChatbotContext = function() {
-    if (window.generateContextInfo) {
-        const context = window.generateContextInfo();
-        console.log('Current chatbot context:');
-        console.log(context);
-        return context;
-    } else {
-        console.log('No generateContextInfo function found');
-        return null;
-    }
-};
