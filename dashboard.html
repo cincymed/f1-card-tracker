@@ -53,21 +53,33 @@
                 
                 renderDashboard(collection, stats, priceHistory);
                 
+                // Make dashboard state accessible globally
+                window.currentAppState = {
+                    isDashboard: true,
+                    collection,
+                    stats,
+                    priceHistory
+                };
+                
                 // Initialize universal chatbot with dashboard context
                 window.generateContextInfo = () => {
+                    const state = window.currentAppState;
                     let contextInfo = "You are an AI assistant integrated into an F1 card collection dashboard. ";
-                    contextInfo += `The user is currently viewing their collection dashboard. `;
-                    contextInfo += `Their collection contains ${stats.uniqueCards} unique cards and ${stats.totalCards} total cards from the 2025 Topps Chrome F1 set (${stats.totalSetCards} total cards in the set). `;
-                    contextInfo += `Collection completion: ${((stats.uniqueCards / stats.totalSetCards) * 100).toFixed(1)}%. `;
                     
-                    const topVariants = Object.entries(stats.cardsByVariant)
-                        .sort((a, b) => b[1] - a[1])
-                        .slice(0, 3)
-                        .map(([variant, count]) => `${variant} (${count})`)
-                        .join(', ');
-                    
-                    if (topVariants) {
-                        contextInfo += `Top variants owned: ${topVariants}. `;
+                    if (state.isDashboard && state.stats) {
+                        contextInfo += `The user is currently viewing their collection dashboard. `;
+                        contextInfo += `Their collection contains ${state.stats.uniqueCards} unique cards and ${state.stats.totalCards} total cards from the 2025 Topps Chrome F1 set (${state.stats.totalSetCards} total cards in the set). `;
+                        contextInfo += `Collection completion: ${((state.stats.uniqueCards / state.stats.totalSetCards) * 100).toFixed(1)}%. `;
+                        
+                        const topVariants = Object.entries(state.stats.cardsByVariant || {})
+                            .sort((a, b) => b[1] - a[1])
+                            .slice(0, 3)
+                            .map(([variant, count]) => `${variant} (${count})`)
+                            .join(', ');
+                        
+                        if (topVariants) {
+                            contextInfo += `Top variants owned: ${topVariants}. `;
+                        }
                     }
                     
                     contextInfo += `Be helpful and knowledgeable about F1 cards, collecting, dashboard analytics, and collection building strategies. Keep responses concise and relevant.`;

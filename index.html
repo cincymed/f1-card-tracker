@@ -664,86 +664,128 @@
             const [loadingCardDetails, setLoadingCardDetails] = useState(false);  // Loading state for card details
             const [collapsedSections, setCollapsedSections] = useState({});  // Track which sections are collapsed
 
+            // Make current state accessible to chatbot with debugging
+            useEffect(() => {
+                console.log('🔧 Updating global app state:', {
+                    selectedCard: selectedCard ? { num: selectedCard.num, name: selectedCard.name } : null,
+                    collectionKeys: Object.keys(collection).length,
+                    showImageUpload
+                });
+                
+                window.currentAppState = {
+                    selectedCard,
+                    collection,
+                    showImageUpload,
+                    cardData
+                };
+                
+                // Force chatbot to acknowledge state update
+                if (window.updateChatbotInterface) {
+                    console.log('🔧 Forcing chatbot interface update');
+                    window.updateChatbotInterface();
+                }
+            }, [selectedCard, collection, showImageUpload]);
+
             // Initialize universal chatbot with context provider
             useEffect(() => {
-                // Initialize chatbot on first load
-                if (!window.chatbotContextProvider) {
-                    window.initializeChatbot(() => {
-                        // This function will be called fresh each time a message is sent
-                        return generateContextInfo();
+                console.log('🤖 Initializing chatbot system');
+                
+                // Function to generate fresh context info using global state
+                window.generateContextInfo = () => {
+                    const state = window.currentAppState || {};
+                    console.log('🔍 generateContextInfo called with state:', {
+                        hasSelectedCard: !!state.selectedCard,
+                        selectedCardNum: state.selectedCard?.num,
+                        collectionSize: Object.keys(state.collection || {}).length,
+                        hasCardData: !!state.cardData
                     });
+                    
+                    let contextInfo = "You are an AI assistant integrated into an F1 card collection tracking application. ";
+                    
+                    // Add current card context if available
+                    if (state.selectedCard) {
+                        console.log('📋 Adding selected card context for:', state.selectedCard.num);
+                        const cardKey = `card-${state.selectedCard.num}`;
+                        const cardData = (state.collection || {})[cardKey] || {};
+                        const totalCount = Object.keys(cardData).filter(k => !k.startsWith('_')).reduce((sum, v) => sum + (cardData[v] || 0), 0);
+                        
+                        contextInfo += `The user is currently viewing Card #${state.selectedCard.num} - ${state.selectedCard.name}`;
+                        if (state.selectedCard.team) contextInfo += ` (${state.selectedCard.team})`;
+                        contextInfo += `. This card is from the ${state.selectedCard.subset || 'Unknown'} subset.`;
+                        
+                        if (totalCount > 0) {
+                            contextInfo += ` The user owns ${totalCount} cop${totalCount === 1 ? 'y' : 'ies'} of this card`;
+                            const variants = Object.keys(cardData).filter(k => !k.startsWith('_') && cardData[k] > 0);
+                            if (variants.length > 0) {
+                                contextInfo += ` in these variants: ${variants.map(v => `${v} (${cardData[v]})`).join(', ')}`;
+                            }
+                            contextInfo += `.`;
+                        } else {
+                            contextInfo += ` The user does not currently own this card.`;
+                        }
+
+                        if (state.selectedCard.rookie) {
+                            contextInfo += ` This is a rookie card.`;
+                        }
+                    } else {
+                        console.log('⚠️ No selected card in state');
+                        contextInfo += `The user is browsing their collection but hasn't selected a specific card yet. `;
+                    }
+
+                    // Add collection context
+                    const collection = state.collection || {};
+                    const totalCards = Object.keys(collection).filter(k => !k.startsWith('_')).length;
+                    const totalCopies = Object.keys(collection).reduce((total, cardKey) => {
+                        if (cardKey.startsWith('_')) return total;
+                        const variants = collection[cardKey] || {};
+                        return total + Object.keys(variants).filter(k => !k.startsWith('_')).reduce((sum, v) => sum + (variants[v] || 0), 0);
+                    }, 0);
+                    
+                    if (totalCards > 0) {
+                        contextInfo += ` The user's collection contains ${totalCards} unique cards and ${totalCopies} total cards from the 2025 Topps Chrome F1 set.`;
+
+                        // Add some specific examples if collection has cards
+                        const ownedCardKeys = Object.keys(collection).filter(k => !k.startsWith('_'));
+                        const exampleCards = ownedCardKeys.slice(0, 3).map(cardKey => {
+                            const cardNum = cardKey.replace('card-', '');
+                            const card = (state.cardData || []).find(c => c.num === cardNum);
+                            return card ? `#${card.num} ${card.name}` : `#${cardNum}`;
+                        });
+                        if (exampleCards.length > 0) {
+                            contextInfo += ` For example, they own: ${exampleCards.join(', ')}.`;
+                        }
+                    } else {
+                        contextInfo += ` The user's collection is empty - they haven't added any cards yet.`;
+                    }
+
+                    // Add interface context
+                    if (state.showImageUpload) {
+                        contextInfo += ` The user currently has the AI Scanner open.`;
+                    }
+                    
+                    contextInfo += ` IMPORTANT: You can see their collection data and current card. Do not say you cannot see what they're looking at. Provide specific help based on what you know about their collection and current selection.`;
+                    
+                    console.log('✅ Generated context preview:', contextInfo.substring(0, 300) + '...');
+                    console.log('✅ Full context length:', contextInfo.length);
+                    return contextInfo;
+                };
+
+                // Test context generation immediately
+                console.log('🧪 Testing initial context generation...');
+                if (window.generateContextInfo) {
+                    const testContext = window.generateContextInfo();
+                    console.log('🧪 Initial context test result:', testContext.substring(0, 200));
+                }
+
+                // Initialize chatbot only once
+                if (!window.chatbotInitialized) {
+                    console.log('🚀 Initializing chatbot for first time');
+                    window.initializeChatbot();
+                    window.chatbotInitialized = true;
+                } else {
+                    console.log('🔄 Chatbot already initialized, context updated');
                 }
             }, []); // Only run once on mount
-
-            // Function to generate fresh context info
-            const generateContextInfo = () => {
-                let contextInfo = "You are an AI assistant integrated into an F1 card collection tracking application. ";
-                
-                console.log('Generating context - selectedCard:', selectedCard?.num, selectedCard?.name);
-                console.log('Generating context - collection keys:', Object.keys(collection).length);
-                
-                // Add current card context if available
-                if (selectedCard) {
-                    const cardKey = getCardKey(selectedCard.num);
-                    const cardData = collection[cardKey] || {};
-                    const totalCount = Object.keys(cardData).filter(k => !k.startsWith('_')).reduce((sum, v) => sum + (cardData[v] || 0), 0);
-                    
-                    contextInfo += `The user is currently viewing Card #${selectedCard.num} - ${selectedCard.name}`;
-                    if (selectedCard.team) contextInfo += ` (${selectedCard.team})`;
-                    contextInfo += `. This card is from the ${selectedCard.subset || 'Unknown'} subset.`;
-                    
-                    if (totalCount > 0) {
-                        contextInfo += ` The user owns ${totalCount} cop${totalCount === 1 ? 'y' : 'ies'} of this card`;
-                        const variants = Object.keys(cardData).filter(k => !k.startsWith('_') && cardData[k] > 0);
-                        if (variants.length > 0) {
-                            contextInfo += ` in these variants: ${variants.map(v => `${v} (${cardData[v]})`).join(', ')}`;
-                        }
-                        contextInfo += `.`;
-                    } else {
-                        contextInfo += ` The user does not currently own this card.`;
-                    }
-
-                    if (selectedCard.rookie) {
-                        contextInfo += ` This is a rookie card.`;
-                    }
-                }
-
-                // Add collection context
-                const totalCards = Object.keys(collection).filter(k => !k.startsWith('_')).length;
-                const totalCopies = Object.keys(collection).reduce((total, cardKey) => {
-                    if (cardKey.startsWith('_')) return total;
-                    const variants = collection[cardKey];
-                    return total + Object.keys(variants).filter(k => !k.startsWith('_')).reduce((sum, v) => sum + (variants[v] || 0), 0);
-                }, 0);
-                
-                contextInfo += ` The user's collection contains ${totalCards} unique cards and ${totalCopies} total cards from the 2025 Topps Chrome F1 set.`;
-
-                // Add some specific examples if collection has cards
-                if (totalCards > 0) {
-                    const ownedCardKeys = Object.keys(collection).filter(k => !k.startsWith('_'));
-                    const exampleCards = ownedCardKeys.slice(0, 3).map(cardKey => {
-                        const cardNum = cardKey.replace('card-', '');
-                        const card = cardData.find(c => c.num === cardNum);
-                        return card ? `#${card.num} ${card.name}` : `#${cardNum}`;
-                    });
-                    if (exampleCards.length > 0) {
-                        contextInfo += ` For example, they own: ${exampleCards.join(', ')}.`;
-                    }
-                }
-
-                // Add interface context
-                if (showImageUpload) {
-                    contextInfo += ` The user currently has the AI Scanner open.`;
-                }
-                
-                contextInfo += ` Be helpful and knowledgeable about F1 cards, collecting, grading, and card values. Keep responses concise and relevant.`;
-                
-                console.log('Generated context length:', contextInfo.length);
-                return contextInfo;
-            };
-
-            // Make generateContextInfo available globally so chatbot can call it
-            window.generateContextInfo = generateContextInfo;
 
             // Check for card to open from dashboard
             useEffect(() => {
