@@ -666,7 +666,7 @@
 
             // Initialize universal chatbot with context provider
             useEffect(() => {
-                window.initializeChatbot(() => {
+                const contextProvider = () => {
                     let contextInfo = "You are an AI assistant integrated into an F1 card collection tracking application. ";
                     
                     // Add current card context if available
@@ -713,7 +713,18 @@
                     contextInfo += ` Be helpful and knowledgeable about F1 cards, collecting, grading, and card values. Keep responses concise and relevant.`;
                     
                     return contextInfo;
-                });
+                };
+
+                // Initialize or update chatbot context
+                if (window.initializeChatbot) {
+                    if (window.chatbotContextProvider) {
+                        // Already initialized, just update context
+                        window.updateChatbotContext(contextProvider);
+                    } else {
+                        // First time initialization
+                        window.initializeChatbot(contextProvider);
+                    }
+                }
             }, [selectedCard, collection, showImageUpload]);
 
             // Check for card to open from dashboard

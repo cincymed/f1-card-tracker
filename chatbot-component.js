@@ -20,11 +20,18 @@ window.initializeChatbot = function(contextProvider) {
         document.body.appendChild(chatbotContainer);
     }
     
-    // Store context provider function
+    // Store context provider function (allow updates)
     window.chatbotContextProvider = contextProvider;
+    console.log('Chatbot context provider registered/updated');
     
     // Render initial state
     updateChatbotInterface();
+};
+
+// Function to update context provider without re-initializing UI
+window.updateChatbotContext = function(contextProvider) {
+    window.chatbotContextProvider = contextProvider;
+    console.log('Chatbot context provider updated');
 };
 
 // Send chat message
@@ -54,16 +61,33 @@ window.sendChatMessage = async function(message) {
     updateChatbotInterface();
 
     try {
-        // Get context from provider function
-        const contextInfo = window.chatbotContextProvider ? window.chatbotContextProvider() : 
-            "You are an AI assistant integrated into an F1 card collection tracking application. Be helpful and knowledgeable about F1 cards, collecting, grading, and card values. Keep responses concise and relevant.";
+        // Get context from provider function with fresh data
+        let contextInfo;
+        if (window.chatbotContextProvider) {
+            try {
+                contextInfo = window.chatbotContextProvider();
+                console.log('Context provider result:', contextInfo.length, 'characters');
+            } catch (error) {
+                console.error('Context provider error:', error);
+                contextInfo = "You are an AI assistant integrated into an F1 card collection tracking application. Be helpful and knowledgeable about F1 cards, collecting, grading, and card values. Keep responses concise and relevant.";
+            }
+        } else {
+            console.warn('No context provider found - using default context');
+            contextInfo = "You are an AI assistant integrated into an F1 card collection tracking application. Be helpful and knowledgeable about F1 cards, collecting, grading, and card values. Keep responses concise and relevant.";
+        }
+
+        console.log('Context being sent:', contextInfo.substring(0, 200) + '...');
 
         const requestBody = {
             model: 'claude-sonnet-4-5-20250929',
             max_tokens: 1500,
             system: contextInfo, // System message as top-level parameter
             messages: [
-                ...window.chatbotState.chatMessages.slice(-10).filter(msg => msg.role !== 'system'), // Exclude system messages from history
+                // Clean message history - only include role and content
+                ...window.chatbotState.chatMessages
+                    .slice(-10)
+                    .filter(msg => msg.role !== 'system')
+                    .map(msg => ({ role: msg.role, content: msg.content })), // Remove timestamp and other fields
                 { role: 'user', content: message }
             ]
         };
@@ -387,3 +411,16 @@ if (!document.querySelector('#universal-chatbot-styles')) {
     `;
     document.head.appendChild(style);
 }
+
+// Debug helper function - type debugChatbotContext() in console
+window.debugChatbotContext = function() {
+    if (window.chatbotContextProvider) {
+        const context = window.chatbotContextProvider();
+        console.log('Current chatbot context:');
+        console.log(context);
+        return context;
+    } else {
+        console.log('No context provider found');
+        return null;
+    }
+};
