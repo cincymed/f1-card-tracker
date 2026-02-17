@@ -54,7 +54,7 @@
                 renderDashboard(collection, stats, priceHistory);
                 
                 // Initialize universal chatbot with dashboard context
-                window.initializeChatbot(() => {
+                window.generateContextInfo = () => {
                     let contextInfo = "You are an AI assistant integrated into an F1 card collection dashboard. ";
                     contextInfo += `The user is currently viewing their collection dashboard. `;
                     contextInfo += `Their collection contains ${stats.uniqueCards} unique cards and ${stats.totalCards} total cards from the 2025 Topps Chrome F1 set (${stats.totalSetCards} total cards in the set). `;
@@ -72,7 +72,11 @@
                     
                     contextInfo += `Be helpful and knowledgeable about F1 cards, collecting, dashboard analytics, and collection building strategies. Keep responses concise and relevant.`;
                     return contextInfo;
-                });
+                };
+                
+                if (!window.chatbotContextProvider) {
+                    window.initializeChatbot();
+                }
             } catch (error) {
                 console.error('Error loading dashboard:', error);
                 document.getElementById('root').innerHTML = '<div class="p-8"><p class="text-red-400">Failed to load collection</p></div>';

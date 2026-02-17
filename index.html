@@ -666,66 +666,84 @@
 
             // Initialize universal chatbot with context provider
             useEffect(() => {
-                const contextProvider = () => {
-                    let contextInfo = "You are an AI assistant integrated into an F1 card collection tracking application. ";
+                // Initialize chatbot on first load
+                if (!window.chatbotContextProvider) {
+                    window.initializeChatbot(() => {
+                        // This function will be called fresh each time a message is sent
+                        return generateContextInfo();
+                    });
+                }
+            }, []); // Only run once on mount
+
+            // Function to generate fresh context info
+            const generateContextInfo = () => {
+                let contextInfo = "You are an AI assistant integrated into an F1 card collection tracking application. ";
+                
+                console.log('Generating context - selectedCard:', selectedCard?.num, selectedCard?.name);
+                console.log('Generating context - collection keys:', Object.keys(collection).length);
+                
+                // Add current card context if available
+                if (selectedCard) {
+                    const cardKey = getCardKey(selectedCard.num);
+                    const cardData = collection[cardKey] || {};
+                    const totalCount = Object.keys(cardData).filter(k => !k.startsWith('_')).reduce((sum, v) => sum + (cardData[v] || 0), 0);
                     
-                    // Add current card context if available
-                    if (selectedCard) {
-                        const cardKey = getCardKey(selectedCard.num);
-                        const cardData = collection[cardKey] || {};
-                        const totalCount = Object.keys(cardData).filter(k => !k.startsWith('_')).reduce((sum, v) => sum + (cardData[v] || 0), 0);
-                        
-                        contextInfo += `The user is currently viewing Card #${selectedCard.num} - ${selectedCard.name}`;
-                        if (selectedCard.team) contextInfo += ` (${selectedCard.team})`;
-                        contextInfo += `. This card is from the ${selectedCard.subset || 'Unknown'} subset.`;
-                        
-                        if (totalCount > 0) {
-                            contextInfo += ` The user owns ${totalCount} cop${totalCount === 1 ? 'y' : 'ies'} of this card`;
-                            const variants = Object.keys(cardData).filter(k => !k.startsWith('_') && cardData[k] > 0);
-                            if (variants.length > 0) {
-                                contextInfo += ` in these variants: ${variants.map(v => `${v} (${cardData[v]})`).join(', ')}`;
-                            }
-                            contextInfo += `.`;
-                        } else {
-                            contextInfo += ` The user does not currently own this card.`;
+                    contextInfo += `The user is currently viewing Card #${selectedCard.num} - ${selectedCard.name}`;
+                    if (selectedCard.team) contextInfo += ` (${selectedCard.team})`;
+                    contextInfo += `. This card is from the ${selectedCard.subset || 'Unknown'} subset.`;
+                    
+                    if (totalCount > 0) {
+                        contextInfo += ` The user owns ${totalCount} cop${totalCount === 1 ? 'y' : 'ies'} of this card`;
+                        const variants = Object.keys(cardData).filter(k => !k.startsWith('_') && cardData[k] > 0);
+                        if (variants.length > 0) {
+                            contextInfo += ` in these variants: ${variants.map(v => `${v} (${cardData[v]})`).join(', ')}`;
                         }
-
-                        if (selectedCard.rookie) {
-                            contextInfo += ` This is a rookie card.`;
-                        }
-                    }
-
-                    // Add collection context
-                    const totalCards = Object.keys(collection).filter(k => !k.startsWith('_')).length;
-                    const totalCopies = Object.keys(collection).reduce((total, cardKey) => {
-                        if (cardKey.startsWith('_')) return total;
-                        const variants = collection[cardKey];
-                        return total + Object.keys(variants).filter(k => !k.startsWith('_')).reduce((sum, v) => sum + (variants[v] || 0), 0);
-                    }, 0);
-                    
-                    contextInfo += ` The user's collection contains ${totalCards} unique cards and ${totalCopies} total cards from the 2025 Topps Chrome F1 set.`;
-
-                    // Add interface context
-                    if (showImageUpload) {
-                        contextInfo += ` The user currently has the AI Scanner open.`;
-                    }
-                    
-                    contextInfo += ` Be helpful and knowledgeable about F1 cards, collecting, grading, and card values. Keep responses concise and relevant.`;
-                    
-                    return contextInfo;
-                };
-
-                // Initialize or update chatbot context
-                if (window.initializeChatbot) {
-                    if (window.chatbotContextProvider) {
-                        // Already initialized, just update context
-                        window.updateChatbotContext(contextProvider);
+                        contextInfo += `.`;
                     } else {
-                        // First time initialization
-                        window.initializeChatbot(contextProvider);
+                        contextInfo += ` The user does not currently own this card.`;
+                    }
+
+                    if (selectedCard.rookie) {
+                        contextInfo += ` This is a rookie card.`;
                     }
                 }
-            }, [selectedCard, collection, showImageUpload]);
+
+                // Add collection context
+                const totalCards = Object.keys(collection).filter(k => !k.startsWith('_')).length;
+                const totalCopies = Object.keys(collection).reduce((total, cardKey) => {
+                    if (cardKey.startsWith('_')) return total;
+                    const variants = collection[cardKey];
+                    return total + Object.keys(variants).filter(k => !k.startsWith('_')).reduce((sum, v) => sum + (variants[v] || 0), 0);
+                }, 0);
+                
+                contextInfo += ` The user's collection contains ${totalCards} unique cards and ${totalCopies} total cards from the 2025 Topps Chrome F1 set.`;
+
+                // Add some specific examples if collection has cards
+                if (totalCards > 0) {
+                    const ownedCardKeys = Object.keys(collection).filter(k => !k.startsWith('_'));
+                    const exampleCards = ownedCardKeys.slice(0, 3).map(cardKey => {
+                        const cardNum = cardKey.replace('card-', '');
+                        const card = cardData.find(c => c.num === cardNum);
+                        return card ? `#${card.num} ${card.name}` : `#${cardNum}`;
+                    });
+                    if (exampleCards.length > 0) {
+                        contextInfo += ` For example, they own: ${exampleCards.join(', ')}.`;
+                    }
+                }
+
+                // Add interface context
+                if (showImageUpload) {
+                    contextInfo += ` The user currently has the AI Scanner open.`;
+                }
+                
+                contextInfo += ` Be helpful and knowledgeable about F1 cards, collecting, grading, and card values. Keep responses concise and relevant.`;
+                
+                console.log('Generated context length:', contextInfo.length);
+                return contextInfo;
+            };
+
+            // Make generateContextInfo available globally so chatbot can call it
+            window.generateContextInfo = generateContextInfo;
 
             // Check for card to open from dashboard
             useEffect(() => {

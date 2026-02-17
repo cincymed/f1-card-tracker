@@ -8,7 +8,31 @@ window.chatbotState = {
     showChatbot: false,
     chatMessages: [],
     chatInput: '',
-    chatLoading: false
+    chatLoading: false,
+    selectedModel: 'claude-sonnet-4-5-20250929' // Default model
+};
+
+// Change model
+window.changeModel = function(model) {
+    window.chatbotState.selectedModel = model;
+    console.log('Changed model to:', model);
+    
+    // Add a system message indicating the model change
+    const modelNames = {
+        'claude-sonnet-4-5-20250929': 'Sonnet 4',
+        'claude-opus-4-5-20251101': 'Opus 4', 
+        'claude-3-5-sonnet-20241022': 'Sonnet 3.5',
+        'claude-3-haiku-20240307': 'Haiku 3'
+    };
+    
+    const modelMessage = {
+        role: 'assistant',
+        content: `Switched to ${modelNames[model] || model}. How can I help you?`,
+        timestamp: Date.now(),
+        system: true
+    };
+    window.chatbotState.chatMessages.push(modelMessage);
+    updateChatbotInterface();
 };
 
 // Initialize chatbot functionality
@@ -22,16 +46,10 @@ window.initializeChatbot = function(contextProvider) {
     
     // Store context provider function (allow updates)
     window.chatbotContextProvider = contextProvider;
-    console.log('Chatbot context provider registered/updated');
+    console.log('Chatbot initialized');
     
     // Render initial state
     updateChatbotInterface();
-};
-
-// Function to update context provider without re-initializing UI
-window.updateChatbotContext = function(contextProvider) {
-    window.chatbotContextProvider = contextProvider;
-    console.log('Chatbot context provider updated');
 };
 
 // Send chat message
@@ -61,27 +79,25 @@ window.sendChatMessage = async function(message) {
     updateChatbotInterface();
 
     try {
-        // Get context from provider function with fresh data
+        // Get context from the main page's generateContextInfo function
         let contextInfo;
-        if (window.chatbotContextProvider) {
+        if (window.generateContextInfo) {
             try {
-                contextInfo = window.chatbotContextProvider();
-                console.log('Context provider result:', contextInfo.length, 'characters');
+                contextInfo = window.generateContextInfo();
+                console.log('Fresh context generated:', contextInfo.substring(0, 200) + '...');
             } catch (error) {
-                console.error('Context provider error:', error);
+                console.error('Context generation error:', error);
                 contextInfo = "You are an AI assistant integrated into an F1 card collection tracking application. Be helpful and knowledgeable about F1 cards, collecting, grading, and card values. Keep responses concise and relevant.";
             }
         } else {
-            console.warn('No context provider found - using default context');
+            console.warn('No generateContextInfo function found - using fallback');
             contextInfo = "You are an AI assistant integrated into an F1 card collection tracking application. Be helpful and knowledgeable about F1 cards, collecting, grading, and card values. Keep responses concise and relevant.";
         }
 
-        console.log('Context being sent:', contextInfo.substring(0, 200) + '...');
-
         const requestBody = {
-            model: 'claude-sonnet-4-5-20250929',
+            model: window.chatbotState.selectedModel, // Use selected model
             max_tokens: 1500,
-            system: contextInfo, // System message as top-level parameter
+            system: contextInfo, // Fresh context every time
             messages: [
                 // Clean message history - only include role and content
                 ...window.chatbotState.chatMessages
@@ -127,7 +143,7 @@ window.sendChatMessage = async function(message) {
                 // Try a simpler format as fallback
                 console.log('Trying simpler format as fallback...');
                 const simpleRequestBody = {
-                    model: 'claude-sonnet-4-5-20250929',
+                    model: window.chatbotState.selectedModel, // Use selected model
                     max_tokens: 1500,
                     system: contextInfo, // System as top-level parameter
                     messages: [{
@@ -298,7 +314,16 @@ function updateChatbotInterface() {
                     <div class="flex items-center gap-2">
                         <span class="text-xl">🤖</span>
                         <span class="font-semibold text-white">AI Assistant</span>
-                        <span class="text-xs text-slate-400 bg-slate-700 px-2 py-1 rounded-full">Haiku</span>
+                        <select 
+                            onchange="changeModel(this.value)"
+                            class="text-xs bg-slate-700 border border-slate-600 text-white rounded px-2 py-1"
+                            title="Select Claude model"
+                        >
+                            <option value="claude-sonnet-4-5-20250929" ${window.chatbotState.selectedModel === 'claude-sonnet-4-5-20250929' ? 'selected' : ''}>Sonnet 4</option>
+                            <option value="claude-opus-4-5-20251101" ${window.chatbotState.selectedModel === 'claude-opus-4-5-20251101' ? 'selected' : ''}>Opus 4</option>
+                            <option value="claude-3-5-sonnet-20241022" ${window.chatbotState.selectedModel === 'claude-3-5-sonnet-20241022' ? 'selected' : ''}>Sonnet 3.5</option>
+                            <option value="claude-3-haiku-20240307" ${window.chatbotState.selectedModel === 'claude-3-haiku-20240307' ? 'selected' : ''}>Haiku 3</option>
+                        </select>
                     </div>
                     <div class="flex gap-1">
                         <button
@@ -324,6 +349,9 @@ function updateChatbotInterface() {
                         <div class="text-center text-slate-400 text-sm py-8">
                             <span class="text-2xl mb-2 block">👋</span>
                             Hi! I'm your F1 card collection assistant. I can help you with card values, collecting tips, and questions about your collection.
+                            <div class="mt-3 text-xs bg-slate-700/50 rounded p-2">
+                                <div onclick="debugChatbotContext()" class="cursor-pointer hover:text-white">🔍 Click to test context in console</div>
+                            </div>
                         </div>
                     ` : ''}
                     
@@ -334,6 +362,8 @@ function updateChatbotInterface() {
                                     ? 'bg-blue-600 text-white' 
                                     : message.error
                                     ? 'bg-red-900/50 text-red-300 border border-red-700'
+                                    : message.system
+                                    ? 'bg-slate-700/50 text-slate-400 border border-slate-600'
                                     : 'bg-slate-700 text-slate-100'
                             }">
                                 <div class="whitespace-pre-wrap break-words">${message.content}</div>
@@ -414,13 +444,13 @@ if (!document.querySelector('#universal-chatbot-styles')) {
 
 // Debug helper function - type debugChatbotContext() in console
 window.debugChatbotContext = function() {
-    if (window.chatbotContextProvider) {
-        const context = window.chatbotContextProvider();
+    if (window.generateContextInfo) {
+        const context = window.generateContextInfo();
         console.log('Current chatbot context:');
         console.log(context);
         return context;
     } else {
-        console.log('No context provider found');
+        console.log('No generateContextInfo function found');
         return null;
     }
 };
