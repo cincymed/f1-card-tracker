@@ -294,12 +294,16 @@
                 }
                 
                 if (!foundHeader && currentSection && line.trim()) {
-                    // Skip separator lines
+                    // Skip separator lines and clean up symbols
                     if (line.trim() !== '===================================================' && 
                         line.trim() !== '---' && 
                         line.trim() !== '====' &&
                         !line.trim().startsWith('=')) {
-                        sections[currentSection].push(line.trim());
+                        // Clean line by removing # and * symbols at start
+                        let cleanLine = line.trim().replace(/^[#*\s]+/, '');
+                        if (cleanLine) {
+                            sections[currentSection].push(cleanLine);
+                        }
                     }
                 }
             });
@@ -311,9 +315,11 @@
                 console.log('QGA: No sections found, using full text as fallback');
                 return (
                     <div className="text-sm space-y-2 text-slate-300 break-words leading-relaxed">
-                        {lines.filter(l => l.trim()).map((line, idx) => (
-                            <div key={idx}>{line}</div>
-                        ))}
+                        {lines.filter(l => l.trim()).map((line, idx) => {
+                            // Clean symbols from fallback lines too
+                            const cleanLine = line.trim().replace(/^[#*\s]+/, '');
+                            return cleanLine ? <div key={idx}>{cleanLine}</div> : null;
+                        }).filter(Boolean)}
                     </div>
                 );
             }
@@ -339,105 +345,138 @@
             
             console.log('QGA: Ordered sections:', orderedSections.length, 'sections');
             
-            // Format as JSX with app-matching style
+            // Helper function to extract and left-align emojis
+            const formatLineWithEmojis = (line) => {
+                // Extract emojis from start of line
+                const emojiMatch = line.match(/^([\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]+)/u);
+                if (emojiMatch) {
+                    const emoji = emojiMatch[1];
+                    const restOfLine = line.substring(emoji.length).trim();
+                    return { emoji, text: restOfLine };
+                }
+                return { emoji: null, text: line };
+            };
+            
+            // Format as JSX with improved styling
             return (
-                <div className="space-y-3 text-slate-300 text-sm">
+                <div className="space-y-4 text-slate-300 text-sm">
                     {orderedSections.map((section, idx) => (
-                        <div key={idx} className="space-y-1.5">
-                            {/* Section header - clean and simple */}
-                            <div className="text-sm font-semibold text-blue-400 border-b border-slate-700 pb-0.5">
+                        <div key={idx} className="space-y-2">
+                            {/* Section header - clean and modern */}
+                            <div className="text-sm font-semibold text-blue-400 border-l-2 border-blue-400 pl-2 bg-blue-950/30 py-1 rounded-r">
                                 {section.key}
                             </div>
                             
-                            {/* Section content with smart parsing and responsive wrapping */}
-                            <div className="space-y-1">
+                            {/* Section content with improved formatting */}
+                            <div className="space-y-1.5 ml-2">
                                 {section.content.length === 0 ? (
                                     <div className="text-slate-500 italic text-xs">No content</div>
                                 ) : (
                                     section.content.map((line, lineIdx) => {
+                                        // Format line with emoji separation
+                                        const { emoji, text } = formatLineWithEmojis(line);
+                                        
                                         // Handle checklist items: "Centering: PASS/FAIL"
-                                        const checklistMatch = line.match(/^([A-Za-z\s\/&]+?):\s*(PASS|FAIL|Yes|No)/i);
+                                        const checklistMatch = text.match(/^([A-Za-z\s\/&]+?):\s*(PASS|FAIL|Yes|No)/i);
                                         if (checklistMatch) {
                                             const checkItem = checklistMatch[1].trim();
                                             const status = checklistMatch[2].toUpperCase();
                                             const isPass = status === 'PASS' || status === 'YES';
-                                            const remainingText = line.substring(line.indexOf(':') + 1).trim();
+                                            const remainingText = text.substring(text.indexOf(':') + 1).trim();
                                             
                                             return (
-                                                <div key={lineIdx} className="flex gap-2 items-baseline flex-wrap text-sm">
-                                                    <span className="font-semibold text-slate-300 flex-shrink-0">{checkItem}:</span>
-                                                    <span className={`font-semibold flex-shrink-0 ${isPass ? 'text-green-400' : 'text-red-400'}`}>
-                                                        {status}
-                                                    </span>
-                                                    {remainingText && remainingText !== status && (
-                                                        <span className="text-slate-400 flex-grow">{remainingText.replace(status, '').trim()}</span>
-                                                    )}
+                                                <div key={lineIdx} className="flex items-start gap-2 text-sm">
+                                                    {emoji && <span className="flex-shrink-0">{emoji}</span>}
+                                                    <div className="flex gap-2 items-baseline flex-wrap flex-1">
+                                                        <span className="font-semibold text-slate-300 flex-shrink-0">{checkItem}:</span>
+                                                        <span className={`font-semibold flex-shrink-0 ${isPass ? 'text-green-400' : 'text-red-400'}`}>
+                                                            {status}
+                                                        </span>
+                                                        {remainingText && remainingText !== status && (
+                                                            <span className="text-slate-400 flex-grow">{remainingText.replace(status, '').trim()}</span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             );
                                         }
                                         
                                         // Handle PSA percentage lines: "PSA 10: 85%"
-                                        const psaMatch = line.match(/^PSA\s+(\d+):\s*([\d.]+%)/i);
+                                        const psaMatch = text.match(/^PSA\s+(\d+):\s*([\d.]+%)/i);
                                         if (psaMatch) {
                                             const grade = psaMatch[1];
                                             const percentage = psaMatch[2];
-                                            const remainingText = line.substring(line.indexOf(':') + 1).trim();
+                                            const remainingText = text.substring(text.indexOf(':') + 1).trim();
                                             
                                             return (
-                                                <div key={lineIdx} className="flex gap-2 items-baseline flex-wrap text-sm">
-                                                    <span className="font-semibold text-slate-300 flex-shrink-0">PSA {grade}:</span>
-                                                    <span className="text-yellow-300 font-semibold flex-shrink-0">{percentage}</span>
-                                                    {remainingText && remainingText !== percentage && (
-                                                        <span className="text-slate-400 flex-grow">{remainingText.replace(percentage, '').trim()}</span>
-                                                    )}
+                                                <div key={lineIdx} className="flex items-start gap-2 text-sm">
+                                                    {emoji && <span className="flex-shrink-0">{emoji}</span>}
+                                                    <div className="flex gap-2 items-baseline flex-wrap flex-1">
+                                                        <span className="font-semibold text-slate-300 flex-shrink-0">PSA {grade}:</span>
+                                                        <span className="text-yellow-300 font-semibold flex-shrink-0">{percentage}</span>
+                                                        {remainingText && remainingText !== percentage && (
+                                                            <span className="text-slate-400 flex-grow">{remainingText.replace(percentage, '').trim()}</span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             );
                                         }
                                         
                                         // Handle "Estimated PSA Grade: X with Y% confidence"
-                                        if (line.toLowerCase().includes('estimated psa grade') || 
-                                            line.toLowerCase().includes('recommended for grading')) {
-                                            const colonIdx = line.indexOf(':');
+                                        if (text.toLowerCase().includes('estimated psa grade') || 
+                                            text.toLowerCase().includes('recommended for grading')) {
+                                            const colonIdx = text.indexOf(':');
                                             if (colonIdx > -1) {
-                                                const label = line.substring(0, colonIdx).trim();
-                                                const value = line.substring(colonIdx + 1).trim();
+                                                const label = text.substring(0, colonIdx).trim();
+                                                const value = text.substring(colonIdx + 1).trim();
                                                 return (
-                                                    <div key={lineIdx} className="flex gap-2 items-baseline flex-wrap text-sm">
-                                                        <span className="font-semibold text-slate-300">{label}:</span>
-                                                        <span className="text-blue-300 font-semibold">{value}</span>
+                                                    <div key={lineIdx} className="flex items-start gap-2 text-sm">
+                                                        {emoji && <span className="flex-shrink-0">{emoji}</span>}
+                                                        <div className="flex gap-2 items-baseline flex-wrap flex-1">
+                                                            <span className="font-semibold text-slate-300">{label}:</span>
+                                                            <span className="text-blue-300 font-semibold">{value}</span>
+                                                        </div>
                                                     </div>
                                                 );
                                             }
                                         }
                                         
-                                        // Handle key-value pairs with colons (Centering: Assessment)
-                                        const kvMatch = line.match(/^([^:]+?):\s*(.+)$/);
+                                        // Handle key-value pairs with colons
+                                        const kvMatch = text.match(/^([^:]+?):\s*(.+)$/);
                                         if (kvMatch) {
                                             const label = kvMatch[1].trim();
                                             const value = kvMatch[2].trim();
                                             
                                             return (
-                                                <div key={lineIdx} className="space-y-0.5 text-sm">
-                                                    <div className="font-semibold text-slate-300">{label}</div>
-                                                    <div className="text-slate-400 ml-2 leading-relaxed break-words">{value}</div>
+                                                <div key={lineIdx} className="flex items-start gap-2 text-sm">
+                                                    {emoji && <span className="flex-shrink-0">{emoji}</span>}
+                                                    <div className="space-y-0.5 flex-1">
+                                                        <div className="font-semibold text-slate-300">{label}</div>
+                                                        <div className="text-slate-400 ml-2 leading-relaxed break-words">{value}</div>
+                                                    </div>
                                                 </div>
                                             );
                                         }
                                         
                                         // Handle bracketed text [...]
-                                        if (line.startsWith('[') && line.endsWith(']')) {
-                                            const content = line.slice(1, -1).trim();
+                                        if (text.startsWith('[') && text.endsWith(']')) {
+                                            const content = text.slice(1, -1).trim();
                                             return (
-                                                <div key={lineIdx} className="text-slate-400 italic text-sm break-words">
-                                                    {content}
+                                                <div key={lineIdx} className="flex items-start gap-2 text-sm">
+                                                    {emoji && <span className="flex-shrink-0">{emoji}</span>}
+                                                    <div className="text-slate-400 italic break-words flex-1">
+                                                        {content}
+                                                    </div>
                                                 </div>
                                             );
                                         }
                                         
-                                        // Regular text lines - preserve with wrapping
+                                        // Regular text lines with emoji separation
                                         return (
-                                            <div key={lineIdx} className="text-slate-300 leading-relaxed break-words text-sm">
-                                                {line}
+                                            <div key={lineIdx} className="flex items-start gap-2 text-sm">
+                                                {emoji && <span className="flex-shrink-0">{emoji}</span>}
+                                                <div className="text-slate-300 leading-relaxed break-words flex-1">
+                                                    {text}
+                                                </div>
                                             </div>
                                         );
                                     })
@@ -622,6 +661,7 @@
             const [showAddCardManual, setShowAddCardManual] = useState(false);  // Manual card addition modal
             const [manualCardData, setManualCardData] = useState({ cardNumber: '', variant: 'Base', serialNumber: '', cardTitle: '', driverName: '', value: '' });  // Card data being entered
             const [loadingCardDetails, setLoadingCardDetails] = useState(false);  // Loading state for card details
+            const [collapsedSections, setCollapsedSections] = useState({});  // Track which sections are collapsed
 
             // Check for card to open from dashboard
             useEffect(() => {
@@ -1724,6 +1764,110 @@ KEY FACTORS:
                     alert('❌ Error generating grade report:\n' + error.message);
                 } finally {
                     setIsDeepAnalyzing(false);
+                }
+            };
+
+            // Quick grade function for individual variants in card detail view
+            const performQuickGradeForVariant = async (cardNum, variant) => {
+                if (!uploadedImages || uploadedImages.length === 0) {
+                    alert('Please upload an image before grading this variant.');
+                    return;
+                }
+
+                try {
+                    const gradingPrompt = `You are an expert trading card grader analyzing 2025 Topps Chrome Formula 1 cards for potential PSA grading.
+
+IMPORTANT - PROTECTIVE CONTAINERS:
+Cards in protective containers (sleeves, toploaders, magnetic holders, etc.) can still be accurately assessed. Focus on visible card condition through the protection.
+
+Please provide a detailed grading assessment for this ${variant} card #${cardNum} with these sections:
+
+FINAL ASSESSMENT
+- Overall condition summary
+- Estimated PSA grade with confidence level
+- Key factors affecting grade
+
+GRADE PROBABILITY
+- PSA 10: X% (probability)  
+- PSA 9: X% (probability)
+- PSA 8: X% (probability)
+- Lower: X% (probability)
+
+CONDITION CHECKLIST
+- Centering: PASS/FAIL (detailed assessment)
+- Corners: PASS/FAIL (detailed assessment)  
+- Edges: PASS/FAIL (detailed assessment)
+- Surface: PASS/FAIL (detailed assessment)
+
+DETAILED ANALYSIS
+- Specific observations about flaws or positive aspects
+- Impact of any protective casing on assessment
+- Recommendations for grading submission
+
+Be thorough and specific in your assessment.`;
+
+                    // Build content array with all images
+                    const contentArray = [];
+                    
+                    uploadedImages.forEach((uploadedImage) => {
+                        contentArray.push({
+                            type: 'image',
+                            source: {
+                                type: 'base64',
+                                media_type: 'image/jpeg',
+                                data: uploadedImage.split(',')[1]
+                            }
+                        });
+                    });
+
+                    contentArray.push({
+                        type: 'text',
+                        text: gradingPrompt
+                    });
+
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify({
+                            model: 'claude-opus-4-5-20251101',
+                            max_tokens: 2000,
+                            messages: [{
+                                role: 'user',
+                                content: contentArray
+                            }]
+                        })
+                    });
+
+                    const data = await response.json();
+                    console.log('QGA: Quick grade response received for variant', variant);
+                    
+                    if (data.content && data.content.length > 0) {
+                        const gradeReport = data.content
+                            .filter(block => block.type === 'text')
+                            .map(block => block.text)
+                            .join('\n\n');
+                        
+                        console.log('QGA: Grade report generated for variant', variant);
+                        
+                        // Save the grade report for this specific variant
+                        const key = getCardKey(cardNum);
+                        const updatedCollection = { ...collection };
+                        
+                        if (!updatedCollection[key]) updatedCollection[key] = {};
+                        if (!updatedCollection[key]._gradeReports) updatedCollection[key]._gradeReports = {};
+                        
+                        updatedCollection[key]._gradeReports[variant] = gradeReport;
+                        
+                        setCollection(updatedCollection);
+                        saveCollection(updatedCollection);
+                        
+                        console.log('QGA: Grade report saved for variant', variant);
+                    } else {
+                        console.error('QGA: No response from grading API');
+                    }
+                } catch (error) {
+                    console.error('QGA: Quick grade error for variant:', error);
+                    setRecognitionError('Failed to grade card variant. Please try again.');
                 }
             };
 
@@ -3036,50 +3180,128 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                             {latestAnalysis && !isAnalyzing && count > 0 && (
                                                                 <div className="mt-2 bg-blue-900/20 border border-blue-500/30 rounded p-3">
                                                                     <div className="flex justify-between items-center mb-2">
-                                                                        <div className="font-semibold text-blue-400 text-sm">💎 Card Value Analysis</div>
-                                                                        <button
-                                                                            onClick={async (e) => {
+                                                                        <button 
+                                                                            onClick={(e) => {
                                                                                 e.stopPropagation();
-                                                                                const analyzeKey = `${selectedCard.num}-${variant}`;
-                                                                                setAnalyzingCards(prev => ({ ...prev, [analyzeKey]: true }));
-                                                                                
-                                                                                try {
-                                                                                    const newAnalysis = await reanalyzeCardValue(selectedCard.num, variant);
-                                                                                    
-                                                                                    if (newAnalysis) {
-                                                                                        const key = getCardKey(selectedCard.num);
-                                                                                        const updatedCollection = { ...collection };
-                                                                                        if (!updatedCollection[key]._analyses) updatedCollection[key]._analyses = {};
-                                                                                        if (!updatedCollection[key]._analyses[variant]) updatedCollection[key]._analyses[variant] = [];
-                                                                                        updatedCollection[key]._analyses[variant].push({
-                                                                                            id: Date.now(),
-                                                                                            addedDate: new Date().toISOString(),
-                                                                                            analysis: newAnalysis
-                                                                                        });
-                                                                                        setCollection(updatedCollection);
-                                                                                        saveCollection(updatedCollection);
-                                                                                    }
-                                                                                } catch (error) {
-                                                                                    console.error('Reanalysis error:', error);
-                                                                                } finally {
-                                                                                    setAnalyzingCards(prev => {
-                                                                                        const updated = { ...prev };
-                                                                                        delete updated[analyzeKey];
-                                                                                        return updated;
-                                                                                    });
-                                                                                }
+                                                                                const collapseKey = `analysis-${selectedCard.num}-${variant}`;
+                                                                                setCollapsedSections(prev => ({...prev, [collapseKey]: !prev[collapseKey]}));
                                                                             }}
-                                                                            disabled={isAnalyzing}
-                                                                            className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1 rounded font-semibold disabled:opacity-50"
-                                                                            title="Reanalyze this card with current market data"
+                                                                            className="font-semibold text-blue-400 text-sm flex items-center gap-1 hover:text-blue-300 transition-colors"
                                                                         >
-                                                                            {isAnalyzing ? '⟳ Analyzing...' : '🔍 Reanalyze'}
+                                                                            💎 Card Value Analysis
+                                                                            <span className="text-xs">{collapsedSections[`analysis-${selectedCard.num}-${variant}`] ? '▼' : '▲'}</span>
                                                                         </button>
+                                                                        <div className="flex gap-1">
+                                                                            <button
+                                                                                onClick={async (e) => {
+                                                                                    e.stopPropagation();
+                                                                                    const analyzeKey = `${selectedCard.num}-${variant}`;
+                                                                                    setAnalyzingCards(prev => ({ ...prev, [analyzeKey]: true }));
+                                                                                    
+                                                                                    try {
+                                                                                        const newAnalysis = await reanalyzeCardValue(selectedCard.num, variant, 'claude-3-5-sonnet-20241022');
+                                                                                        
+                                                                                        if (newAnalysis) {
+                                                                                            const key = getCardKey(selectedCard.num);
+                                                                                            const updatedCollection = { ...collection };
+                                                                                            if (!updatedCollection[key]._analyses) updatedCollection[key]._analyses = {};
+                                                                                            if (!updatedCollection[key]._analyses[variant]) updatedCollection[key]._analyses[variant] = [];
+                                                                                            updatedCollection[key]._analyses[variant].push({
+                                                                                                id: Date.now(),
+                                                                                                addedDate: new Date().toISOString(),
+                                                                                                analysis: newAnalysis
+                                                                                            });
+                                                                                            setCollection(updatedCollection);
+                                                                                            saveCollection(updatedCollection);
+                                                                                        }
+                                                                                    } catch (error) {
+                                                                                        console.error('Analysis error:', error);
+                                                                                    } finally {
+                                                                                        setAnalyzingCards(prev => {
+                                                                                            const updated = { ...prev };
+                                                                                            delete updated[analyzeKey];
+                                                                                            return updated;
+                                                                                        });
+                                                                                    }
+                                                                                }}
+                                                                                disabled={isAnalyzing}
+                                                                                className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded font-semibold disabled:opacity-50"
+                                                                                title="Reanalyze with Sonnet model"
+                                                                            >
+                                                                                {isAnalyzing ? '⟳' : '⚡'}
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={async (e) => {
+                                                                                    e.stopPropagation();
+                                                                                    const analyzeKey = `${selectedCard.num}-${variant}`;
+                                                                                    setAnalyzingCards(prev => ({ ...prev, [analyzeKey]: true }));
+                                                                                    
+                                                                                    try {
+                                                                                        const newAnalysis = await reanalyzeCardValue(selectedCard.num, variant, 'claude-3-opus-20240229');
+                                                                                        
+                                                                                        if (newAnalysis) {
+                                                                                            const key = getCardKey(selectedCard.num);
+                                                                                            const updatedCollection = { ...collection };
+                                                                                            if (!updatedCollection[key]._analyses) updatedCollection[key]._analyses = {};
+                                                                                            if (!updatedCollection[key]._analyses[variant]) updatedCollection[key]._analyses[variant] = [];
+                                                                                            updatedCollection[key]._analyses[variant].push({
+                                                                                                id: Date.now(),
+                                                                                                addedDate: new Date().toISOString(),
+                                                                                                analysis: newAnalysis
+                                                                                            });
+                                                                                            setCollection(updatedCollection);
+                                                                                            saveCollection(updatedCollection);
+                                                                                        }
+                                                                                    } catch (error) {
+                                                                                        console.error('Analysis error:', error);
+                                                                                    } finally {
+                                                                                        setAnalyzingCards(prev => {
+                                                                                            const updated = { ...prev };
+                                                                                            delete updated[analyzeKey];
+                                                                                            return updated;
+                                                                                        });
+                                                                                    }
+                                                                                }}
+                                                                                disabled={isAnalyzing}
+                                                                                className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1 rounded font-semibold disabled:opacity-50"
+                                                                                title="Reanalyze with Opus model"
+                                                                            >
+                                                                                {isAnalyzing ? '⟳' : '🔍'}
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={async (e) => {
+                                                                                    e.stopPropagation();
+                                                                                    const analyzeKey = `${selectedCard.num}-${variant}`;
+                                                                                    setAnalyzingCards(prev => ({ ...prev, [analyzeKey]: true }));
+                                                                                    
+                                                                                    try {
+                                                                                        await performQuickGradeForVariant(selectedCard.num, variant);
+                                                                                    } catch (error) {
+                                                                                        console.error('Quick grade error:', error);
+                                                                                    } finally {
+                                                                                        setAnalyzingCards(prev => {
+                                                                                            const updated = { ...prev };
+                                                                                            delete updated[analyzeKey];
+                                                                                            return updated;
+                                                                                        });
+                                                                                    }
+                                                                                }}
+                                                                                disabled={isAnalyzing}
+                                                                                className="bg-amber-600 hover:bg-amber-700 text-white text-xs px-2 py-1 rounded font-semibold disabled:opacity-50"
+                                                                                title="Quick Grade this variant"
+                                                                            >
+                                                                                {isAnalyzing ? '⟳' : '📊'}
+                                                                            </button>
+                                                                        </div>
                                                                     </div>
-                                                                    <div className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{latestAnalysis.analysis}</div>
-                                                                    <div className="text-xs text-slate-500 mt-2">
-                                                                        Added: {new Date(latestAnalysis.addedDate).toLocaleDateString()}
-                                                                    </div>
+                                                                    {!collapsedSections[`analysis-${selectedCard.num}-${variant}`] && (
+                                                                        <>
+                                                                            <div className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{latestAnalysis.analysis}</div>
+                                                                            <div className="text-xs text-slate-500 mt-2">
+                                                                                Added: {new Date(latestAnalysis.addedDate).toLocaleDateString()}
+                                                                            </div>
+                                                                        </>
+                                                                    )}
                                                                 </div>
                                                             )}
 
@@ -3087,11 +3309,23 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                         {variant && collection[getCardKey(selectedCard.num)]?._gradeReports?.[variant] && (
                                                             <div className="mt-2 bg-blue-900/20 border border-blue-500/30 rounded p-3">
                                                                 <div className="flex justify-between items-center mb-3">
-                                                                    <div className="font-semibold text-blue-400 text-sm">📊 Quick Grade Assessment</div>
+                                                                    <button 
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const collapseKey = `grade-${selectedCard.num}-${variant}`;
+                                                                            setCollapsedSections(prev => ({...prev, [collapseKey]: !prev[collapseKey]}));
+                                                                        }}
+                                                                        className="font-semibold text-blue-400 text-sm flex items-center gap-1 hover:text-blue-300 transition-colors"
+                                                                    >
+                                                                        📊 Quick Grade Assessment
+                                                                        <span className="text-xs">{collapsedSections[`grade-${selectedCard.num}-${variant}`] ? '▼' : '▲'}</span>
+                                                                    </button>
                                                                 </div>
-                                                                <div className="text-slate-300 leading-relaxed">
-                                                                    {formatQuickGradeReport(collection[getCardKey(selectedCard.num)]._gradeReports[variant])}
-                                                                </div>
+                                                                {!collapsedSections[`grade-${selectedCard.num}-${variant}`] && (
+                                                                    <div className="text-slate-300 leading-relaxed">
+                                                                        {formatQuickGradeReport(collection[getCardKey(selectedCard.num)]._gradeReports[variant])}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         )}
                                                     </div>
@@ -3791,11 +4025,23 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                     {recognizedCard?.gradeReport && (
                                                         <div className="mt-2 bg-blue-900/20 border border-blue-500/30 rounded p-3">
                                                             <div className="flex items-center justify-between mb-3">
-                                                                <h5 className="font-semibold text-blue-400 text-sm">📊 Quick Grade Assessment</h5>
+                                                                <button 
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        const collapseKey = 'scanner-grade-report';
+                                                                        setCollapsedSections(prev => ({...prev, [collapseKey]: !prev[collapseKey]}));
+                                                                    }}
+                                                                    className="font-semibold text-blue-400 text-sm flex items-center gap-1 hover:text-blue-300 transition-colors"
+                                                                >
+                                                                    📊 Quick Grade Assessment
+                                                                    <span className="text-xs">{collapsedSections['scanner-grade-report'] ? '▼' : '▲'}</span>
+                                                                </button>
                                                             </div>
-                                                            <div className="text-slate-300 leading-relaxed">
-                                                                {formatQuickGradeReport(recognizedCard.gradeReport)}
-                                                            </div>
+                                                            {!collapsedSections['scanner-grade-report'] && (
+                                                                <div className="text-slate-300 leading-relaxed">
+                                                                    {formatQuickGradeReport(recognizedCard.gradeReport)}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
@@ -3840,7 +4086,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                     <div className="flex flex-col gap-3">
                                         <button
                                             onClick={() => fileInputRef.current?.click()}
-                                            className="w-full bg-green-600 hover:bg-green-700 px-4 py-3 rounded-lg font-semibold text-white"
+                                            className="w-full bg-green-600 hover:bg-green-700 px-4 py-6 rounded-lg font-semibold text-white"
                                         >
                                             📷 Add Second Image
                                         </button>
