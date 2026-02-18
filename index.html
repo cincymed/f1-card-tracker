@@ -3555,6 +3555,68 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                             ✕ Cancel
                                         </button>
                                     </div>
+                                    
+                                    {/* Mobile Debug Panel - Only show on mobile */}
+                                    {isMobile && (
+                                        <div className="mb-4 bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3">
+                                            <details className="text-xs text-yellow-300">
+                                                <summary className="cursor-pointer font-semibold mb-2">🔍 Mobile Debug Info</summary>
+                                                <div className="space-y-1 mt-2">
+                                                    <div>Local Storage: {localStorage.getItem('f1Collection') ? 'EXISTS' : 'EMPTY'}</div>
+                                                    <div>Collection Size: {Object.keys(collection || {}).length} cards</div>
+                                                    <div>Auth Token: {localStorage.getItem('authToken') ? 'SET' : 'MISSING'}</div>
+                                                    <div>Last Sync: {localStorage.getItem('lastSync') || 'NEVER'}</div>
+                                                    <div>Recognition Error: {recognitionError || 'NONE'}</div>
+                                                    <div>Network: {navigator.onLine ? 'ONLINE' : 'OFFLINE'}</div>
+                                                    <div>Recognized Card: {recognizedCard?.name || 'NONE'}</div>
+                                                    <div>Server Online: {serverOnline ? 'YES' : 'NO'}</div>
+                                                </div>
+                                                <div className="flex gap-2 mt-3">
+                                                    <button 
+                                                        onClick={() => {
+                                                            // Test storage
+                                                            const testData = { test: new Date().toISOString() };
+                                                            localStorage.setItem('mobileDebugTest', JSON.stringify(testData));
+                                                            const retrieved = localStorage.getItem('mobileDebugTest');
+                                                            alert(`Storage Test: ${retrieved ? 'SUCCESS' : 'FAILED'}\n\nData: ${retrieved}`);
+                                                        }}
+                                                        className="bg-yellow-600 hover:bg-yellow-700 text-black text-xs px-2 py-1 rounded"
+                                                    >
+                                                        Test Storage
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => {
+                                                            // Force collection save
+                                                            try {
+                                                                const collectionData = JSON.stringify(collection);
+                                                                localStorage.setItem('f1Collection', collectionData);
+                                                                alert(`Force Save: SUCCESS\n\nSize: ${collectionData.length} chars\nCards: ${Object.keys(collection || {}).length}`);
+                                                            } catch (error) {
+                                                                alert(`Force Save: FAILED\n\nError: ${error.message}`);
+                                                            }
+                                                        }}
+                                                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded"
+                                                    >
+                                                        Force Save
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => {
+                                                            // Test sync
+                                                            if (localStorage.getItem('authToken')) {
+                                                                alert('Auth token exists - sync should work');
+                                                            } else {
+                                                                alert('No auth token - sync will fail');
+                                                            }
+                                                        }}
+                                                        className="bg-green-600 hover:bg-green-700 text-white text-xs px-2 py-1 rounded"
+                                                    >
+                                                        Check Auth
+                                                    </button>
+                                                </div>
+                                            </details>
+                                        </div>
+                                    )}
+                                    
                                     <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageUpload} multiple className="hidden" />
                                     
                                     <>
