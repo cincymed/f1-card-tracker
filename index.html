@@ -3561,35 +3561,98 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                         <div className="mb-4 bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3">
                                             <details className="text-xs text-yellow-300">
                                                 <summary className="cursor-pointer font-semibold mb-2">🔍 Mobile Debug Info</summary>
-                                                <div className="space-y-1 mt-2">
-                                                    <div>Local Storage: {localStorage.getItem('f1Collection') ? 'EXISTS' : 'EMPTY'}</div>
-                                                    <div>Collection Size: {Object.keys(collection || {}).length} cards</div>
-                                                    <div>Auth Token: {localStorage.getItem('authToken') ? 'SET' : 'MISSING'}</div>
-                                                    <div>Last Sync: {localStorage.getItem('lastSync') || 'NEVER'}</div>
+                                                <div className="space-y-1 mt-2" id="mobile-debug-status">
+                                                    <div>Local Storage: <span id="debug-storage-status">{localStorage.getItem('f1Collection') ? 'EXISTS' : 'EMPTY'}</span></div>
+                                                    <div>Collection Size: <span id="debug-collection-size">{Object.keys(collection || {}).length}</span> cards</div>
+                                                    <div>Auth Token: <span id="debug-auth-status">{localStorage.getItem('authToken') ? 'SET' : 'MISSING'}</span></div>
+                                                    <div>Last Sync: <span id="debug-sync-status">{localStorage.getItem('lastSync') || 'NEVER'}</span></div>
                                                     <div>Recognition Error: {recognitionError || 'NONE'}</div>
                                                     <div>Network: {navigator.onLine ? 'ONLINE' : 'OFFLINE'}</div>
                                                     <div>Recognized Card: {recognizedCard?.name || 'NONE'}</div>
                                                     <div>Server Online: {serverOnline ? 'YES' : 'NO'}</div>
+                                                    <div>Browser: <span id="debug-browser-info">{navigator.userAgent.includes('Safari') ? 'Safari' : 'Other'}</span></div>
                                                 </div>
                                                 <div className="flex gap-2 mt-3">
                                                     <button 
                                                         onClick={() => {
-                                                            // Test storage
-                                                            const testData = { test: new Date().toISOString() };
-                                                            localStorage.setItem('mobileDebugTest', JSON.stringify(testData));
-                                                            const retrieved = localStorage.getItem('mobileDebugTest');
-                                                            alert(`Storage Test: ${retrieved ? 'SUCCESS' : 'FAILED'}\n\nData: ${retrieved}`);
+                                                            // Function to refresh all debug displays
+                                                            const refreshDebugDisplay = () => {
+                                                                document.getElementById('debug-storage-status').textContent = 
+                                                                    localStorage.getItem('f1Collection') ? 'EXISTS' : 'EMPTY';
+                                                                document.getElementById('debug-auth-status').textContent = 
+                                                                    localStorage.getItem('authToken') ? 'SET' : 'MISSING';
+                                                                document.getElementById('debug-sync-status').textContent = 
+                                                                    localStorage.getItem('lastSync') || 'NEVER';
+                                                                
+                                                                const stored = localStorage.getItem('f1Collection');
+                                                                if (stored) {
+                                                                    try {
+                                                                        const parsed = JSON.parse(stored);
+                                                                        document.getElementById('debug-collection-size').textContent = 
+                                                                            Object.keys(parsed || {}).length;
+                                                                    } catch (e) {
+                                                                        document.getElementById('debug-collection-size').textContent = 'ERROR';
+                                                                    }
+                                                                }
+                                                            };
+                                                            
+                                                            // Enhanced storage test with refresh
+                                                            let results = [];
+                                                            
+                                                            try {
+                                                                localStorage.setItem('test', 'working');
+                                                                const retrieved = localStorage.getItem('test');
+                                                                if (retrieved === 'working') {
+                                                                    results.push('✅ localStorage: WORKING');
+                                                                    localStorage.removeItem('test');
+                                                                } else {
+                                                                    results.push('❌ localStorage: READ FAILED');
+                                                                }
+                                                            } catch (error) {
+                                                                results.push(`❌ localStorage: ERROR - ${error.message}`);
+                                                            }
+                                                            
+                                                            const collectionKeys = Object.keys(collection || {});
+                                                            results.push(`📊 Collection in React: ${collectionKeys.length} cards`);
+                                                            
+                                                            const stored = localStorage.getItem('f1Collection');
+                                                            if (stored) {
+                                                                try {
+                                                                    const parsed = JSON.parse(stored);
+                                                                    results.push(`📊 Collection in Storage: ${Object.keys(parsed).length} cards`);
+                                                                } catch (e) {
+                                                                    results.push('❌ Storage data corrupted');
+                                                                }
+                                                            } else {
+                                                                results.push('📊 Collection in Storage: 0 cards (empty)');
+                                                            }
+                                                            
+                                                            // Check private mode
+                                                            if ('storage' in navigator && 'estimate' in navigator.storage) {
+                                                                results.push('✅ Not in private mode');
+                                                            } else {
+                                                                results.push('⚠️ Possibly private mode');
+                                                            }
+                                                            
+                                                            alert(results.join('\n\n'));
+                                                            refreshDebugDisplay();
                                                         }}
                                                         className="bg-yellow-600 hover:bg-yellow-700 text-black text-xs px-2 py-1 rounded"
                                                     >
-                                                        Test Storage
+                                                        Full Test
                                                     </button>
                                                     <button 
                                                         onClick={() => {
-                                                            // Force collection save
+                                                            // Force save with immediate refresh
                                                             try {
                                                                 const collectionData = JSON.stringify(collection);
                                                                 localStorage.setItem('f1Collection', collectionData);
+                                                                
+                                                                // Refresh display immediately
+                                                                document.getElementById('debug-storage-status').textContent = 'EXISTS';
+                                                                document.getElementById('debug-collection-size').textContent = 
+                                                                    Object.keys(collection || {}).length;
+                                                                
                                                                 alert(`Force Save: SUCCESS\n\nSize: ${collectionData.length} chars\nCards: ${Object.keys(collection || {}).length}`);
                                                             } catch (error) {
                                                                 alert(`Force Save: FAILED\n\nError: ${error.message}`);
@@ -3601,16 +3664,22 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                     </button>
                                                     <button 
                                                         onClick={() => {
-                                                            // Test sync
-                                                            if (localStorage.getItem('authToken')) {
-                                                                alert('Auth token exists - sync should work');
+                                                            // Test loading from storage
+                                                            const stored = localStorage.getItem('f1Collection');
+                                                            if (stored) {
+                                                                try {
+                                                                    const parsed = JSON.parse(stored);
+                                                                    alert(`✅ STORAGE LOAD TEST\n\nStored: ${Object.keys(parsed).length} cards\nIn React: ${Object.keys(collection || {}).length} cards\n\n${Object.keys(parsed).length !== Object.keys(collection || {}).length ? '⚠️ MISMATCH - App not loading from storage!' : '✅ Match - App loading correctly'}`);
+                                                                } catch (e) {
+                                                                    alert('❌ Storage data corrupted');
+                                                                }
                                                             } else {
-                                                                alert('No auth token - sync will fail');
+                                                                alert('❌ No data in localStorage');
                                                             }
                                                         }}
                                                         className="bg-green-600 hover:bg-green-700 text-white text-xs px-2 py-1 rounded"
                                                     >
-                                                        Check Auth
+                                                        Test Load
                                                     </button>
                                                 </div>
                                             </details>
