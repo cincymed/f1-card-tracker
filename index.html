@@ -3211,18 +3211,25 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                     return;
                 }
                 try {
+                    // Apply same cleanup pipeline as saveCollection to keep payload size manageable
                     const localColl = JSON.parse(localRaw);
-                    const mongoData = stripMetadataForMongo(localColl);
-                    const cardCount = Object.keys(localColl).filter(k => k.startsWith('card-')).length;
+                    const cleaned = cleanupCollection(localColl);
+                    trimAnalyses(cleaned, 3);
+                    const mongoData = stripMetadataForMongo(cleaned);
+                    const cardCount = Object.keys(cleaned).filter(k => k.startsWith('card-')).length;
+                    const payloadBytes = JSON.stringify({ cards: mongoData }).length;
+                    console.log(`Push to cloud: ${cardCount} cards, ${(payloadBytes/1024).toFixed(1)}KB`);
 
                     const res = await fetch(
                         'https://f1-card-tracker-backend-1.onrender.com/api/collection/cincymed-f1-collection',
                         { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ cards: mongoData }) }
                     );
                     if (res.ok) {
-                        alert(`☁️ Pushed to cloud!\n${cardCount} cards uploaded from this device.\n\nDesktop will pick up changes within 60 seconds, or use Force Reload on the laptop.`);
+                        alert(`☁️ Pushed to cloud!\n${cardCount} cards uploaded (${(payloadBytes/1024).toFixed(1)}KB).\n\nDesktop will pick up changes within 60 seconds, or use Force Reload on the laptop.`);
                     } else {
-                        alert(`❌ Push failed (${res.status}). Check your connection and try again.`);
+                        let detail = '';
+                        try { detail = await res.text(); } catch (_) {}
+                        alert(`❌ Push failed (${res.status}).\n${detail || 'Check your connection and try again.'}`);
                     }
                 } catch (err) {
                     alert('❌ Push failed: ' + err.message);
