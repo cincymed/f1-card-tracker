@@ -3211,21 +3211,35 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                     return;
                 }
                 try {
-                    // Apply same cleanup pipeline as saveCollection to keep payload size manageable
                     const localColl = JSON.parse(localRaw);
                     const cleaned = cleanupCollection(localColl);
-                    trimAnalyses(cleaned, 3);
-                    const mongoData = stripMetadataForMongo(cleaned);
-                    const cardCount = Object.keys(cleaned).filter(k => k.startsWith('card-')).length;
-                    const payloadBytes = JSON.stringify({ cards: mongoData }).length;
-                    console.log(`Push to cloud: ${cardCount} cards, ${(payloadBytes/1024).toFixed(1)}KB`);
+
+                    // Send counts-only — no analyses or grade reports.
+                    // Analyses live in each device's localStorage and are preserved by
+                    // mergeMongoWithLocal on the receiving device, so they don't need to
+                    // travel through MongoDB. Counts-only keeps the payload tiny and
+                    // avoids the 500 caused by oversized documents.
+                    const countsOnly = {};
+                    Object.keys(cleaned).forEach(cardKey => {
+                        if (cardKey.startsWith('_')) return;
+                        const card = cleaned[cardKey];
+                        const counts = {};
+                        Object.keys(card).forEach(k => {
+                            if (!k.startsWith('_') && card[k] > 0) counts[k] = card[k];
+                        });
+                        if (Object.keys(counts).length > 0) countsOnly[cardKey] = counts;
+                    });
+
+                    const cardCount = Object.keys(countsOnly).length;
+                    const payloadBytes = JSON.stringify({ cards: countsOnly }).length;
+                    console.log(`Push to cloud (counts-only): ${cardCount} cards, ${(payloadBytes/1024).toFixed(1)}KB`);
 
                     const res = await fetch(
                         'https://f1-card-tracker-backend-1.onrender.com/api/collection/cincymed-f1-collection',
-                        { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ cards: mongoData }) }
+                        { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ cards: countsOnly }) }
                     );
                     if (res.ok) {
-                        alert(`☁️ Pushed to cloud!\n${cardCount} cards uploaded (${(payloadBytes/1024).toFixed(1)}KB).\n\nDesktop will pick up changes within 60 seconds, or use Force Reload on the laptop.`);
+                        alert(`☁️ Pushed to cloud!\n${cardCount} cards synced (${(payloadBytes/1024).toFixed(1)}KB).\n\nDesktop will pick up changes within 60 seconds, or use Force Reload on the laptop.`);
                     } else {
                         let detail = '';
                         try { detail = await res.text(); } catch (_) {}
