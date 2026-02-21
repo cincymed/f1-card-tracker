@@ -1627,13 +1627,13 @@ Keep response under 200 words total.`
 
                 // Find all owned cards + variants that don't have an analysis yet
                 const cardsToAnalyze = [];
-                const variantKeys = ['base','refractor','gold','red','orange','superfractor','printing_plate','auto','auto_refractor','auto_gold','auto_red','auto_orange','auto_superfractor','auto_printing_plate'];
 
                 Object.keys(collection).forEach(key => {
                     const cardEntry = collection[key];
                     const cardNum = key.replace('card-', '');
 
-                    variantKeys.forEach(variant => {
+                    // Use all non-internal keys (variant names) from the card entry
+                    Object.keys(cardEntry).filter(k => !k.startsWith('_')).forEach(variant => {
                         if (cardEntry[variant] && cardEntry[variant] > 0) {
                             // Check if analysis already exists
                             const hasAnalysis = cardEntry._analyses && cardEntry._analyses[variant] && cardEntry._analyses[variant].length > 0;
