@@ -768,12 +768,28 @@
 
             const startCamera = async () => {
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
-                    });
+                    const preferredCamera = localStorage.getItem('f1-preferred-camera');
+                    const constraints = preferredCamera
+                        ? { video: { deviceId: { exact: preferredCamera }, width: { ideal: 1920 }, height: { ideal: 1080 } } }
+                        : { video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } };
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
                     setCameraStream(stream);
                     setCameraActive(true);
                 } catch (err) {
+                    // If preferred camera failed, try default
+                    if (localStorage.getItem('f1-preferred-camera')) {
+                        try {
+                            const stream = await navigator.mediaDevices.getUserMedia({
+                                video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+                            });
+                            setCameraStream(stream);
+                            setCameraActive(true);
+                            localStorage.removeItem('f1-preferred-camera');
+                            return;
+                        } catch (fallbackErr) {
+                            console.error('Fallback camera also failed:', fallbackErr);
+                        }
+                    }
                     console.error('Camera access error:', err);
                     alert('Could not access camera. Please use file upload instead.');
                 }
@@ -988,6 +1004,55 @@
             const [scannerCapturedImages, setScannerCapturedImages] = useState([]);  // Images captured from scanner camera
             const [scannerMode, setScannerMode] = useState('camera');  // 'camera' or 'upload'
             const scannerVideoRef = React.useRef(null);
+            const [availableCameras, setAvailableCameras] = useState([]);
+            const [selectedCameraId, setSelectedCameraId] = useState(() => localStorage.getItem('f1-preferred-camera') || '');
+
+            // Enumerate available cameras
+            const enumerateCameras = async () => {
+                try {
+                    // Request a temporary stream to trigger permission prompt (required before enumerateDevices shows labels)
+                    const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    tempStream.getTracks().forEach(t => t.stop());
+
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const cameras = devices.filter(d => d.kind === 'videoinput');
+                    setAvailableCameras(cameras);
+
+                    // If saved camera is not available, clear selection (will fall back to default)
+                    const savedId = localStorage.getItem('f1-preferred-camera');
+                    if (savedId && !cameras.find(c => c.deviceId === savedId)) {
+                        setSelectedCameraId('');
+                        localStorage.removeItem('f1-preferred-camera');
+                    }
+                } catch (err) {
+                    console.error('Could not enumerate cameras:', err);
+                }
+            };
+
+            // Build video constraints using selected camera
+            const getCameraConstraints = () => {
+                // Read from localStorage to avoid stale closure issues
+                const cameraId = localStorage.getItem('f1-preferred-camera') || selectedCameraId;
+                if (cameraId) {
+                    return { video: { deviceId: { exact: cameraId }, width: { ideal: 1920 }, height: { ideal: 1080 } } };
+                }
+                return { video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } };
+            };
+
+            // Handle camera selection change
+            const handleCameraChange = (deviceId) => {
+                setSelectedCameraId(deviceId);
+                if (deviceId) {
+                    localStorage.setItem('f1-preferred-camera', deviceId);
+                } else {
+                    localStorage.removeItem('f1-preferred-camera');
+                }
+            };
+
+            // Enumerate cameras on mount
+            useEffect(() => {
+                enumerateCameras();
+            }, []);
 
             // Make current state accessible to chatbot with debugging
             useEffect(() => {
@@ -2005,13 +2070,27 @@ If you cannot find the exact card, provide your best estimate based on similar c
             // Scanner camera functions
             const startScannerCamera = async () => {
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
-                    });
+                    const constraints = getCameraConstraints();
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
                     setScannerCameraStream(stream);
                     setScannerCameraActive(true);
                 } catch (err) {
                     console.error('Camera access error:', err);
+                    // If preferred camera failed, try default
+                    if (selectedCameraId) {
+                        try {
+                            const stream = await navigator.mediaDevices.getUserMedia({
+                                video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+                            });
+                            setScannerCameraStream(stream);
+                            setScannerCameraActive(true);
+                            setSelectedCameraId('');
+                            localStorage.removeItem('f1-preferred-camera');
+                            return;
+                        } catch (fallbackErr) {
+                            console.error('Fallback camera also failed:', fallbackErr);
+                        }
+                    }
                     alert('Could not access camera. Please use file upload instead.');
                     setScannerMode('upload');
                 }
@@ -4543,6 +4622,32 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                 </button>
                                             </div>
 
+                                            {/* Camera selector - shown in camera mode when multiple cameras available */}
+                                            {scannerMode === 'camera' && availableCameras.length > 1 && (
+                                                <div className="mb-3 flex items-center gap-2">
+                                                    <span className="text-xs text-slate-400 font-semibold flex-shrink-0">Camera:</span>
+                                                    <select
+                                                        value={selectedCameraId}
+                                                        onChange={(e) => {
+                                                            handleCameraChange(e.target.value);
+                                                            // Restart camera if currently active
+                                                            if (scannerCameraActive) {
+                                                                stopScannerCamera();
+                                                                setTimeout(() => startScannerCamera(), 300);
+                                                            }
+                                                        }}
+                                                        className="flex-1 bg-slate-700 border border-slate-600 text-white text-xs rounded-lg px-2 py-1.5 focus:border-blue-500 focus:outline-none"
+                                                    >
+                                                        <option value="">Default Camera</option>
+                                                        {availableCameras.map(cam => (
+                                                            <option key={cam.deviceId} value={cam.deviceId}>
+                                                                {cam.label || `Camera ${availableCameras.indexOf(cam) + 1}`}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
+
                                             {scannerMode === 'camera' ? (
                                                 isMobile && scannerCameraActive ? (
                                                     /* Mobile full-screen camera view */
@@ -4550,17 +4655,37 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                         {/* Full-screen video feed */}
                                                         <video ref={scannerVideoCallbackRef} autoPlay playsInline muted className="w-full h-full object-cover" />
 
-                                                        {/* Top bar - close button and status */}
-                                                        <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-3 bg-gradient-to-b from-black/70 to-transparent">
-                                                            <span className="text-white text-sm font-semibold bg-black/50 px-3 py-1 rounded-full">
-                                                                {scannerCapturedImages.length === 0 ? 'Capture Front' : 'Capture Back'}
-                                                            </span>
-                                                            <button
-                                                                onClick={() => { stopScannerCamera(); }}
-                                                                className="bg-red-600/80 hover:bg-red-700 text-white w-9 h-9 rounded-full flex items-center justify-center text-lg font-bold"
-                                                            >
-                                                                ✕
-                                                            </button>
+                                                        {/* Top bar - close button, status, and camera selector */}
+                                                        <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/70 to-transparent">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-white text-sm font-semibold bg-black/50 px-3 py-1 rounded-full">
+                                                                    {scannerCapturedImages.length === 0 ? 'Capture Front' : 'Capture Back'}
+                                                                </span>
+                                                                <button
+                                                                    onClick={() => { stopScannerCamera(); }}
+                                                                    className="bg-red-600/80 hover:bg-red-700 text-white w-9 h-9 rounded-full flex items-center justify-center text-lg font-bold"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            </div>
+                                                            {availableCameras.length > 1 && (
+                                                                <select
+                                                                    value={selectedCameraId}
+                                                                    onChange={(e) => {
+                                                                        handleCameraChange(e.target.value);
+                                                                        stopScannerCamera();
+                                                                        setTimeout(() => startScannerCamera(), 300);
+                                                                    }}
+                                                                    className="mt-2 w-full bg-black/60 border border-white/30 text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none"
+                                                                >
+                                                                    <option value="">Default Camera</option>
+                                                                    {availableCameras.map(cam => (
+                                                                        <option key={cam.deviceId} value={cam.deviceId}>
+                                                                            {cam.label || `Camera ${availableCameras.indexOf(cam) + 1}`}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            )}
                                                         </div>
 
                                                         {/* Captured thumbnails - floating top-left */}
