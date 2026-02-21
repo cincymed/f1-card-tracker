@@ -1298,21 +1298,14 @@ Base your analysis on current 2025 market data from web search.`
                 try {
                     setLoadingCardDetails(true);
                     
-                    // Use Claude API with web search to find card details
-                    const response = await fetch('https://api.anthropic.com/v1/messages', {
+                    // Use Claude API via backend proxy to find card details
+                    const response = await fetch(API_URL, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
+                        headers: getAuthHeaders(),
                         body: JSON.stringify({
-                            model: 'claude-opus-4-5-20251101',
+                            model: 'claude-sonnet-4-5-20250929',
                             max_tokens: 500,
-                            tools: [
-                                {
-                                    type: 'web_search',
-                                    name: 'web_search'
-                                }
-                            ],
+                            tools: [{ type: 'web_search', name: 'web_search' }],
                             messages: [{
                                 role: 'user',
                                 content: `Find information about 2025 Topps Chrome F1 card #${cardNum}. Respond ONLY with JSON in this format:
@@ -3336,12 +3329,114 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                     
                                                     return (
                                                         <div key={variant} className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
-                                                            <div className="flex items-center justify-between mb-2">
+                                                            <div className="flex items-center justify-between mb-3">
                                                                 <span className="text-sm font-medium">{variant}</span>
-                                                                <div className="flex items-center gap-4">
+                                                            </div>
+                                                            {/* Analysis & Grading container */}
+                                                            <div className="flex items-center justify-between mb-3">
+                                                                <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-600/40">
+                                                                    <div className="text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Analysis & Grading</div>
+                                                                    <div className="flex gap-1.5 flex-wrap">
+                                                                        <button
+                                                                            onClick={async (e) => {
+                                                                                e.stopPropagation();
+                                                                                const analyzeKey = `${selectedCard.num}-${variant}`;
+                                                                                setAnalyzingCards(prev => ({ ...prev, [analyzeKey]: true }));
+                                                                                try {
+                                                                                    const newAnalysis = await reanalyzeCardValue(selectedCard.num, variant, 'claude-3-5-sonnet-20241022');
+                                                                                    if (newAnalysis) {
+                                                                                        const key = getCardKey(selectedCard.num);
+                                                                                        const updatedCollection = { ...collection };
+                                                                                        if (!updatedCollection[key]._analyses) updatedCollection[key]._analyses = {};
+                                                                                        if (!updatedCollection[key]._analyses[variant]) updatedCollection[key]._analyses[variant] = [];
+                                                                                        updatedCollection[key]._analyses[variant].push({
+                                                                                            id: Date.now(),
+                                                                                            addedDate: new Date().toISOString(),
+                                                                                            analysis: newAnalysis
+                                                                                        });
+                                                                                        setCollection(updatedCollection);
+                                                                                        saveCollection(updatedCollection);
+                                                                                    }
+                                                                                } catch (error) {
+                                                                                    console.error('Analysis error:', error);
+                                                                                } finally {
+                                                                                    setAnalyzingCards(prev => {
+                                                                                        const updated = { ...prev };
+                                                                                        delete updated[analyzeKey];
+                                                                                        return updated;
+                                                                                    });
+                                                                                }
+                                                                            }}
+                                                                            disabled={isAnalyzing}
+                                                                            className={`bg-blue-600 hover:bg-blue-700 text-white text-xs rounded font-semibold disabled:opacity-50 ${isMobile ? 'px-2 py-1.5' : 'px-3 py-1.5'}`}
+                                                                            title="Analyze value with Sonnet model"
+                                                                        >
+                                                                            {isAnalyzing ? '⟳' : '⚡'} Sonnet
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={async (e) => {
+                                                                                e.stopPropagation();
+                                                                                const analyzeKey = `${selectedCard.num}-${variant}`;
+                                                                                setAnalyzingCards(prev => ({ ...prev, [analyzeKey]: true }));
+                                                                                try {
+                                                                                    const newAnalysis = await reanalyzeCardValue(selectedCard.num, variant, 'claude-3-opus-20240229');
+                                                                                    if (newAnalysis) {
+                                                                                        const key = getCardKey(selectedCard.num);
+                                                                                        const updatedCollection = { ...collection };
+                                                                                        if (!updatedCollection[key]._analyses) updatedCollection[key]._analyses = {};
+                                                                                        if (!updatedCollection[key]._analyses[variant]) updatedCollection[key]._analyses[variant] = [];
+                                                                                        updatedCollection[key]._analyses[variant].push({
+                                                                                            id: Date.now(),
+                                                                                            addedDate: new Date().toISOString(),
+                                                                                            analysis: newAnalysis
+                                                                                        });
+                                                                                        setCollection(updatedCollection);
+                                                                                        saveCollection(updatedCollection);
+                                                                                    }
+                                                                                } catch (error) {
+                                                                                    console.error('Analysis error:', error);
+                                                                                } finally {
+                                                                                    setAnalyzingCards(prev => {
+                                                                                        const updated = { ...prev };
+                                                                                        delete updated[analyzeKey];
+                                                                                        return updated;
+                                                                                    });
+                                                                                }
+                                                                            }}
+                                                                            disabled={isAnalyzing}
+                                                                            className={`bg-purple-600 hover:bg-purple-700 text-white text-xs rounded font-semibold disabled:opacity-50 ${isMobile ? 'px-2 py-1.5' : 'px-3 py-1.5'}`}
+                                                                            title="Analyze value with Opus model"
+                                                                        >
+                                                                            {isAnalyzing ? '⟳' : '🔍'} Opus
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={async (e) => {
+                                                                                e.stopPropagation();
+                                                                                const analyzeKey = `${selectedCard.num}-${variant}`;
+                                                                                setAnalyzingCards(prev => ({ ...prev, [analyzeKey]: true }));
+                                                                                try {
+                                                                                    await performQuickGradeForVariant(selectedCard.num, variant);
+                                                                                } catch (error) {
+                                                                                    console.error('Quick grade error:', error);
+                                                                                } finally {
+                                                                                    setAnalyzingCards(prev => {
+                                                                                        const updated = { ...prev };
+                                                                                        delete updated[analyzeKey];
+                                                                                        return updated;
+                                                                                    });
+                                                                                }
+                                                                            }}
+                                                                            disabled={isAnalyzing}
+                                                                            className={`bg-amber-600 hover:bg-amber-700 text-white text-xs rounded font-semibold disabled:opacity-50 ${isMobile ? 'px-2 py-1.5' : 'px-3 py-1.5'}`}
+                                                                            title="Quick Grade Assessment"
+                                                                        >
+                                                                            {isAnalyzing ? '⟳' : '📊'} Grade
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex items-center gap-3 ml-3">
                                                                     <button
                                                                         onClick={() => {
-                                                                            // Track original state before first change
                                                                             if (!originalCardDetail) {
                                                                                 const key = getCardKey(selectedCard.num);
                                                                                 setOriginalCardDetail(JSON.parse(JSON.stringify(collection[key])));
@@ -3356,7 +3451,6 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                     <span className={`text-center font-bold text-green-400 ${isMobile ? 'text-xl' : 'text-lg'}`} title="Number of this variant in your collection">{count}</span>
                                                                     <button
                                                                         onClick={() => {
-                                                                            // Track original state before first change
                                                                             if (!originalCardDetail) {
                                                                                 const key = getCardKey(selectedCard.num);
                                                                                 setOriginalCardDetail(JSON.parse(JSON.stringify(collection[key] || {})));
@@ -3379,8 +3473,8 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                             
                                                             {latestAnalysis && !isAnalyzing && count > 0 && (
                                                                 <div className="mt-2 bg-blue-900/20 border border-blue-500/30 rounded p-3">
-                                                                    <div className="flex justify-between items-center mb-2">
-                                                                        <button 
+                                                                    <div className="mb-2">
+                                                                        <button
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
                                                                                 const collapseKey = `analysis-${selectedCard.num}-${variant}`;
@@ -3391,108 +3485,6 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                             💎 Card Value Analysis
                                                                             <span className="text-xs">{collapsedSections[`analysis-${selectedCard.num}-${variant}`] ? '▼' : '▲'}</span>
                                                                         </button>
-                                                                        <div className="flex gap-1">
-                                                                            <button
-                                                                                onClick={async (e) => {
-                                                                                    e.stopPropagation();
-                                                                                    const analyzeKey = `${selectedCard.num}-${variant}`;
-                                                                                    setAnalyzingCards(prev => ({ ...prev, [analyzeKey]: true }));
-                                                                                    
-                                                                                    try {
-                                                                                        const newAnalysis = await reanalyzeCardValue(selectedCard.num, variant, 'claude-3-5-sonnet-20241022');
-                                                                                        
-                                                                                        if (newAnalysis) {
-                                                                                            const key = getCardKey(selectedCard.num);
-                                                                                            const updatedCollection = { ...collection };
-                                                                                            if (!updatedCollection[key]._analyses) updatedCollection[key]._analyses = {};
-                                                                                            if (!updatedCollection[key]._analyses[variant]) updatedCollection[key]._analyses[variant] = [];
-                                                                                            updatedCollection[key]._analyses[variant].push({
-                                                                                                id: Date.now(),
-                                                                                                addedDate: new Date().toISOString(),
-                                                                                                analysis: newAnalysis
-                                                                                            });
-                                                                                            setCollection(updatedCollection);
-                                                                                            saveCollection(updatedCollection);
-                                                                                        }
-                                                                                    } catch (error) {
-                                                                                        console.error('Analysis error:', error);
-                                                                                    } finally {
-                                                                                        setAnalyzingCards(prev => {
-                                                                                            const updated = { ...prev };
-                                                                                            delete updated[analyzeKey];
-                                                                                            return updated;
-                                                                                        });
-                                                                                    }
-                                                                                }}
-                                                                                disabled={isAnalyzing}
-                                                                                className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded font-semibold disabled:opacity-50"
-                                                                                title="Reanalyze with Sonnet model"
-                                                                            >
-                                                                                {isAnalyzing ? '⟳' : '⚡'}
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={async (e) => {
-                                                                                    e.stopPropagation();
-                                                                                    const analyzeKey = `${selectedCard.num}-${variant}`;
-                                                                                    setAnalyzingCards(prev => ({ ...prev, [analyzeKey]: true }));
-                                                                                    
-                                                                                    try {
-                                                                                        const newAnalysis = await reanalyzeCardValue(selectedCard.num, variant, 'claude-3-opus-20240229');
-                                                                                        
-                                                                                        if (newAnalysis) {
-                                                                                            const key = getCardKey(selectedCard.num);
-                                                                                            const updatedCollection = { ...collection };
-                                                                                            if (!updatedCollection[key]._analyses) updatedCollection[key]._analyses = {};
-                                                                                            if (!updatedCollection[key]._analyses[variant]) updatedCollection[key]._analyses[variant] = [];
-                                                                                            updatedCollection[key]._analyses[variant].push({
-                                                                                                id: Date.now(),
-                                                                                                addedDate: new Date().toISOString(),
-                                                                                                analysis: newAnalysis
-                                                                                            });
-                                                                                            setCollection(updatedCollection);
-                                                                                            saveCollection(updatedCollection);
-                                                                                        }
-                                                                                    } catch (error) {
-                                                                                        console.error('Analysis error:', error);
-                                                                                    } finally {
-                                                                                        setAnalyzingCards(prev => {
-                                                                                            const updated = { ...prev };
-                                                                                            delete updated[analyzeKey];
-                                                                                            return updated;
-                                                                                        });
-                                                                                    }
-                                                                                }}
-                                                                                disabled={isAnalyzing}
-                                                                                className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1 rounded font-semibold disabled:opacity-50"
-                                                                                title="Reanalyze with Opus model"
-                                                                            >
-                                                                                {isAnalyzing ? '⟳' : '🔍'}
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={async (e) => {
-                                                                                    e.stopPropagation();
-                                                                                    const analyzeKey = `${selectedCard.num}-${variant}`;
-                                                                                    setAnalyzingCards(prev => ({ ...prev, [analyzeKey]: true }));
-                                                                                    
-                                                                                    try {
-                                                                                        await performQuickGradeForVariant(selectedCard.num, variant);
-                                                                                    } catch (error) {
-                                                                                        console.error('Quick grade error:', error);
-                                                                                    } finally {
-                                                                                        setAnalyzingCards(prev => {
-                                                                                            const updated = { ...prev };
-                                                                                            delete updated[analyzeKey];
-                                                                                            return updated;
-                                                                                        });
-                                                                                    }
-                                                                                }}
-                                                                                disabled={isAnalyzing}
-                                                                                className="bg-amber-600 hover:bg-amber-700 text-white text-xs px-2 py-1 rounded font-semibold disabled:opacity-50"
-                                                                                title="Quick Grade this variant"
-                                                                            >
-                                                                                {isAnalyzing ? '⟳' : '📊'}
-                                                                            </button>
-                                                                        </div>
                                                                     </div>
                                                                     {!collapsedSections[`analysis-${selectedCard.num}-${variant}`] && (
                                                                         <>
