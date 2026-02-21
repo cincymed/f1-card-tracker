@@ -956,6 +956,8 @@
             const [showResetConfirm, setShowResetConfirm] = useState(false);
             const [showExportBeforeDelete, setShowExportBeforeDelete] = useState(false);
             const [analyzingCards, setAnalyzingCards] = useState({});
+            const [bulkAnalyzing, setBulkAnalyzing] = useState(false);
+            const [bulkAnalyzeProgress, setBulkAnalyzeProgress] = useState({ current: 0, total: 0 });
             const [deepAnalysis, setDeepAnalysis] = useState(null);
             const [isDeepAnalyzing, setIsDeepAnalyzing] = useState(false);
             const [selectedAnalysisSource, setSelectedAnalysisSource] = useState('opus'); // 'sonnet' or 'opus'
@@ -1618,6 +1620,69 @@ Keep response under 200 words total.`
                     console.error('Analysis error:', error);
                     return null;
                 }
+            };
+
+            const bulkAnalyzeCards = async () => {
+                if (bulkAnalyzing || !serverOnline) return;
+
+                // Find all owned cards + variants that don't have an analysis yet
+                const cardsToAnalyze = [];
+                const variantKeys = ['base','refractor','gold','red','orange','superfractor','printing_plate','auto','auto_refractor','auto_gold','auto_red','auto_orange','auto_superfractor','auto_printing_plate'];
+
+                Object.keys(collection).forEach(key => {
+                    const cardEntry = collection[key];
+                    const cardNum = key.replace('card-', '');
+
+                    variantKeys.forEach(variant => {
+                        if (cardEntry[variant] && cardEntry[variant] > 0) {
+                            // Check if analysis already exists
+                            const hasAnalysis = cardEntry._analyses && cardEntry._analyses[variant] && cardEntry._analyses[variant].length > 0;
+                            if (!hasAnalysis) {
+                                cardsToAnalyze.push({ cardNum, variant });
+                            }
+                        }
+                    });
+                });
+
+                if (cardsToAnalyze.length === 0) {
+                    alert('All owned cards already have analyses!');
+                    return;
+                }
+
+                setBulkAnalyzing(true);
+                setBulkAnalyzeProgress({ current: 0, total: cardsToAnalyze.length });
+
+                let updatedCollection = { ...collection };
+
+                for (let i = 0; i < cardsToAnalyze.length; i++) {
+                    const { cardNum, variant } = cardsToAnalyze[i];
+                    setBulkAnalyzeProgress({ current: i + 1, total: cardsToAnalyze.length });
+
+                    try {
+                        const analysis = await analyzeCardValue(cardNum, variant);
+                        if (analysis) {
+                            const key = getCardKey(cardNum);
+                            if (!updatedCollection[key]._analyses) updatedCollection[key]._analyses = {};
+                            if (!updatedCollection[key]._analyses[variant]) updatedCollection[key]._analyses[variant] = [];
+                            updatedCollection[key]._analyses[variant].push({
+                                id: Date.now(),
+                                addedDate: new Date().toISOString(),
+                                analysis: analysis
+                            });
+                            saveCollection(updatedCollection);
+                        }
+                    } catch (error) {
+                        console.error(`Bulk analyze error for card ${cardNum} ${variant}:`, error);
+                    }
+
+                    // Small delay between API calls to avoid rate limiting
+                    if (i < cardsToAnalyze.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                }
+
+                setBulkAnalyzing(false);
+                setBulkAnalyzeProgress({ current: 0, total: 0 });
             };
 
             const reanalyzeCardValue = async (cardNum, variant) => {
@@ -3209,7 +3274,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                         <div ref={menuRef} className="relative flex-shrink-0">
                                             <button
                                                 onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-                                                className="hamburger text-white hover:text-blue-400 transition text-4xl md:text-3xl"
+                                                className="hamburger text-white hover:text-blue-400 transition text-6xl md:text-5xl"
                                                 title="Open menu"
                                             >
                                                 ☰
@@ -3777,30 +3842,44 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                         />
 
                         {/* Right Sidebar - Fixed buttons at bottom */}
-                        {/* AI Scanner & Dashboard - Bottom Right */}
+                        {/* AI Scanner, Dashboard & Bulk Analyze - Bottom Right */}
                         <div className={`fixed ${isMobile ? 'bottom-4 left-4 right-4' : 'bottom-6 right-6'} z-40 ${isMobile ? 'flex gap-2' : 'flex flex-col gap-3'}`}>
                             <button
                                 onClick={() => setShowImageUpload(true)}
                                 disabled={!serverOnline}
                                 title={serverOnline ? "Open AI Scanner to analyze card images (upload front and back)" : "Server offline - start server to enable AI scanning"}
-                                className={`bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-semibold shadow-lg disabled:opacity-50 flex flex-col items-center justify-center gap-2 transition-all ${isMobile ? 'flex-1 py-3' : 'px-4 py-3 w-24'}`}
-                                style={isMobile ? {height: '60px'} : {height: '60px'}}
+                                className={`bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-semibold shadow-lg disabled:opacity-50 flex flex-col items-center justify-center gap-2 transition-all ${isMobile ? 'flex-1 py-3' : 'px-4 py-3 w-28'}`}
+                                style={isMobile ? {height: '60px'} : {height: '120px'}}
                             >
-                                <span className={isMobile ? 'text-3xl' : 'text-2xl'}>📷</span>
+                                <span className={isMobile ? 'text-3xl' : 'text-4xl'}>📷</span>
                                 <span className={isMobile ? 'text-xs' : 'text-sm'}>Scanner</span>
                                 {!serverOnline && <span className="text-xs text-red-300">Offline</span>}
                             </button>
 
                             {/* Dashboard Button */}
-                            <a 
-                                href="dashboard.html" 
-                                className={`bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-lg flex flex-col items-center justify-center gap-2 transition-all ${isMobile ? 'flex-1 py-3' : 'px-4 py-3 w-24'}`}
-                                style={isMobile ? {height: '60px'} : {height: '60px'}}
+                            <a
+                                href="dashboard.html"
+                                className={`bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-lg flex flex-col items-center justify-center gap-2 transition-all ${isMobile ? 'flex-1 py-3' : 'px-4 py-3 w-28'}`}
+                                style={isMobile ? {height: '60px'} : {height: '120px'}}
                                 title="View your collection dashboard and analytics"
                             >
-                                <span className={isMobile ? 'text-2xl' : 'text-2xl'}>📊</span>
+                                <span className={isMobile ? 'text-2xl' : 'text-4xl'}>📊</span>
                                 <span className={isMobile ? 'text-xs' : 'text-sm'}>Dashboard</span>
                             </a>
+
+                            {/* Bulk Analyze Button - Desktop only */}
+                            {!isMobile && (
+                                <button
+                                    onClick={bulkAnalyzeCards}
+                                    disabled={!serverOnline || bulkAnalyzing}
+                                    title={bulkAnalyzing ? `Analyzing ${bulkAnalyzeProgress.current}/${bulkAnalyzeProgress.total}...` : "Bulk analyze all owned cards without analyses (Sonnet)"}
+                                    className={`bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg font-semibold shadow-lg disabled:opacity-50 flex flex-col items-center justify-center gap-2 transition-all px-4 py-3 w-28`}
+                                    style={{height: '120px'}}
+                                >
+                                    <span className="text-4xl">{bulkAnalyzing ? '⏳' : '🔬'}</span>
+                                    <span className="text-sm">{bulkAnalyzing ? `${bulkAnalyzeProgress.current}/${bulkAnalyzeProgress.total}` : 'Bulk Analyze'}</span>
+                                </button>
+                            )}
                         </div>
 
                         {selectedCard && (
