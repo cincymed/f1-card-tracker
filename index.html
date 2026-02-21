@@ -977,6 +977,7 @@
             const [showGradeCamera, setShowGradeCamera] = useState(false);  // Grade camera modal
             const [gradeCameraAutoOpen, setGradeCameraAutoOpen] = useState(() => localStorage.getItem('f1-grade-camera-auto') === 'true');  // Persist camera toggle
             const [gradeCardContext, setGradeCardContext] = useState(null);  // {cardNum, variant} being graded
+            const [returnTo, setReturnTo] = useState(null);  // Track where user came from (e.g. 'dashboard')
 
             // Make current state accessible to chatbot with debugging
             useEffect(() => {
@@ -1106,12 +1107,13 @@
                 const openCardData = localStorage.getItem('openCardOnLoad');
                 if (openCardData) {
                     try {
-                        const { cardNum, card, timestamp } = JSON.parse(openCardData);
+                        const { cardNum, card, timestamp, returnTo: source } = JSON.parse(openCardData);
                         // Only auto-open if timestamp is recent (within 5 seconds)
                         if (Date.now() - timestamp < 5000) {
                             const cardFromDatabase = cardData.find(c => c.num === cardNum);
                             if (cardFromDatabase) {
                                 setSelectedCard(cardFromDatabase);
+                                if (source) setReturnTo(source);
                             }
                         }
                         // Clear the localStorage item
@@ -2981,6 +2983,19 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                 return null;
             };
 
+            // Close card detail and return to source page if applicable
+            const closeCardDetail = () => {
+                setSelectedCard(null);
+                setCardDetailEdit(null);
+                setOriginalCardDetail(null);
+                if (returnTo === 'dashboard') {
+                    setReturnTo(null);
+                    window.location.href = 'dashboard.html';
+                    return;
+                }
+                setReturnTo(null);
+            };
+
             // Use predefined variant list for filter dropdown
             const allVariants = OFFICIAL_VARIANTS;
 
@@ -3657,9 +3672,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
 
                         {selectedCard && (
                             <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50" onClick={() => {
-                                setSelectedCard(null);
-                                setCardDetailEdit(null);
-                                setOriginalCardDetail(null);
+                                closeCardDetail();
                             }}>
                                 <div className={`bg-slate-800 rounded-2xl p-6 ${isMobile ? 'w-full max-h-[95vh]' : 'max-w-4xl w-full max-h-[90vh]'} overflow-y-auto scrollbar-hide`} onClick={(e) => e.stopPropagation()}>
                                     <div className={`flex ${isMobile ? 'flex-col gap-4' : 'justify-between items-start'} mb-6`}>
@@ -3669,22 +3682,20 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                             <p className="text-xs text-slate-500">{selectedCard.subset}</p>
                                         </div>
                                         <div className={`flex ${isMobile ? 'w-full gap-2' : 'gap-2 items-start'}`}>
-                                            <button 
+                                            <button
                                                 onClick={() => {
                                                     // Save changes
                                                     if (cardDetailEdit) {
                                                         saveCollection(collection);
                                                     }
-                                                    setCardDetailEdit(null);
-                                                    setOriginalCardDetail(null);
-                                                    setSelectedCard(null);
+                                                    closeCardDetail();
                                                 }}
                                                 title="Save changes and close"
                                                 className={`bg-green-600 hover:bg-green-700 rounded-lg font-semibold ${isMobile ? 'flex-1 py-3 text-base' : 'px-4 py-2 text-sm'}`}
                                             >
                                                 ✓ Done
                                             </button>
-                                            <button 
+                                            <button
                                                 onClick={() => {
                                                     // Cancel changes and restore original
                                                     if (originalCardDetail) {
@@ -3695,9 +3706,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                         setCollection(newCollection);
                                                         saveCollection(newCollection);
                                                     }
-                                                    setCardDetailEdit(null);
-                                                    setOriginalCardDetail(null);
-                                                    setSelectedCard(null);
+                                                    closeCardDetail();
                                                 }}
                                                 title="Discard changes and close"
                                                 className={`bg-red-600 hover:bg-red-700 rounded-lg font-semibold ${isMobile ? 'flex-1 py-3 text-base' : 'px-4 py-2 text-sm'}`}
