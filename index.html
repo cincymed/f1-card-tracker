@@ -3231,7 +3231,13 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
             // Uses mergeMongoWithLocal so local analyses/grades aren't overwritten.
             // Uses a ref so visibilitychange/polling always call the latest version.
             const silentSyncRef = useRef(null);
+            const lastSyncAttemptRef = useRef(0); // throttle: don't sync more than once per 45s
+
             const silentSyncFromMongo = async () => {
+                const now = Date.now();
+                if (now - lastSyncAttemptRef.current < 45000) return; // throttle
+                lastSyncAttemptRef.current = now;
+
                 try {
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -3240,6 +3246,10 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                         { method: 'GET', headers: getAuthHeaders(), signal: controller.signal }
                     );
                     clearTimeout(timeoutId);
+                    if (response.status === 429) {
+                        console.log('Silent sync: rate limited, skipping');
+                        return;
+                    }
                     if (!response.ok) return;
                     const data = await response.json();
                     if (!data.cards || Object.keys(data.cards).length === 0) return;
@@ -3261,22 +3271,22 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
             };
             silentSyncRef.current = silentSyncFromMongo;
 
-            // Sync when tab becomes visible or window is focused (covers switching back from mobile)
+            // Sync when tab becomes visible or window is focused (covers switching back from mobile).
+            // The 45s throttle inside silentSyncFromMongo prevents these from causing excess requests.
             useEffect(() => {
                 const run = () => silentSyncRef.current?.();
-                document.addEventListener('visibilitychange', () => {
-                    if (document.visibilityState === 'visible') run();
-                });
+                const onVisibility = () => { if (document.visibilityState === 'visible') run(); };
+                document.addEventListener('visibilitychange', onVisibility);
                 window.addEventListener('focus', run);
                 return () => {
-                    document.removeEventListener('visibilitychange', run);
+                    document.removeEventListener('visibilitychange', onVisibility);
                     window.removeEventListener('focus', run);
                 };
             }, []);
 
-            // Poll MongoDB every 15 seconds to pick up changes from other devices
+            // Poll MongoDB every 60 seconds to pick up changes from other devices
             useEffect(() => {
-                const interval = setInterval(() => silentSyncRef.current?.(), 15000);
+                const interval = setInterval(() => silentSyncRef.current?.(), 60000);
                 return () => clearInterval(interval);
             }, []);
 
