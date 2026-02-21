@@ -1053,15 +1053,31 @@
                     if (totalCards > 0) {
                         contextInfo += ` The user's collection contains ${totalCards} unique cards and ${totalCopies} total cards from the 2025 Topps Chrome F1 set.`;
 
-                        // Add some specific examples if collection has cards
+                        // Build comprehensive driver ownership summary so chatbot knows exact counts
+                        const driverCounts = {};
                         const ownedCardKeys = Object.keys(collection).filter(k => !k.startsWith('_'));
-                        const exampleCards = ownedCardKeys.slice(0, 3).map(cardKey => {
+                        ownedCardKeys.forEach(cardKey => {
                             const cardNum = cardKey.replace('card-', '');
                             const card = (state.cardData || []).find(c => c.num === cardNum);
-                            return card ? `#${card.num} ${card.name}` : `#${cardNum}`;
+                            const variants = collection[cardKey] || {};
+                            const cardTotal = Object.keys(variants).filter(k => !k.startsWith('_')).reduce((sum, v) => sum + (variants[v] || 0), 0);
+                            if (card && cardTotal > 0) {
+                                const name = card.name;
+                                if (!driverCounts[name]) driverCounts[name] = { total: 0, cards: [] };
+                                driverCounts[name].total += cardTotal;
+                                const variantDetails = Object.keys(variants)
+                                    .filter(k => !k.startsWith('_') && variants[k] > 0)
+                                    .map(v => `${v}:${variants[v]}`).join(', ');
+                                driverCounts[name].cards.push(`#${cardNum} (${variantDetails})`);
+                            }
                         });
-                        if (exampleCards.length > 0) {
-                            contextInfo += ` For example, they own: ${exampleCards.join(', ')}.`;
+
+                        // Include full driver breakdown
+                        const driverSummaries = Object.entries(driverCounts)
+                            .sort((a, b) => b[1].total - a[1].total)
+                            .map(([name, info]) => `${name}: ${info.total} total [${info.cards.join('; ')}]`);
+                        if (driverSummaries.length > 0) {
+                            contextInfo += ` COMPLETE COLLECTION BREAKDOWN BY DRIVER/CARD: ${driverSummaries.join(' | ')}`;
                         }
                     } else {
                         contextInfo += ` The user's collection is empty - they haven't added any cards yet.`;
@@ -3319,17 +3335,25 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                     </button>
                                 </div>
                                 <span className="text-slate-400 text-sm">
-                                    {showOwnedOnly ? (
-                                        (() => {
-                                            const ownedInSubset = filteredCards.filter(card => getTotalCount(card.num) > 0).length;
-                                            const totalInSubset = filterSubset === 'all'
-                                                ? cardData.length
-                                                : cardData.filter(card => card.subset === filterSubset).length;
-                                            return `Showing ${ownedInSubset} of ${totalInSubset} cards`;
-                                        })()
-                                    ) : (
-                                        `Showing ${filteredCards.length} cards`
-                                    )}
+                                    {(() => {
+                                        // Count cards matching all filters EXCEPT the owned-only filter
+                                        const totalMatchingFilters = cardData.filter(card => {
+                                            const matchesSearch = !searchTerm ||
+                                                card.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                card.num.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                (card.team && card.team.toLowerCase().includes(searchTerm.toLowerCase()));
+                                            const matchesSubset = filterSubset === 'all' || card.subset === filterSubset;
+                                            const matchesRookie = filterRookie === 'all' ||
+                                                (filterRookie === 'rookie' && card.rookie) ||
+                                                (filterRookie === 'veteran' && !card.rookie);
+                                            return matchesSearch && matchesSubset && matchesRookie;
+                                        }).length;
+
+                                        if (filteredCards.length === totalMatchingFilters) {
+                                            return `Showing ${filteredCards.length} cards`;
+                                        }
+                                        return `Showing ${filteredCards.length} of ${totalMatchingFilters} cards`;
+                                    })()}
                                 </span>
                             </div>
                         </div>
@@ -3705,8 +3729,8 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                             <div className="flex items-center justify-between mb-3">
                                                                 <span className="text-sm font-medium">{variant}</span>
                                                             </div>
-                                                            {/* Analysis & Grading container */}
-                                                            <div className="flex items-center justify-between mb-3">
+                                                            {/* Analysis & Grading + Quantity controls */}
+                                                            <div className="flex items-center justify-end gap-3 mb-3">
                                                                 <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-600/40">
                                                                     <div className="text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Analysis & Grading</div>
                                                                     <div className="flex gap-1.5 flex-wrap">
@@ -3719,7 +3743,6 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                                 try {
                                                                                     const newAnalysis = await analyzeCardValue(selectedCard.num, variant);
                                                                                     if (newAnalysis) {
-                                                                                        // Use functional updater to avoid stale closure
                                                                                         setCollection(prevCollection => {
                                                                                             const updatedCollection = JSON.parse(JSON.stringify(prevCollection));
                                                                                             if (!updatedCollection[cardKey]) updatedCollection[cardKey] = {};
@@ -3731,7 +3754,6 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                                                 analysis: newAnalysis,
                                                                                                 source: 'sonnet'
                                                                                             });
-                                                                                            // Persist: trim, save to localStorage, sync to MongoDB
                                                                                             trimAnalyses(updatedCollection, 3);
                                                                                             localStorage.setItem('f1-collection-pro-v2', JSON.stringify(updatedCollection));
                                                                                             const mongoData = stripMetadataForMongo(updatedCollection);
@@ -3754,7 +3776,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                                 }
                                                                             }}
                                                                             disabled={isAnalyzing}
-                                                                            className={`bg-blue-600 hover:bg-blue-700 text-white text-xs rounded font-semibold disabled:opacity-50 ${isMobile ? 'px-2 py-1.5' : 'px-3 py-1.5'}`}
+                                                                            className={`bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold disabled:opacity-50 ${isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-2 text-sm'}`}
                                                                             title="Analyze value with Sonnet model"
                                                                         >
                                                                             {isAnalyzing ? '⟳' : '⚡'} Sonnet
@@ -3768,7 +3790,6 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                                 try {
                                                                                     const newAnalysis = await reanalyzeCardValue(selectedCard.num, variant);
                                                                                     if (newAnalysis) {
-                                                                                        // Use functional updater to avoid stale closure after long API call
                                                                                         setCollection(prevCollection => {
                                                                                             const updatedCollection = JSON.parse(JSON.stringify(prevCollection));
                                                                                             if (!updatedCollection[cardKey]) updatedCollection[cardKey] = {};
@@ -3780,7 +3801,6 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                                                 analysis: newAnalysis,
                                                                                                 source: 'opus'
                                                                                             });
-                                                                                            // Persist: trim, save to localStorage, sync to MongoDB
                                                                                             trimAnalyses(updatedCollection, 3);
                                                                                             localStorage.setItem('f1-collection-pro-v2', JSON.stringify(updatedCollection));
                                                                                             const mongoData = stripMetadataForMongo(updatedCollection);
@@ -3803,7 +3823,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                                 }
                                                                             }}
                                                                             disabled={isAnalyzing}
-                                                                            className={`bg-purple-600 hover:bg-purple-700 text-white text-xs rounded font-semibold disabled:opacity-50 ${isMobile ? 'px-2 py-1.5' : 'px-3 py-1.5'}`}
+                                                                            className={`bg-purple-600 hover:bg-purple-700 text-white rounded font-semibold disabled:opacity-50 ${isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-2 text-sm'}`}
                                                                             title="Analyze value with Opus model"
                                                                         >
                                                                             {isAnalyzing ? '⟳' : '🔍'} Opus
@@ -3812,18 +3832,17 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
                                                                                 setGradeCardContext({ cardNum: selectedCard.num, variant });
-                                                                                setGradeCapturedImages([]);
                                                                                 setShowGradeCamera(true);
                                                                             }}
                                                                             disabled={isAnalyzing}
-                                                                            className={`bg-amber-600 hover:bg-amber-700 text-white text-xs rounded font-semibold disabled:opacity-50 ${isMobile ? 'px-2 py-1.5' : 'px-3 py-1.5'}`}
+                                                                            className={`bg-amber-600 hover:bg-amber-700 text-white rounded font-semibold disabled:opacity-50 ${isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-2 text-sm'}`}
                                                                             title="Quick Grade Assessment"
                                                                         >
-                                                                            {isAnalyzing ? '⟳' : '📊'} Grade
+                                                                            {isAnalyzing ? '⟳' : '📊'} Quick Grade
                                                                         </button>
                                                                     </div>
                                                                 </div>
-                                                                <div className="flex items-center gap-3 ml-3">
+                                                                <div className="flex items-center gap-3">
                                                                     <button
                                                                         onClick={() => {
                                                                             if (!originalCardDetail) {
@@ -4275,7 +4294,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                         disabled={isDeepAnalyzing}
                                                         className={`rounded-lg font-semibold bg-amber-600 hover:bg-amber-700 disabled:opacity-50 ${isMobile ? 'flex-1 py-2 text-sm' : 'px-4 py-2 text-sm'}`}
                                                     >
-                                                        {isDeepAnalyzing ? '⟳ Grading...' : '📊 Grade'}
+                                                        {isDeepAnalyzing ? '⟳ Grading...' : '📊 Quick Grade'}
                                                     </button>
                                                 </div>
                                                 
