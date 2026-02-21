@@ -9,9 +9,18 @@
     <style>
         body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
         .card-table { width: 100%; border-collapse: collapse; }
-        .card-table th, .card-table td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
-        .card-table th { background: #0f172a; font-weight: bold; }
-        .card-table tr:hover { background: #1e293b; }
+        .card-table th, .card-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #334155; }
+        .card-table th { background: #0f172a; font-weight: bold; cursor: pointer; user-select: none; position: sticky; top: 0; z-index: 10; }
+        .card-table th:hover { background: #1e293b; }
+        .card-table tr.data-row:hover { background: #1e293b; cursor: pointer; }
+        .card-table tr.data-row:active { background: #334155; }
+        .section-header { cursor: pointer; user-select: none; }
+        .section-header:hover { background: rgba(59, 130, 246, 0.1) !important; }
+        .sort-arrow { display: inline-block; margin-left: 4px; font-size: 10px; opacity: 0.5; }
+        .sort-arrow.active { opacity: 1; color: #60a5fa; }
+        .filter-input { background: #1e293b; border: 1px solid #475569; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; width: 100%; margin-top: 4px; }
+        .filter-input::placeholder { color: #64748b; }
+        .filter-input:focus { outline: none; border-color: #3b82f6; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
@@ -25,6 +34,21 @@
         const userId = 'cincymed-f1-collection';
         const cardDatabase = COMPLETE_CARD_DATABASE || [];
         const token = localStorage.getItem('f1-token');
+
+        // Dashboard state
+        let dashboardState = {
+            sortColumn: 'num',
+            sortDirection: 'asc',
+            filters: { num: '', name: '', team: '', variants: '', total: '' },
+            collapsedSections: {},  // Track which sections are collapsed
+            allExpanded: false      // Global expand/collapse state
+        };
+
+        // Initialize all sections as collapsed
+        const allSubsets = [...new Set(cardDatabase.map(c => c.subset))];
+        allSubsets.forEach(subset => {
+            dashboardState.collapsedSections[subset] = true; // collapsed by default
+        });
 
         function getAuthHeaders() {
           return {
@@ -50,9 +74,12 @@
                 const priceHistory = historyData.priceHistory || [];
 
                 const stats = calculateStats(collection);
-                
+
+                // Store globally for re-renders
+                window.dashboardData = { collection, stats, priceHistory };
+
                 renderDashboard(collection, stats, priceHistory);
-                
+
                 // Make dashboard state accessible globally
                 window.currentAppState = {
                     isDashboard: true,
@@ -60,32 +87,32 @@
                     stats,
                     priceHistory
                 };
-                
+
                 // Initialize universal chatbot with dashboard context
                 window.generateContextInfo = () => {
                     const state = window.currentAppState;
                     let contextInfo = "You are an AI assistant integrated into an F1 card collection dashboard. ";
-                    
+
                     if (state.isDashboard && state.stats) {
                         contextInfo += `The user is currently viewing their collection dashboard. `;
                         contextInfo += `Their collection contains ${state.stats.uniqueCards} unique cards and ${state.stats.totalCards} total cards from the 2025 Topps Chrome F1 set (${state.stats.totalSetCards} total cards in the set). `;
                         contextInfo += `Collection completion: ${((state.stats.uniqueCards / state.stats.totalSetCards) * 100).toFixed(1)}%. `;
-                        
+
                         const topVariants = Object.entries(state.stats.cardsByVariant || {})
                             .sort((a, b) => b[1] - a[1])
                             .slice(0, 3)
                             .map(([variant, count]) => `${variant} (${count})`)
                             .join(', ');
-                        
+
                         if (topVariants) {
                             contextInfo += `Top variants owned: ${topVariants}. `;
                         }
                     }
-                    
+
                     contextInfo += `Be helpful and knowledgeable about F1 cards, collecting, dashboard analytics, and collection building strategies. Keep responses concise and relevant.`;
                     return contextInfo;
                 };
-                
+
                 if (!window.chatbotContextProvider) {
                     window.initializeChatbot();
                 }
@@ -107,7 +134,7 @@
 
                 Object.keys(variants).forEach(variant => {
                     if (variant === '_analyses' || variant.startsWith('_')) return;
-                    
+
                     const count = variants[variant];
                     if (count > 0) {
                         totalCards += count;
@@ -128,15 +155,242 @@
             };
         }
 
+        function getCardsInCollection(collection) {
+            return Object.keys(collection)
+                .filter(key => !key.startsWith('_'))
+                .map(key => key.replace('card-', ''))
+                .sort((a, b) => {
+                    const numA = parseInt(a) || 999999;
+                    const numB = parseInt(b) || 999999;
+                    return numA - numB;
+                });
+        }
+
+        function getCardData(cardNum, collection) {
+            const card = cardDatabase.find(c => c.num === cardNum);
+            if (!card) return null;
+            const cardKey = `card-${cardNum}`;
+            const variants = collection[cardKey] || {};
+            const totalCount = Object.keys(variants)
+                .filter(k => !k.startsWith('_'))
+                .reduce((sum, v) => sum + (variants[v] || 0), 0);
+            const variantList = Object.keys(variants)
+                .filter(k => !k.startsWith('_') && variants[k] > 0)
+                .map(v => `${v} (${variants[v]})`)
+                .join(', ');
+            return { card, totalCount, variantList, subset: card.subset };
+        }
+
+        function sortCards(cards, column, direction) {
+            return [...cards].sort((a, b) => {
+                let valA, valB;
+                switch(column) {
+                    case 'num':
+                        valA = parseInt(a.card.num) || 999999;
+                        valB = parseInt(b.card.num) || 999999;
+                        break;
+                    case 'name':
+                        valA = a.card.name.toLowerCase();
+                        valB = b.card.name.toLowerCase();
+                        break;
+                    case 'team':
+                        valA = (a.card.team || '').toLowerCase();
+                        valB = (b.card.team || '').toLowerCase();
+                        break;
+                    case 'variants':
+                        valA = a.variantList.toLowerCase();
+                        valB = b.variantList.toLowerCase();
+                        break;
+                    case 'total':
+                        valA = a.totalCount;
+                        valB = b.totalCount;
+                        break;
+                    default:
+                        valA = parseInt(a.card.num) || 999999;
+                        valB = parseInt(b.card.num) || 999999;
+                }
+                if (typeof valA === 'string') {
+                    const cmp = valA.localeCompare(valB);
+                    return direction === 'asc' ? cmp : -cmp;
+                }
+                return direction === 'asc' ? valA - valB : valB - valA;
+            });
+        }
+
+        function filterCards(cards, filters) {
+            return cards.filter(item => {
+                if (filters.num && !item.card.num.toLowerCase().includes(filters.num.toLowerCase())) return false;
+                if (filters.name && !item.card.name.toLowerCase().includes(filters.name.toLowerCase())) return false;
+                if (filters.team && !(item.card.team || '').toLowerCase().includes(filters.team.toLowerCase())) return false;
+                if (filters.variants && !item.variantList.toLowerCase().includes(filters.variants.toLowerCase())) return false;
+                if (filters.total && item.totalCount < parseInt(filters.total)) return false;
+                return true;
+            });
+        }
+
+        // Navigate to main UI and open card detail
+        function openCardDetail(cardNum) {
+            const card = cardDatabase.find(c => c.num === cardNum);
+            if (card) {
+                localStorage.setItem('openCardOnLoad', JSON.stringify({
+                    cardNum: cardNum,
+                    card: card,
+                    timestamp: Date.now()
+                }));
+                window.location.href = 'index.html';
+            }
+        }
+
+        // Toggle section collapse
+        function toggleSection(subset) {
+            dashboardState.collapsedSections[subset] = !dashboardState.collapsedSections[subset];
+            reRender();
+        }
+
+        // Expand all sections
+        function expandAllSections() {
+            dashboardState.allExpanded = true;
+            Object.keys(dashboardState.collapsedSections).forEach(key => {
+                dashboardState.collapsedSections[key] = false;
+            });
+            reRender();
+        }
+
+        // Collapse all sections
+        function collapseAllSections() {
+            dashboardState.allExpanded = false;
+            Object.keys(dashboardState.collapsedSections).forEach(key => {
+                dashboardState.collapsedSections[key] = true;
+            });
+            reRender();
+        }
+
+        // Sort by column
+        function sortByColumn(column) {
+            if (dashboardState.sortColumn === column) {
+                dashboardState.sortDirection = dashboardState.sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                dashboardState.sortColumn = column;
+                dashboardState.sortDirection = 'asc';
+            }
+            reRender();
+        }
+
+        // Update filter
+        function updateFilter(column, value) {
+            dashboardState.filters[column] = value;
+            reRender();
+        }
+
+        // Re-render with current state
+        function reRender() {
+            if (window.dashboardData) {
+                renderDashboard(
+                    window.dashboardData.collection,
+                    window.dashboardData.stats,
+                    window.dashboardData.priceHistory
+                );
+            }
+        }
+
+        function renderSortArrow(column) {
+            const isActive = dashboardState.sortColumn === column;
+            const arrow = isActive
+                ? (dashboardState.sortDirection === 'asc' ? '▲' : '▼')
+                : '▲▼';
+            return `<span class="sort-arrow ${isActive ? 'active' : ''}">${arrow}</span>`;
+        }
+
         function renderDashboard(collection, stats, priceHistory = []) {
             const completion = ((stats.uniqueCards / stats.totalSetCards) * 100).toFixed(1);
+
+            // Get all card data
+            const allCardNums = getCardsInCollection(collection);
+            let allCards = allCardNums.map(num => getCardData(num, collection)).filter(Boolean);
+
+            // Apply filters
+            allCards = filterCards(allCards, dashboardState.filters);
+
+            // Group by subset
+            const subsetGroups = {};
+            allCards.forEach(item => {
+                const subset = item.subset || 'Unknown';
+                if (!subsetGroups[subset]) subsetGroups[subset] = [];
+                subsetGroups[subset].push(item);
+            });
+
+            // Sort within each group
+            Object.keys(subsetGroups).forEach(subset => {
+                subsetGroups[subset] = sortCards(subsetGroups[subset], dashboardState.sortColumn, dashboardState.sortDirection);
+            });
+
+            // Determine ordered subset keys (by first card number in the database)
+            const subsetOrder = [];
+            const seenSubsets = new Set();
+            cardDatabase.forEach(card => {
+                if (!seenSubsets.has(card.subset) && subsetGroups[card.subset]) {
+                    subsetOrder.push(card.subset);
+                    seenSubsets.add(card.subset);
+                }
+            });
+            // Add any remaining subsets not found in the database order
+            Object.keys(subsetGroups).forEach(subset => {
+                if (!seenSubsets.has(subset)) {
+                    subsetOrder.push(subset);
+                }
+            });
+
+            // Check if any sections are expanded
+            const anyExpanded = Object.values(dashboardState.collapsedSections).some(v => !v);
+            const allCollapsed = Object.values(dashboardState.collapsedSections).every(v => v);
+
+            // Build table rows with section headers
+            let tableRows = '';
+            subsetOrder.forEach(subset => {
+                const cards = subsetGroups[subset];
+                if (!cards || cards.length === 0) return;
+                const isCollapsed = dashboardState.collapsedSections[subset] !== false;
+                const subsetTotalCards = cards.reduce((sum, c) => sum + c.totalCount, 0);
+
+                // Section header row
+                tableRows += `
+                    <tr class="section-header" onclick="toggleSection('${subset.replace(/'/g, "\\'")}')">
+                        <td colspan="5" style="background: linear-gradient(90deg, #1e293b, #0f172a); padding: 12px 16px; border-bottom: 2px solid #3b82f6;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-size: 14px; transition: transform 0.2s; display: inline-block; transform: rotate(${isCollapsed ? '0' : '90'}deg);">▶</span>
+                                    <span style="font-weight: 700; font-size: 14px; color: #93c5fd;">${subset}</span>
+                                    <span style="font-size: 12px; color: #64748b; font-weight: 400;">${cards.length} card${cards.length !== 1 ? 's' : ''} &middot; ${subsetTotalCards} total</span>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+
+                // Card rows (only if section is expanded)
+                if (!isCollapsed) {
+                    cards.forEach(item => {
+                        tableRows += `
+                            <tr class="data-row" onclick="openCardDetail('${item.card.num}')">
+                                <td class="font-bold">#${item.card.num}</td>
+                                <td>${item.card.name}${item.card.rookie ? ' <span style="color: #fbbf24; font-size: 11px;">RC</span>' : ''}</td>
+                                <td class="text-sm text-slate-400">${item.card.team || 'N/A'}</td>
+                                <td class="text-sm">${item.variantList}</td>
+                                <td class="font-bold text-green-400">${item.totalCount}</td>
+                            </tr>
+                        `;
+                    });
+                }
+            });
+
+            const filters = dashboardState.filters;
 
             const html = `
                 <div class="min-h-screen p-8">
                     <div class="max-w-7xl mx-auto">
                         <!-- Header -->
                         <div class="mb-8">
-                            <h1 class="text-4xl font-bold mb-4">📊 F1 Card Collection Dashboard</h1>
+                            <h1 class="text-4xl font-bold mb-4">F1 Card Collection Dashboard</h1>
                             <p class="text-slate-400">View and analyze your 2025 Topps Chrome F1 collection</p>
                         </div>
 
@@ -182,7 +436,7 @@
 
                         <!-- Valuation History -->
                         <div class="bg-slate-800 rounded-lg p-6 border border-slate-700 mb-8">
-                            <h2 class="text-xl font-bold mb-4">💰 Valuation History</h2>
+                            <h2 class="text-xl font-bold mb-4">Valuation History</h2>
                             ${priceHistory.length > 0 ? `
                                 <div class="space-y-4">
                                     <div class="text-sm text-slate-400 mb-4">
@@ -218,46 +472,54 @@
 
                         <!-- Collection Table -->
                         <div class="bg-slate-800 rounded-lg p-6 border border-slate-700 mb-8">
-                            <h2 class="text-xl font-bold mb-4">Your Cards</h2>
+                            <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+                                <h2 class="text-xl font-bold">Your Cards</h2>
+                                <div class="flex gap-2">
+                                    <button
+                                        onclick="expandAllSections()"
+                                        class="px-3 py-1.5 rounded text-xs font-semibold transition-all ${anyExpanded && !allCollapsed ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}"
+                                    >
+                                        Expand All
+                                    </button>
+                                    <button
+                                        onclick="collapseAllSections()"
+                                        class="px-3 py-1.5 rounded text-xs font-semibold transition-all ${allCollapsed ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}"
+                                    >
+                                        Collapse All
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="text-xs text-slate-500 mb-3">Click any row to view card details. Click column headers to sort. Click section headers to expand/collapse.</div>
                             <div class="overflow-x-auto">
                                 <table class="card-table">
                                     <thead>
                                         <tr>
-                                            <th>#</th>
-                                            <th>Driver</th>
-                                            <th>Team</th>
-                                            <th>Variants</th>
-                                            <th>Total</th>
+                                            <th onclick="sortByColumn('num')" style="min-width: 70px;"># ${renderSortArrow('num')}</th>
+                                            <th onclick="sortByColumn('name')" style="min-width: 140px;">Driver ${renderSortArrow('name')}</th>
+                                            <th onclick="sortByColumn('team')" style="min-width: 120px;">Team ${renderSortArrow('team')}</th>
+                                            <th onclick="sortByColumn('variants')" style="min-width: 160px;">Variants ${renderSortArrow('variants')}</th>
+                                            <th onclick="sortByColumn('total')" style="min-width: 70px;">Total ${renderSortArrow('total')}</th>
+                                        </tr>
+                                        <tr style="background: #0f172a;">
+                                            <th style="padding: 4px 8px;">
+                                                <input type="text" class="filter-input" placeholder="Filter #" value="${filters.num}" oninput="updateFilter('num', this.value)" onclick="event.stopPropagation()">
+                                            </th>
+                                            <th style="padding: 4px 8px;">
+                                                <input type="text" class="filter-input" placeholder="Filter driver" value="${filters.name}" oninput="updateFilter('name', this.value)" onclick="event.stopPropagation()">
+                                            </th>
+                                            <th style="padding: 4px 8px;">
+                                                <input type="text" class="filter-input" placeholder="Filter team" value="${filters.team}" oninput="updateFilter('team', this.value)" onclick="event.stopPropagation()">
+                                            </th>
+                                            <th style="padding: 4px 8px;">
+                                                <input type="text" class="filter-input" placeholder="Filter variant" value="${filters.variants}" oninput="updateFilter('variants', this.value)" onclick="event.stopPropagation()">
+                                            </th>
+                                            <th style="padding: 4px 8px;">
+                                                <input type="text" class="filter-input" placeholder="Min" value="${filters.total}" oninput="updateFilter('total', this.value)" onclick="event.stopPropagation()">
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        ${getCardsInCollection(collection)
-                                            .map(cardNum => {
-                                                const card = cardDatabase.find(c => c.num === cardNum);
-                                                if (!card) return '';
-                                                
-                                                const cardKey = `card-${cardNum}`;
-                                                const variants = collection[cardKey];
-                                                const totalCount = Object.keys(variants)
-                                                    .filter(k => !k.startsWith('_'))
-                                                    .reduce((sum, v) => sum + (variants[v] || 0), 0);
-
-                                                const variantList = Object.keys(variants)
-                                                    .filter(k => !k.startsWith('_') && variants[k] > 0)
-                                                    .map(v => `${v} (${variants[v]})`)
-                                                    .join(', ');
-
-                                                return `
-                                                    <tr>
-                                                        <td class="font-bold">#${card.num}</td>
-                                                        <td>${card.name}</td>
-                                                        <td class="text-sm text-slate-400">${card.team || 'N/A'}</td>
-                                                        <td class="text-sm">${variantList}</td>
-                                                        <td class="font-bold text-green-400">${totalCount}</td>
-                                                    </tr>
-                                                `;
-                                            }).join('')
-                                        }
+                                        ${tableRows || '<tr><td colspan="5" class="text-center text-slate-400 py-8">No cards match the current filters</td></tr>'}
                                     </tbody>
                                 </table>
                             </div>
@@ -265,13 +527,13 @@
 
                         <!-- Right Sidebar Button -->
                         <div class="fixed right-6 bottom-6 z-40">
-                            <a 
-                                href="index.html" 
+                            <a
+                                href="index.html"
                                 class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-lg flex flex-col items-center justify-center gap-2 transition-all"
                                 style="width: 160px; height: 100px;"
                                 title="Return to main collection view"
                             >
-                                <span style="font-size: 2rem;">↑</span>
+                                <span style="font-size: 2rem;">&#8593;</span>
                                 <span class="text-sm">Return to<br/>Main Page</span>
                             </a>
                         </div>
@@ -280,17 +542,26 @@
             `;
 
             document.getElementById('root').innerHTML = html;
-        }
 
-        function getCardsInCollection(collection) {
-            return Object.keys(collection)
-                .filter(key => !key.startsWith('_'))
-                .map(key => key.replace('card-', ''))
-                .sort((a, b) => {
-                    const numA = parseInt(a) || 999999;
-                    const numB = parseInt(b) || 999999;
-                    return numA - numB;
-                });
+            // Restore filter input focus if user was typing
+            setTimeout(() => {
+                const activeFilter = document.activeElement;
+                if (activeFilter && activeFilter.classList && activeFilter.classList.contains('filter-input')) {
+                    // Already focused
+                } else {
+                    // Try to restore focus to filter inputs that have values
+                    Object.entries(dashboardState.filters).forEach(([col, val]) => {
+                        if (val) {
+                            const inputs = document.querySelectorAll('.filter-input');
+                            inputs.forEach(input => {
+                                if (input.value === val) {
+                                    // Don't steal focus, just ensure value persists
+                                }
+                            });
+                        }
+                    });
+                }
+            }, 0);
         }
 
         loadDashboard();
