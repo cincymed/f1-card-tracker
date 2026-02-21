@@ -4200,8 +4200,8 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                             ✕ Cancel
                                         </button>
                                     </div>
-                                    
-                                    {/* Mobile Debug Panel - Only show on mobile */}
+
+                                    {/* Mobile Debug Panel - Commented out, can be re-enabled if needed
                                     {isMobile && (
                                         <div className="mb-4 bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3">
                                             <details className="text-xs text-yellow-300">
@@ -4218,32 +4218,30 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                     <div>Browser: <span id="debug-browser-info">{navigator.userAgent.includes('Safari') ? 'Safari' : 'Other'}</span></div>
                                                 </div>
                                                 <div className="flex gap-2 mt-3">
-                                                    <button 
+                                                    <button
                                                         onClick={() => {
-                                                            // Function to refresh all debug displays
                                                             const refreshDebugDisplay = () => {
-                                                                document.getElementById('debug-storage-status').textContent = 
+                                                                document.getElementById('debug-storage-status').textContent =
                                                                     localStorage.getItem('f1Collection') ? 'EXISTS' : 'EMPTY';
-                                                                document.getElementById('debug-auth-status').textContent = 
+                                                                document.getElementById('debug-auth-status').textContent =
                                                                     localStorage.getItem('authToken') ? 'SET' : 'MISSING';
-                                                                document.getElementById('debug-sync-status').textContent = 
+                                                                document.getElementById('debug-sync-status').textContent =
                                                                     localStorage.getItem('lastSync') || 'NEVER';
-                                                                
+
                                                                 const stored = localStorage.getItem('f1Collection');
                                                                 if (stored) {
                                                                     try {
                                                                         const parsed = JSON.parse(stored);
-                                                                        document.getElementById('debug-collection-size').textContent = 
+                                                                        document.getElementById('debug-collection-size').textContent =
                                                                             Object.keys(parsed || {}).length;
                                                                     } catch (e) {
                                                                         document.getElementById('debug-collection-size').textContent = 'ERROR';
                                                                     }
                                                                 }
                                                             };
-                                                            
-                                                            // Enhanced storage test with refresh
+
                                                             let results = [];
-                                                            
+
                                                             try {
                                                                 localStorage.setItem('test', 'working');
                                                                 const retrieved = localStorage.getItem('test');
@@ -4256,10 +4254,10 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                             } catch (error) {
                                                                 results.push(`❌ localStorage: ERROR - ${error.message}`);
                                                             }
-                                                            
+
                                                             const collectionKeys = Object.keys(collection || {});
                                                             results.push(`📊 Collection in React: ${collectionKeys.length} cards`);
-                                                            
+
                                                             const stored = localStorage.getItem('f1Collection');
                                                             if (stored) {
                                                                 try {
@@ -4271,14 +4269,13 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                             } else {
                                                                 results.push('📊 Collection in Storage: 0 cards (empty)');
                                                             }
-                                                            
-                                                            // Check private mode
+
                                                             if ('storage' in navigator && 'estimate' in navigator.storage) {
                                                                 results.push('✅ Not in private mode');
                                                             } else {
                                                                 results.push('⚠️ Possibly private mode');
                                                             }
-                                                            
+
                                                             alert(results.join('\n\n'));
                                                             refreshDebugDisplay();
                                                         }}
@@ -4286,18 +4283,16 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                     >
                                                         Full Test
                                                     </button>
-                                                    <button 
+                                                    <button
                                                         onClick={() => {
-                                                            // Force save with immediate refresh
                                                             try {
                                                                 const collectionData = JSON.stringify(collection);
                                                                 localStorage.setItem('f1Collection', collectionData);
-                                                                
-                                                                // Refresh display immediately
+
                                                                 document.getElementById('debug-storage-status').textContent = 'EXISTS';
-                                                                document.getElementById('debug-collection-size').textContent = 
+                                                                document.getElementById('debug-collection-size').textContent =
                                                                     Object.keys(collection || {}).length;
-                                                                
+
                                                                 alert(`Force Save: SUCCESS\n\nSize: ${collectionData.length} chars\nCards: ${Object.keys(collection || {}).length}`);
                                                             } catch (error) {
                                                                 alert(`Force Save: FAILED\n\nError: ${error.message}`);
@@ -4307,9 +4302,8 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                     >
                                                         Force Save
                                                     </button>
-                                                    <button 
+                                                    <button
                                                         onClick={() => {
-                                                            // Test loading from storage
                                                             const stored = localStorage.getItem('f1Collection');
                                                             if (stored) {
                                                                 try {
@@ -4330,6 +4324,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                             </details>
                                         </div>
                                     )}
+                                    End of Mobile Debug Panel */}
                                     
                                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} multiple className="hidden" />
 
@@ -4353,8 +4348,77 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                             </div>
 
                                             {scannerMode === 'camera' ? (
+                                                isMobile && scannerCameraActive ? (
+                                                    /* Mobile full-screen camera view */
+                                                    <div className="fixed inset-0 z-[200] bg-black flex flex-col">
+                                                        {/* Full-screen video feed */}
+                                                        <video ref={scannerVideoCallbackRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+
+                                                        {/* Top bar - close button and status */}
+                                                        <div className="absolute top-0 left-0 right-0 flex justify-between items-center p-3 bg-gradient-to-b from-black/70 to-transparent">
+                                                            <span className="text-white text-sm font-semibold bg-black/50 px-3 py-1 rounded-full">
+                                                                {scannerCapturedImages.length === 0 ? 'Capture Front' : 'Capture Back'}
+                                                            </span>
+                                                            <button
+                                                                onClick={() => { stopScannerCamera(); }}
+                                                                className="bg-red-600/80 hover:bg-red-700 text-white w-9 h-9 rounded-full flex items-center justify-center text-lg font-bold"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </div>
+
+                                                        {/* Captured thumbnails - floating top-left */}
+                                                        {scannerCapturedImages.length > 0 && (
+                                                            <div className="absolute top-14 left-3 flex gap-2">
+                                                                {scannerCapturedImages.map((img, idx) => (
+                                                                    <div key={idx} className="relative w-16 h-20 rounded-lg overflow-hidden border-2 border-white/50 shadow-lg">
+                                                                        <img src={img} alt={idx === 0 ? 'Front' : 'Back'} className="w-full h-full object-cover" />
+                                                                        <span className="absolute bottom-0 left-0 right-0 text-center text-[10px] bg-black/70 text-white py-0.5">{idx === 0 ? 'Front' : 'Back'}</span>
+                                                                        <button
+                                                                            onClick={() => removeScannerImage(idx)}
+                                                                            className="absolute top-0 right-0 bg-red-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center"
+                                                                        >
+                                                                            x
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Bottom controls - floating over camera */}
+                                                        <div className="absolute bottom-0 left-0 right-0 p-4 pb-8 bg-gradient-to-t from-black/80 to-transparent">
+                                                            <div className="flex items-center justify-center gap-4">
+                                                                <button
+                                                                    onClick={stopScannerCamera}
+                                                                    className="bg-slate-600/80 hover:bg-slate-500 w-14 h-14 rounded-full flex items-center justify-center text-sm font-semibold shadow-lg"
+                                                                >
+                                                                    Stop
+                                                                </button>
+                                                                <button
+                                                                    onClick={captureScannerPhoto}
+                                                                    className="bg-white hover:bg-slate-200 w-20 h-20 rounded-full flex items-center justify-center shadow-lg border-4 border-white/30"
+                                                                >
+                                                                    <div className="bg-green-500 w-16 h-16 rounded-full flex items-center justify-center">
+                                                                        <span className="text-white text-2xl">📸</span>
+                                                                    </div>
+                                                                </button>
+                                                                {scannerCapturedImages.length > 0 && (
+                                                                    <button
+                                                                        onClick={submitScannerImages}
+                                                                        className="bg-green-600/80 hover:bg-green-700 w-14 h-14 rounded-full flex items-center justify-center text-[10px] font-bold shadow-lg text-center leading-tight"
+                                                                    >
+                                                                        Done
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-center text-white/60 text-xs mt-3">
+                                                                {scannerCapturedImages.length === 0 ? 'Position the front of the card in frame' : scannerCapturedImages.length === 1 ? 'Now capture the back (card number)' : 'Ready to analyze'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                ) : (
                                                 <div className="space-y-3">
-                                                    {/* Camera viewfinder */}
+                                                    {/* Camera viewfinder - desktop or mobile camera not yet started */}
                                                     <div className={`bg-slate-900 rounded-xl overflow-hidden relative ${isMobile ? 'h-64' : 'h-80'}`}>
                                                         {scannerCameraActive ? (
                                                             <video ref={scannerVideoCallbackRef} autoPlay playsInline muted className="w-full h-full object-contain" />
@@ -4372,7 +4436,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                         )}
                                                     </div>
 
-                                                    {/* Camera controls */}
+                                                    {/* Camera controls - desktop */}
                                                     {scannerCameraActive && (
                                                         <div className="flex gap-2">
                                                             <button
@@ -4435,6 +4499,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                         </p>
                                                     </div>
                                                 </div>
+                                                )
                                             ) : (
                                                 <>
                                                     <button onClick={() => fileInputRef.current?.click()} className={`w-full border-2 border-dashed border-slate-600 rounded-xl flex flex-col items-center justify-center hover:border-blue-500 transition-colors bg-slate-900/50 ${isMobile ? 'h-48' : 'h-80'}`}>
