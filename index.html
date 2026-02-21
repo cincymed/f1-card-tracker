@@ -476,6 +476,84 @@
                 </div>
             );
         };
+        // Format AI analysis text (value analysis) with clean rendering
+        const formatAnalysisText = (text) => {
+            if (!text) return null;
+
+            // Normalize escaped newlines
+            const normalized = text.replace(/\\n/g, '\n');
+            const lines = normalized.split('\n');
+            const elements = [];
+
+            lines.forEach((line, idx) => {
+                const trimmed = line.trim();
+                if (!trimmed) return;
+
+                // Skip pure separator lines (---, ===, etc.)
+                if (/^[-=_*]{3,}$/.test(trimmed)) return;
+
+                // Clean markdown formatting
+                let cleaned = trimmed
+                    .replace(/^#+\s*/, '')           // Remove ## headers
+                    .replace(/\*\*([^*]+)\*\*/g, '$1') // Remove **bold** markers
+                    .replace(/^\*\s+/, '')            // Remove * bullets
+                    .replace(/^-\s+/, '')             // Remove - bullets
+                    .replace(/^•\s*/, '')             // Remove bullet chars
+                    .trim();
+
+                if (!cleaned) return;
+
+                // Section headers: ALL CAPS words (with optional colon)
+                if (/^[A-Z][A-Z\s&/,]{4,}:?\s*$/.test(cleaned) && cleaned.length < 50) {
+                    elements.push(
+                        <div key={idx} className="text-xs font-semibold text-blue-400 border-l-2 border-blue-400 pl-2 bg-blue-950/30 py-0.5 rounded-r mt-2 first:mt-0">
+                            {cleaned.replace(/:$/, '')}
+                        </div>
+                    );
+                    return;
+                }
+
+                // Value lines: Raw: $X-Y, PSA 9: $X-Y, PSA 10: $X-Y
+                const valueMatch = cleaned.match(/^(Raw|PSA\s*\d+)[:\s]+(\$[\d,]+\s*-\s*\$?[\d,]+)/i);
+                if (valueMatch) {
+                    const label = valueMatch[1];
+                    const value = valueMatch[2];
+                    const rest = cleaned.substring(cleaned.indexOf(value) + value.length).replace(/^[,\s]+/, '').trim();
+                    const colorClass = label.toLowerCase().includes('10') ? 'text-yellow-400' :
+                                       label.toLowerCase().includes('9') ? 'text-blue-400' : 'text-green-400';
+                    elements.push(
+                        <div key={idx} className="flex items-baseline gap-2 text-xs ml-2">
+                            <span className="text-slate-400 font-medium">{label}:</span>
+                            <span className={`font-bold ${colorClass}`}>{value}</span>
+                            {rest && <span className="text-slate-500 text-xs">{rest}</span>}
+                        </div>
+                    );
+                    return;
+                }
+
+                // Key-value pairs (Label: value)
+                const kvMatch = cleaned.match(/^([^:]{2,35}):\s+(.+)$/);
+                if (kvMatch && !/^https?:/.test(cleaned)) {
+                    elements.push(
+                        <div key={idx} className="text-xs ml-2">
+                            <span className="text-slate-400 font-medium">{kvMatch[1]}:</span>{' '}
+                            <span className="text-slate-300">{kvMatch[2]}</span>
+                        </div>
+                    );
+                    return;
+                }
+
+                // Regular text
+                elements.push(
+                    <div key={idx} className="text-xs text-slate-300 ml-2 leading-relaxed">
+                        {cleaned}
+                    </div>
+                );
+            });
+
+            return <div className="space-y-1">{elements}</div>;
+        };
+
         const renderCheckerBadge = (style, text) => {
             const color1 = style.color1 || '#475569';
             const color2 = style.color2 || '#1e293b';
@@ -2434,11 +2512,13 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
 
             const extractValueEstimates = (analysisText) => {
                 if (!analysisText) return null;
-                
-                // Updated regex to not capture trailing punctuation like commas
-                const rawMatch = analysisText.match(/Raw[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
-                const psa9Match = analysisText.match(/PSA\s*9[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
-                const psa10Match = analysisText.match(/PSA\s*10[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
+
+                // Strip markdown formatting before regex matching
+                const cleanText = analysisText.replace(/\*\*/g, '').replace(/\*/g, '').replace(/^#+\s*/gm, '');
+
+                const rawMatch = cleanText.match(/Raw[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
+                const psa9Match = cleanText.match(/PSA\s*9[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
+                const psa10Match = cleanText.match(/PSA\s*10[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
                 
                 if (!rawMatch && !psa9Match && !psa10Match) return null;
                 
@@ -2458,7 +2538,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                 
                 // Get all variants for this card
                 Object.keys(cardInventory).forEach(variant => {
-                    if (variant === '_analyses') return; // Skip metadata
+                    if (variant.startsWith('_')) return; // Skip metadata (_analyses, _gradeReports)
                     
                     const count = cardInventory[variant];
                     if (count === 0) return; // Skip if no cards
@@ -2469,8 +2549,9 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                     
                     const latestAnalysis = variantAnalyses[variantAnalyses.length - 1];
                     
-                    // Parse Raw value (using maximum)
-                    const rawMatch = latestAnalysis.analysis.match(/Raw[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
+                    // Parse Raw value (using maximum) - strip markdown before matching
+                    const cleanAnalysis = latestAnalysis.analysis.replace(/\*\*/g, '').replace(/\*/g, '');
+                    const rawMatch = cleanAnalysis.match(/Raw[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
                     
                     if (rawMatch) {
                         // Get max raw value and remove commas
@@ -3343,7 +3424,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                                 const analyzeKey = `${selectedCard.num}-${variant}`;
                                                                                 setAnalyzingCards(prev => ({ ...prev, [analyzeKey]: true }));
                                                                                 try {
-                                                                                    const newAnalysis = await reanalyzeCardValue(selectedCard.num, variant, 'claude-3-5-sonnet-20241022');
+                                                                                    const newAnalysis = await analyzeCardValue(selectedCard.num, variant);
                                                                                     if (newAnalysis) {
                                                                                         const key = getCardKey(selectedCard.num);
                                                                                         const updatedCollection = { ...collection };
@@ -3379,7 +3460,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                                 const analyzeKey = `${selectedCard.num}-${variant}`;
                                                                                 setAnalyzingCards(prev => ({ ...prev, [analyzeKey]: true }));
                                                                                 try {
-                                                                                    const newAnalysis = await reanalyzeCardValue(selectedCard.num, variant, 'claude-3-opus-20240229');
+                                                                                    const newAnalysis = await reanalyzeCardValue(selectedCard.num, variant);
                                                                                     if (newAnalysis) {
                                                                                         const key = getCardKey(selectedCard.num);
                                                                                         const updatedCollection = { ...collection };
@@ -3488,7 +3569,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                     </div>
                                                                     {!collapsedSections[`analysis-${selectedCard.num}-${variant}`] && (
                                                                         <>
-                                                                            <div className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{latestAnalysis.analysis}</div>
+                                                                            <div className="text-slate-300 leading-relaxed">{formatAnalysisText(latestAnalysis.analysis)}</div>
                                                                             <div className="text-xs text-slate-500 mt-2">
                                                                                 Added: {new Date(latestAnalysis.addedDate).toLocaleDateString()}
                                                                             </div>
@@ -4322,7 +4403,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                         <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">SELECTED</span>
                                                                     )}
                                                                 </div>
-                                                                <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{recognizedCard.analysis ? recognizedCard.analysis.replace(/\\n/g, '\n') : ''}</div>
+                                                                <div className="text-slate-300 leading-relaxed">{formatAnalysisText(recognizedCard.analysis)}</div>
                                                             </div>
                                                         )}
                                                         
@@ -4339,7 +4420,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                         <span className="text-xs bg-purple-600 text-white px-2 py-1 rounded-full">SELECTED</span>
                                                                     )}
                                                                 </div>
-                                                                <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{deepAnalysis ? deepAnalysis.replace(/\\n/g, '\n') : ''}</div>
+                                                                <div className="text-slate-300 leading-relaxed">{formatAnalysisText(deepAnalysis)}</div>
                                                             </div>
                                                         )}
                                                     </div>
