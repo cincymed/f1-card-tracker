@@ -2098,9 +2098,27 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
                     });
 
                     const data = await response.json();
-                    
-                    if (data.content && data.content[0]?.text) {
-                        let fullText = data.content[0].text.trim();
+
+                    // Log response structure for debugging
+                    console.log('Recognition API response status:', response.status);
+                    console.log('Recognition response blocks:', data.content?.length || 0, 'stop_reason:', data.stop_reason);
+                    if (data.error) {
+                        console.error('API error:', data.error);
+                        throw new Error(data.error.message || 'API returned an error');
+                    }
+
+                    // Extract text from all content blocks (handle tool_use blocks before text)
+                    if (data.content && data.content.length > 0) {
+                        let fullText = data.content
+                            .filter(block => block.type === 'text')
+                            .map(block => block.text)
+                            .join('\n\n')
+                            .trim();
+
+                        if (!fullText) {
+                            console.error('No text blocks in response. Block types:', data.content.map(b => b.type));
+                            throw new Error('No text content in API response');
+                        }
                         
                         // Remove markdown code blocks
                         fullText = fullText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
