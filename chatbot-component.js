@@ -288,7 +288,7 @@ function updateChatbotInterface() {
                 class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg transition-all duration-200 hover:scale-105"
                 title="Open AI Assistant"
             >
-                <img src="logo.png" alt="AI" class="w-9 h-9 rounded-full" />
+                <span class="text-2xl">🤖</span>
             </button>
         `;
     } else {

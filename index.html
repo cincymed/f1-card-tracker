@@ -940,7 +940,7 @@
             const [filterRookie, setFilterRookie] = useState("all");
             const [filterVariants, setFilterVariants] = useState([]); // Multi-select variant filter
             const [filterValues, setFilterValues] = useState([]); // Multi-select value filter
-            const [showOwnedOnly, setShowOwnedOnly] = useState(false);  // Toggle to show only owned cards
+            const [ownedFilter, setOwnedFilter] = useState('all');  // 'all', 'owned', or 'not_owned'
             const [showImageUpload, setShowImageUpload] = useState(false);
             const [showMenuDropdown, setShowMenuDropdown] = useState(false);
             const [showFiltersDropdown, setShowFiltersDropdown] = useState(false);  // Mobile filters dropdown
@@ -3250,7 +3250,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                     (filterRookie === 'veteran' && !card.rookie);
                 
                 // Owned only filter
-                const matchesOwned = !showOwnedOnly || getTotalCount(card.num) > 0;
+                const matchesOwned = ownedFilter === 'all' || (ownedFilter === 'owned' && getTotalCount(card.num) > 0) || (ownedFilter === 'not_owned' && getTotalCount(card.num) === 0);
                 
                 // Variant filtering (multi-select)
                 const matchesVariant = filterVariants.length === 0 || (() => {
@@ -3569,9 +3569,9 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                             <div className={`flex items-center gap-3 ${isMobile ? 'mt-3 pt-2 border-t border-slate-700' : 'mt-4 pt-3 border-t border-slate-700'}`}>
                                 <div className="flex items-center bg-slate-800 rounded-full p-0.5 border border-slate-600">
                                     <button
-                                        onClick={() => setShowOwnedOnly(false)}
+                                        onClick={() => setOwnedFilter('all')}
                                         className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                                            !showOwnedOnly
+                                            ownedFilter === 'all'
                                                 ? 'bg-blue-600 text-white shadow-md'
                                                 : 'text-slate-400 hover:text-slate-200'
                                         }`}
@@ -3579,14 +3579,24 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                         All
                                     </button>
                                     <button
-                                        onClick={() => setShowOwnedOnly(true)}
+                                        onClick={() => setOwnedFilter('owned')}
                                         className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                                            showOwnedOnly
-                                                ? 'bg-blue-600 text-white shadow-md'
+                                            ownedFilter === 'owned'
+                                                ? 'bg-green-600 text-white shadow-md'
                                                 : 'text-slate-400 hover:text-slate-200'
                                         }`}
                                     >
                                         Owned
+                                    </button>
+                                    <button
+                                        onClick={() => setOwnedFilter('not_owned')}
+                                        className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                                            ownedFilter === 'not_owned'
+                                                ? 'bg-red-600 text-white shadow-md'
+                                                : 'text-slate-400 hover:text-slate-200'
+                                        }`}
+                                    >
+                                        Not Owned
                                     </button>
                                 </div>
                                 <span className="text-slate-400 text-sm">
@@ -4054,9 +4064,9 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                             <div className="flex items-center justify-between mb-3">
                                                                 <span className="text-sm font-medium">{variant}</span>
                                                             </div>
-                                                            {/* Analysis & Grading + Quantity controls */}
-                                                            <div className="flex items-center justify-end gap-3 mb-3">
-                                                                <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-600/40">
+                                                            {/* Analysis & Grading + Add/Delete Card controls */}
+                                                            <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} items-stretch gap-3 mb-3`}>
+                                                                <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-600/40 flex-1">
                                                                     <div className="text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Analysis & Grading</div>
                                                                     <div className="flex gap-1.5 flex-wrap">
                                                                         <button
@@ -4167,33 +4177,36 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                         </button>
                                                                     </div>
                                                                 </div>
-                                                                <div className="flex items-center gap-3">
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            if (!originalCardDetail) {
-                                                                                const key = getCardKey(selectedCard.num);
-                                                                                setOriginalCardDetail(JSON.parse(JSON.stringify(collection[key])));
-                                                                            }
-                                                                            setCardDetailEdit(true);
-                                                                            removeCard(selectedCard.num, variant);
-                                                                        }}
-                                                                        disabled={count === 0}
-                                                                        title="Remove one card from collection"
-                                                                        className={`bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-30 font-bold ${isMobile ? 'w-12 h-12 text-lg' : 'w-10 h-10'}`}
-                                                                    >−</button>
-                                                                    <span className={`text-center font-bold text-green-400 ${isMobile ? 'text-xl' : 'text-lg'}`} title="Number of this variant in your collection">{count}</span>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            if (!originalCardDetail) {
-                                                                                const key = getCardKey(selectedCard.num);
-                                                                                setOriginalCardDetail(JSON.parse(JSON.stringify(collection[key] || {})));
-                                                                            }
-                                                                            setCardDetailEdit(true);
-                                                                            addCard(selectedCard.num, variant);
-                                                                        }}
-                                                                        title="Add one card to collection"
-                                                                        className={`bg-green-600 hover:bg-green-700 rounded-lg font-bold ${isMobile ? 'w-12 h-12 text-lg' : 'w-10 h-10'}`}
-                                                                    >+</button>
+                                                                <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-600/40 flex-shrink-0">
+                                                                    <div className="text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Add/Delete Card</div>
+                                                                    <div className="flex items-center justify-center gap-3 h-full" style={{minHeight: '36px'}}>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                if (!originalCardDetail) {
+                                                                                    const key = getCardKey(selectedCard.num);
+                                                                                    setOriginalCardDetail(JSON.parse(JSON.stringify(collection[key])));
+                                                                                }
+                                                                                setCardDetailEdit(true);
+                                                                                removeCard(selectedCard.num, variant);
+                                                                            }}
+                                                                            disabled={count === 0}
+                                                                            title="Remove one card from collection"
+                                                                            className={`bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-30 font-bold ${isMobile ? 'w-12 h-12 text-lg' : 'w-10 h-10'}`}
+                                                                        >−</button>
+                                                                        <span className={`text-center font-bold text-green-400 ${isMobile ? 'text-xl' : 'text-lg'}`} title="Number of this variant in your collection">{count}</span>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                if (!originalCardDetail) {
+                                                                                    const key = getCardKey(selectedCard.num);
+                                                                                    setOriginalCardDetail(JSON.parse(JSON.stringify(collection[key] || {})));
+                                                                                }
+                                                                                setCardDetailEdit(true);
+                                                                                addCard(selectedCard.num, variant);
+                                                                            }}
+                                                                            title="Add one card to collection"
+                                                                            className={`bg-green-600 hover:bg-green-700 rounded-lg font-bold ${isMobile ? 'w-12 h-12 text-lg' : 'w-10 h-10'}`}
+                                                                        >+</button>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                             
