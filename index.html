@@ -1920,10 +1920,16 @@ If you cannot find the exact card, provide your best estimate based on similar c
 
             const captureScannerPhoto = async () => {
                 if (!scannerVideoRef.current) return;
+                const video = scannerVideoRef.current;
+                // Wait for video to have actual dimensions
+                if (!video.videoWidth || !video.videoHeight) {
+                    console.warn('Video not ready yet, waiting...');
+                    return;
+                }
                 const canvas = document.createElement('canvas');
-                canvas.width = scannerVideoRef.current.videoWidth;
-                canvas.height = scannerVideoRef.current.videoHeight;
-                canvas.getContext('2d').drawImage(scannerVideoRef.current, 0, 0);
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
                 const compressed = await compressImage(dataUrl, 1200, 0.75);
                 const newImages = [...scannerCapturedImages, compressed];
@@ -1948,10 +1954,11 @@ If you cannot find the exact card, provide your best estimate based on similar c
                 setScannerCapturedImages(prev => prev.filter((_, i) => i !== index));
             };
 
-            // Attach scanner camera stream to video element
-            React.useEffect(() => {
-                if (scannerVideoRef.current && scannerCameraStream) {
-                    scannerVideoRef.current.srcObject = scannerCameraStream;
+            // Callback ref to attach stream as soon as video element mounts
+            const scannerVideoCallbackRef = React.useCallback((node) => {
+                scannerVideoRef.current = node;
+                if (node && scannerCameraStream) {
+                    node.srcObject = scannerCameraStream;
                 }
             }, [scannerCameraStream]);
 
@@ -4348,9 +4355,9 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                             {scannerMode === 'camera' ? (
                                                 <div className="space-y-3">
                                                     {/* Camera viewfinder */}
-                                                    <div className={`bg-slate-900 rounded-xl overflow-hidden relative ${isMobile ? 'h-48' : 'h-80'}`}>
+                                                    <div className={`bg-slate-900 rounded-xl overflow-hidden relative ${isMobile ? 'h-64' : 'h-80'}`}>
                                                         {scannerCameraActive ? (
-                                                            <video ref={scannerVideoRef} autoPlay playsInline muted className="w-full h-full object-contain" />
+                                                            <video ref={scannerVideoCallbackRef} autoPlay playsInline muted className="w-full h-full object-contain" />
                                                         ) : (
                                                             <div className="w-full h-full flex flex-col items-center justify-center">
                                                                 <span className="text-7xl mb-3">📷</span>
