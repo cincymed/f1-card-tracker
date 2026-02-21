@@ -123,21 +123,38 @@
             }
         }
 
-        // Load full collection from localStorage (includes _analyses for value calc)
-        function getLocalCollection() {
+        // Get analyses for a card: prefer collection data (from MongoDB), fall back to localStorage
+        function getCardAnalyses(cardNum, collection) {
+            const cardKey = `card-${cardNum}`;
+            // Check MongoDB-loaded collection first
+            const mongoAnalyses = (collection[cardKey] || {})._analyses;
+            if (mongoAnalyses && Object.keys(mongoAnalyses).length > 0) return mongoAnalyses;
+            // Fall back to localStorage
             try {
-                return JSON.parse(localStorage.getItem('f1-collection-pro-v2') || '{}');
+                const local = JSON.parse(localStorage.getItem('f1-collection-pro-v2') || '{}');
+                return (local[cardKey] || {})._analyses || {};
             } catch (e) {
                 return {};
             }
         }
 
-        // Calculate $-$$$$$ value tier for a card using localStorage analyses
-        function calculateCardValue(cardNum) {
-            const localCollection = getLocalCollection();
+        // Extract max PSA 9 value from analysis text, fallback to Raw max
+        function extractMaxPSA9Value(analysisText) {
+            if (!analysisText) return 0;
+            const clean = analysisText.replace(/\*\*/g, '').replace(/\*/g, '').replace(/[–—]/g, '-');
+            const psa9Match = clean.match(/\bPSA\s*9\b[^:\n]{0,25}:\s*~?(?:approximately\s+)?\$?([\d,]+)\s*-\s*~?\$?([\d,]+)/i);
+            if (psa9Match) return parseInt(psa9Match[2].replace(/,/g, ''));
+            // Fallback to Raw max if no PSA 9 data
+            const rawMatch = clean.match(/\bRaw\b[^:\n]{0,25}:\s*~?(?:approximately\s+)?\$?([\d,]+)\s*-\s*~?\$?([\d,]+)/i);
+            if (rawMatch) return parseInt(rawMatch[2].replace(/,/g, ''));
+            return 0;
+        }
+
+        // Calculate $-$$$$$ value tier for a card
+        function calculateCardValue(cardNum, collection) {
             const cardKey = `card-${cardNum}`;
-            const cardInventory = localCollection[cardKey] || {};
-            const analyses = cardInventory._analyses || {};
+            const cardInventory = collection[cardKey] || {};
+            const analyses = getCardAnalyses(cardNum, collection);
 
             let totalMaxValue = 0;
 
@@ -148,11 +165,8 @@
                 const variantAnalyses = analyses[variant] || [];
                 if (variantAnalyses.length === 0) return;
                 const latestAnalysis = variantAnalyses[variantAnalyses.length - 1];
-                const cleanAnalysis = (latestAnalysis.analysis || '').replace(/\*\*/g, '').replace(/\*/g, '');
-                const rawMatch = cleanAnalysis.match(/Raw[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
-                if (rawMatch) {
-                    totalMaxValue += parseInt(rawMatch[2].replace(/,/g, '')) * count;
-                }
+                const maxVal = extractMaxPSA9Value(latestAnalysis.analysis);
+                if (maxVal > 0) totalMaxValue += maxVal * count;
             });
 
             if (totalMaxValue === 0) return '';
@@ -163,14 +177,36 @@
             return '$$$$$';
         }
 
+        // Calculate total collection value as sum of max PSA 9 values
+        function calculateTotalCollectionValue(collection) {
+            let total = 0;
+            Object.keys(collection).forEach(cardKey => {
+                if (cardKey.startsWith('_') || !cardKey.startsWith('card-')) return;
+                const cardNum = cardKey.replace('card-', '');
+                const cardInventory = collection[cardKey];
+                const analyses = getCardAnalyses(cardNum, collection);
+
+                Object.keys(cardInventory).forEach(variant => {
+                    if (variant.startsWith('_')) return;
+                    const count = cardInventory[variant];
+                    if (count === 0) return;
+                    const variantAnalyses = analyses[variant] || [];
+                    if (variantAnalyses.length === 0) return;
+                    const latestAnalysis = variantAnalyses[variantAnalyses.length - 1];
+                    const maxVal = extractMaxPSA9Value(latestAnalysis.analysis);
+                    if (maxVal > 0) total += maxVal * count;
+                });
+            });
+            return total;
+        }
+
         function calculateStats(collection) {
             let totalCards = 0;
             let uniqueCards = 0;
-            let totalValue = 0;
             const cardsByVariant = {};
 
             Object.keys(collection).forEach(cardKey => {
-                const cardNum = cardKey.replace('card-', '');
+                if (!cardKey.startsWith('card-')) return;
                 const variants = collection[cardKey];
 
                 Object.keys(variants).forEach(variant => {
@@ -188,11 +224,14 @@
                 }
             });
 
+            const currentValue = calculateTotalCollectionValue(collection);
+
             return {
                 totalCards,
                 uniqueCards,
                 cardsByVariant,
-                totalSetCards: cardDatabase.length
+                totalSetCards: cardDatabase.length,
+                currentValue
             };
         }
 
@@ -219,7 +258,7 @@
                 .filter(k => !k.startsWith('_') && variants[k] > 0)
                 .map(v => `${v} (${variants[v]})`)
                 .join(', ');
-            const valueTier = calculateCardValue(cardNum);
+            const valueTier = calculateCardValue(cardNum, collection);
             return { card, totalCount, variantList, subset: card.subset, valueTier };
         }
 
@@ -272,6 +311,15 @@
                 if (filters.total && item.totalCount < parseInt(filters.total)) return false;
                 return true;
             });
+        }
+
+        // Navigate to main UI and filter by variant
+        function navigateToVariant(variant) {
+            localStorage.setItem('filterVariantOnLoad', JSON.stringify({
+                variant: variant,
+                timestamp: Date.now()
+            }));
+            window.location.href = 'index.html';
         }
 
         // Navigate to main UI and open card detail
@@ -481,11 +529,12 @@
                         <!-- Variant Breakdown -->
                         <div class="bg-slate-800 rounded-lg p-6 border border-slate-700 mb-8">
                             <h2 class="text-xl font-bold mb-4">Variant Breakdown</h2>
+                            <div class="text-xs text-slate-500 mb-3">Click a variant to view those cards in the collection.</div>
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 ${Object.entries(stats.cardsByVariant)
                                     .sort((a, b) => b[1] - a[1])
                                     .map(([variant, count]) => `
-                                        <div class="bg-slate-700 rounded p-3">
+                                        <div class="bg-slate-700 rounded p-3 cursor-pointer hover:bg-slate-600 transition-colors" onclick="navigateToVariant('${variant.replace(/'/g, "\\'")}')">
                                             <div class="font-semibold text-sm">${variant}</div>
                                             <div class="text-2xl font-bold text-green-400">${count}</div>
                                         </div>
@@ -497,37 +546,33 @@
                         <!-- Valuation History -->
                         <div class="bg-slate-800 rounded-lg p-6 border border-slate-700 mb-8">
                             <h2 class="text-xl font-bold mb-4">Valuation History</h2>
-                            ${priceHistory.length > 0 ? `
-                                <div class="space-y-4">
-                                    <div class="text-sm text-slate-400 mb-4">
-                                        Total Snapshots: ${priceHistory.length}
-                                    </div>
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div class="bg-slate-700 rounded p-4">
-                                            <div class="text-slate-400 text-sm mb-2">Current Value</div>
-                                            <div class="text-3xl font-bold text-green-400">$${priceHistory[priceHistory.length - 1]?.totalValue || 0}</div>
-                                        </div>
-                                        <div class="bg-slate-700 rounded p-4">
-                                            <div class="text-slate-400 text-sm mb-2">Latest Snapshot</div>
-                                            <div class="text-lg font-semibold">${new Date(priceHistory[priceHistory.length - 1]?.date).toLocaleDateString()}</div>
-                                        </div>
-                                    </div>
-                                    <div class="mt-4">
-                                        <div class="text-sm font-semibold mb-2">Recent History</div>
-                                        <div class="space-y-2 text-sm">
-                                            ${priceHistory.slice(-5).reverse().map(entry => `
-                                                <div class="flex justify-between bg-slate-700 p-2 rounded">
-                                                    <span>${new Date(entry.date).toLocaleDateString()}</span>
-                                                    <span class="font-semibold text-green-400">$${entry.totalValue}</span>
-                                                    <span class="text-slate-400">(${entry.cardCount} cards)</span>
-                                                </div>
-                                            `).join('')}
-                                        </div>
-                                    </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div class="bg-slate-700 rounded p-4">
+                                    <div class="text-slate-400 text-sm mb-2">Current Value <span class="text-xs text-slate-500">(PSA 9 max estimates)</span></div>
+                                    <div class="text-3xl font-bold text-green-400">${stats.currentValue > 0 ? '$' + stats.currentValue.toLocaleString() : 'No data'}</div>
+                                    <div class="text-xs text-slate-500 mt-1">Sum of max PSA 9 values across all owned cards</div>
                                 </div>
-                            ` : `
-                                <div class="text-slate-400">No valuation history yet. Add cards to start tracking!</div>
-                            `}
+                                ${priceHistory.length > 0 ? `
+                                    <div class="bg-slate-700 rounded p-4">
+                                        <div class="text-slate-400 text-sm mb-2">Latest Snapshot</div>
+                                        <div class="text-lg font-semibold">${new Date(priceHistory[priceHistory.length - 1]?.date).toLocaleDateString()}</div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            ${priceHistory.length > 0 ? `
+                                <div class="text-sm text-slate-400 mb-2">
+                                    Total Snapshots: ${priceHistory.length}
+                                </div>
+                                <div class="space-y-2 text-sm">
+                                    ${priceHistory.slice(-5).reverse().map(entry => `
+                                        <div class="flex justify-between bg-slate-700 p-2 rounded">
+                                            <span>${new Date(entry.date).toLocaleDateString()}</span>
+                                            <span class="font-semibold text-green-400">$${entry.totalValue}</span>
+                                            <span class="text-slate-400">(${entry.cardCount} cards)</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
                         </div>
 
                         <!-- Collection Table -->
