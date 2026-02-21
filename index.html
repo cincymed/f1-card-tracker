@@ -1298,21 +1298,13 @@ Base your analysis on current 2025 market data from web search.`
                 try {
                     setLoadingCardDetails(true);
                     
-                    // Use Claude API with web search to find card details
-                    const response = await fetch('https://api.anthropic.com/v1/messages', {
+                    // Use Claude API via backend proxy to find card details
+                    const response = await fetch(API_URL, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
+                        headers: getAuthHeaders(),
                         body: JSON.stringify({
-                            model: 'claude-opus-4-5-20251101',
+                            model: 'claude-sonnet-4-5-20250929',
                             max_tokens: 500,
-                            tools: [
-                                {
-                                    type: 'web_search',
-                                    name: 'web_search'
-                                }
-                            ],
                             messages: [{
                                 role: 'user',
                                 content: `Find information about 2025 Topps Chrome F1 card #${cardNum}. Respond ONLY with JSON in this format:
