@@ -87,16 +87,29 @@
             padding-left: 0;
         }
         .page-menu-item {
-            padding: 10px 16px;
+            padding: 10px 18px;
             cursor: pointer;
-            color: #cbd5e1;
+            color: #94a3b8;
             text-align: left;
-            font-size: 14px;
-            border-bottom: 1px solid #334155;
-            transition: background 0.15s;
+            font-size: 13px;
+            font-weight: 500;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+            transition: all 0.15s ease;
+            letter-spacing: 0.02em;
         }
         .page-menu-item:hover {
-            background: #334155 !important;
+            background: rgba(59, 130, 246, 0.15) !important;
+            color: #e2e8f0 !important;
+            padding-left: 22px;
+        }
+        .page-menu-item:last-child {
+            border-bottom: none;
+        }
+        .page-menu-item.active {
+            background: linear-gradient(135deg, #1e40af, #3b82f6) !important;
+            color: #ffffff !important;
+            font-weight: 700;
+            border-left: 3px solid #60a5fa;
         }
         .hamburger:hover { color: #60a5fa; transition: color 0.2s; }
         .dropdown-menu { position: absolute; top: 60px; left: 16px; background: #1e293b; border: 1px solid #475569; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); z-index: 1000; min-width: 160px; }
@@ -510,7 +523,7 @@
                 // Section headers: ALL CAPS words (with optional colon and parenthetical notes)
                 const isAllCapsHeader = /^[A-Z][A-Z\s&/,]{3,}(\([^)]*\))?:?\s*$/.test(cleaned) && cleaned.length < 80;
                 // Also match known section headers that may be mixed case (from Opus responses)
-                const knownSections = ['CARD IDENTIFICATION', 'VARIANT & RARITY', 'VALUE ESTIMATES', 'VALUE SOURCES & DERIVATION', 'VALUE SOURCES', 'COLLECTIBILITY', 'WEB SEARCH FINDINGS', 'MARKET ANALYSIS', 'INVESTMENT POTENTIAL', 'COMPARABLE SALES', 'RECENT SALES', 'SOURCES', 'MARKET TRENDS', 'RARITY'];
+                const knownSections = ['CARD IDENTIFICATION', 'VARIANT & RARITY', 'VALUE ESTIMATES', 'VALUE SOURCES & DERIVATION', 'VALUE SOURCES', 'COLLECTIBILITY', 'WEB SEARCH FINDINGS', 'MARKET ANALYSIS', 'INVESTMENT POTENTIAL', 'COMPARABLE SALES', 'RECENT SALES', 'SOURCES', 'MARKET TRENDS', 'RARITY', 'TOP COMPARABLE SALES'];
                 const cleanedUpper = cleaned.replace(/:$/, '').replace(/\s*\([^)]*\)\s*$/, '').trim();
                 const isKnownSection = knownSections.includes(cleanedUpper.toUpperCase());
                 // Match markdown headers that were ## style
@@ -538,6 +551,23 @@
                             <span className="text-slate-400 font-medium">{label}:</span>
                             <span className={`font-bold ${colorClass}`}>{value}</span>
                             {rest && <span className="text-slate-500 text-xs">{rest}</span>}
+                        </div>
+                    );
+                    return;
+                }
+
+                // Comparable sale lines: "1. #XXX variant - $Y on date (source)" or "#XXX variant - $Y on date (source)"
+                const saleMatch = cleaned.match(/^(?:\d+\.\s*)?#(\d+)\s+(.+?)\s*[-–—]\s*\$?([\d,]+(?:\.\d{2})?)\s+on\s+(.+?)\s*\(([^)]+)\)\s*$/i);
+                if (saleMatch) {
+                    elements.push(
+                        <div key={idx} className="text-xs ml-3 flex items-start gap-1.5 py-0.5">
+                            <span className="text-amber-400 mt-0.5">💲</span>
+                            <span>
+                                <span className="text-blue-300 font-medium">#{saleMatch[1]} {saleMatch[2]}</span>
+                                <span className="text-green-400 font-bold"> ${saleMatch[3]}</span>
+                                <span className="text-slate-400"> on {saleMatch[4]}</span>
+                                <span className="text-emerald-400/70 text-xs"> ({saleMatch[5]})</span>
+                            </span>
                         </div>
                     );
                     return;
@@ -1289,11 +1319,20 @@ ${card.rookie ? 'This is a ROOKIE card' : ''}
 
 Please provide:
 1. Current market value range (Raw, PSA 9, PSA 10)
-2. 1-3 credible sources with specific details:
-   - Recent comparable sales (e.g., "eBay: 3 sales at $5-8 in last 30 days")
-   - Include web source URLs or references
-   - Show how averages were calculated
-3. Brief explanation of market factors affecting value
+2. Brief explanation of market factors affecting value
+
+VALUE ESTIMATES:
+Raw: $X-Y
+PSA 9: $X-Y
+PSA 10: $X-Y
+
+COMPARABLE SALES:
+List the top 5 most pertinent recent sales. Sort by closest match to this card # and variant first, then by most recent date. For each sale include:
+- Card # and variant sold
+- Sale date
+- Sale price
+- Data source (eBay, PSA Price Guide, TCGPlayer, COMC, Beckett, 130point, etc.)
+Format each as: "#[card#] [variant] - $[price] on [date] ([source])"
 
 VALUE WEIGHTING PRIORITY (most to least important):
 - Sales of this EXACT card (same year, driver/card #, subset, variant) carry the MOST weight
@@ -1301,7 +1340,7 @@ VALUE WEIGHTING PRIORITY (most to least important):
 - Then sales of similar cards (same set, comparable drivers/variants)
 - General market trends carry least weight
 
-Keep response under 150 words total, include source names and dates when available.`
+Keep response under 200 words total.`
                             }]
                         })
                     });
@@ -1363,12 +1402,15 @@ Raw: $X-Y
 PSA 9: $X-Y  
 PSA 10: $X-Y
 
+COMPARABLE SALES:
+List the top 5 most pertinent recent sales you can find. Sort by closest match to this card # and variant first, then by most recent sale date. For each sale include:
+1. Card # and variant sold
+2. Sale date
+3. Sale price
+4. Data source (eBay, PSA Price Guide, TCGPlayer, COMC, Beckett, 130point, StockX, etc.)
+Format each as a numbered line: "1. #[card#] [variant] - $[price] on [date] ([source])"
+
 VALUE SOURCES & DERIVATION:
-- List up to 3 credible sources with specific comparable sales data:
-  * eBay completed sales: Include specific listings found (e.g., "3 Base cards sold $5-8 in last 30 days")
-  * PSA Price Guide values with dates
-  * TCGPlayer or other market data with URLs/references
-- Show exact sales data: "Comparable card #XXX Refractor sold for $Y on [Date] on [Source]"
 - Include calculation method: "Average of X comparable sales across Y sources"
 - Note any market condition factors affecting the estimate
 
@@ -1378,8 +1420,6 @@ VALUE WEIGHTING PRIORITY (most to least important):
 - Then sales of similar cards (same set, comparable drivers/variants)
 - General market trends carry least weight
 - Always prioritize and clearly cite exact card match sales when available
-
-Example format: "Values based on 5 recent eBay sales ($5-8 avg, Feb 2025), PSA guide ($7-10), and TCGPlayer listings ($6-9). Card #161 Base shows strong demand due to rookie status."
 
 IMPORTANT: Do NOT use trailing commas after value ranges.
 
@@ -2243,7 +2283,7 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
   "variant": "exact variant (Base, Refractor, Purple /299, Blue /150, Green /99, Gold /50, Orange /25, Red /5, SuperFractor 1/1, Black /10, Magenta /250, Gold Wave /75, Printing Plate 1/1)",
   "isRookie": true/false,
   "confidence": "high/medium/low",
-  "analysis": "CARD IDENTIFICATION:\\n[Back image card number and driver verification]\\n\\nWEB SEARCH FINDINGS:\\n[2025 Topps Chrome F1 market data for this card and variant]\\n\\nVARIANT & RARITY:\\n[Specific variant analysis]\\n\\nVALUE ESTIMATES (2025 Topps Chrome F1):\\nRaw: $X-Y\\nPSA 9: $X-Y\\nPSA 10: $X-Y\\n\\nVALUE SOURCES & DERIVATION:\\n[Weight most heavily: sales of this EXACT card (year, driver/card #, subset, variant)]\\n[Then: same driver different variants, then similar cards in set]\\n[List 1-3 credible sources with comparable sales data]\\n[Include: eBay recent sales (e.g. 3 sold $5-8 Feb 2025), PSA guide, TCGPlayer prices]\\n[Show specific comparable: Card #XXX variant sold for $Y on [Date]]\\n[Calculation: Average of X comparable sales]\\nExample: 'eBay: 5 Base cards $5-8 avg (Feb), PSA guide $7-10, TCGPlayer $6-9. #161 Base up 15% due to rookie demand'\\n\\nCOLLECTIBILITY:\\n[Why collectors want this, market trends]"
+  "analysis": "CARD IDENTIFICATION:\\n[Back image card number and driver verification]\\n\\nWEB SEARCH FINDINGS:\\n[2025 Topps Chrome F1 market data for this card and variant]\\n\\nVARIANT & RARITY:\\n[Specific variant analysis]\\n\\nVALUE ESTIMATES (2025 Topps Chrome F1):\\nRaw: $X-Y\\nPSA 9: $X-Y\\nPSA 10: $X-Y\\n\\nCOMPARABLE SALES:\\n1. #[card#] [variant] - $[price] on [date] ([source])\\n2. #[card#] [variant] - $[price] on [date] ([source])\\n3. #[card#] [variant] - $[price] on [date] ([source])\\n4. #[card#] [variant] - $[price] on [date] ([source])\\n5. #[card#] [variant] - $[price] on [date] ([source])\\n[List top 5 most pertinent sales sorted by closest match to card/variant then most recent date. Include card #, variant, sale price, date, and data source (eBay, PSA Price Guide, TCGPlayer, COMC, Beckett, 130point, etc.)]\\n\\nVALUE SOURCES & DERIVATION:\\n[Calculation: Average of X comparable sales]\\n\\nCOLLECTIBILITY:\\n[Why collectors want this, market trends]"
 }`
                     });
                     
@@ -2556,12 +2596,14 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                 // Strip markdown formatting before regex matching
                 const cleanText = analysisText.replace(/\*\*/g, '').replace(/\*/g, '').replace(/^#+\s*/gm, '');
 
-                const rawMatch = cleanText.match(/Raw[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
-                const psa9Match = cleanText.match(/PSA\s*9[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
-                const psa10Match = cleanText.match(/PSA\s*10[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
-                
+                // More robust patterns to handle various Opus/Sonnet output formats
+                // Handles: "Raw: $5-$10", "Raw (ungraded): $5-10", "Raw value: ~$5-$10", "Raw: approximately $5 - $10"
+                const rawMatch = cleanText.match(/Raw[^:\n]*?[:\s]+~?(?:approximately\s+)?\$?([\d,]+)\s*[-–—to]+\s*~?\$?([\d,]+)/i);
+                const psa9Match = cleanText.match(/PSA\s*9[^:\n]*?[:\s]+~?(?:approximately\s+)?\$?([\d,]+)\s*[-–—to]+\s*~?\$?([\d,]+)/i);
+                const psa10Match = cleanText.match(/PSA\s*10[^:\n]*?[:\s]+~?(?:approximately\s+)?\$?([\d,]+)\s*[-–—to]+\s*~?\$?([\d,]+)/i);
+
                 if (!rawMatch && !psa9Match && !psa10Match) return null;
-                
+
                 return {
                     raw: rawMatch ? `$${rawMatch[1]}-$${rawMatch[2]}` : 'N/A',
                     psa9: psa9Match ? `$${psa9Match[1]}-$${psa9Match[2]}` : 'N/A',
@@ -3109,19 +3151,30 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                         // Show page selection menu
                                                         const pageCount = Math.ceil(filteredCards.length / 12);
                                                         const pageMenuItems = Array.from({length: pageCount}).map((_, i) => `
-                                                            <div class="page-menu-item" data-page="${i}" style="${i === groupIndex ? 'background: #1e40af; color: white; font-weight: bold;' : 'background: #1e293b;'}">
-                                                                Page ${i + 1}
+                                                            <div class="page-menu-item ${i === groupIndex ? 'active' : ''}" data-page="${i}">
+                                                                <span style="display: flex; align-items: center; gap: 8px;">
+                                                                    ${i === groupIndex ? '<span style="font-size: 10px;">▸</span>' : '<span style="font-size: 10px; opacity: 0.3;">·</span>'}
+                                                                    Page ${i + 1}
+                                                                </span>
                                                             </div>
                                                         `).join('');
-                                                        
+
                                                         const menuHtml = `
-                                                            <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 9999;" id="pageMenuOverlay">
-                                                                <div style="position: fixed; left: 80px; top: 280px; background: #1e293b; border: 1px solid #475569; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); z-index: 10000; max-height: 400px; overflow-y: auto; min-width: 130px;" id="pageMenu">
+                                                            <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 9999; backdrop-filter: blur(2px); background: rgba(0,0,0,0.3);" id="pageMenuOverlay">
+                                                                <div style="position: fixed; left: 80px; top: 240px; background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 20px rgba(59, 130, 246, 0.1); z-index: 10000; max-height: 420px; overflow-y: auto; min-width: 150px; scrollbar-width: thin; scrollbar-color: #334155 transparent;" id="pageMenu">
+                                                                    <div style="padding: 10px 18px 8px; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 1px solid rgba(51, 65, 85, 0.5);">Jump to Page</div>
                                                                     ${pageMenuItems}
                                                                 </div>
                                                             </div>
                                                         `;
                                                         document.body.insertAdjacentHTML('beforeend', menuHtml);
+
+                                                        // Scroll the menu to show current page centered
+                                                        const menuEl = document.getElementById('pageMenu');
+                                                        const activeItem = menuEl?.querySelector('.page-menu-item.active');
+                                                        if (activeItem && menuEl) {
+                                                            activeItem.scrollIntoView({ block: 'center', behavior: 'instant' });
+                                                        }
                                                         
                                                         // Add event listeners to menu items
                                                         document.querySelectorAll('.page-menu-item').forEach(item => {
@@ -3462,21 +3515,34 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                             onClick={async (e) => {
                                                                                 e.stopPropagation();
                                                                                 const analyzeKey = `${selectedCard.num}-${variant}`;
+                                                                                const cardKey = getCardKey(selectedCard.num);
                                                                                 setAnalyzingCards(prev => ({ ...prev, [analyzeKey]: true }));
                                                                                 try {
                                                                                     const newAnalysis = await analyzeCardValue(selectedCard.num, variant);
                                                                                     if (newAnalysis) {
-                                                                                        const key = getCardKey(selectedCard.num);
-                                                                                        const updatedCollection = { ...collection };
-                                                                                        if (!updatedCollection[key]._analyses) updatedCollection[key]._analyses = {};
-                                                                                        if (!updatedCollection[key]._analyses[variant]) updatedCollection[key]._analyses[variant] = [];
-                                                                                        updatedCollection[key]._analyses[variant].push({
-                                                                                            id: Date.now(),
-                                                                                            addedDate: new Date().toISOString(),
-                                                                                            analysis: newAnalysis
+                                                                                        // Use functional updater to avoid stale closure
+                                                                                        setCollection(prevCollection => {
+                                                                                            const updatedCollection = JSON.parse(JSON.stringify(prevCollection));
+                                                                                            if (!updatedCollection[cardKey]) updatedCollection[cardKey] = {};
+                                                                                            if (!updatedCollection[cardKey]._analyses) updatedCollection[cardKey]._analyses = {};
+                                                                                            if (!updatedCollection[cardKey]._analyses[variant]) updatedCollection[cardKey]._analyses[variant] = [];
+                                                                                            updatedCollection[cardKey]._analyses[variant].push({
+                                                                                                id: Date.now(),
+                                                                                                addedDate: new Date().toISOString(),
+                                                                                                analysis: newAnalysis,
+                                                                                                source: 'sonnet'
+                                                                                            });
+                                                                                            // Persist: trim, save to localStorage, sync to MongoDB
+                                                                                            trimAnalyses(updatedCollection, 3);
+                                                                                            localStorage.setItem('f1-collection-pro-v2', JSON.stringify(updatedCollection));
+                                                                                            const mongoData = stripMetadataForMongo(updatedCollection);
+                                                                                            fetch(`https://f1-card-tracker-backend-1.onrender.com/api/collection/cincymed-f1-collection`, {
+                                                                                                method: 'POST',
+                                                                                                headers: getAuthHeaders(),
+                                                                                                body: JSON.stringify({ cards: mongoData })
+                                                                                            }).catch(err => console.error('MongoDB sync error:', err));
+                                                                                            return updatedCollection;
                                                                                         });
-                                                                                        setCollection(updatedCollection);
-                                                                                        saveCollection(updatedCollection);
                                                                                     }
                                                                                 } catch (error) {
                                                                                     console.error('Analysis error:', error);
@@ -3498,21 +3564,34 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                             onClick={async (e) => {
                                                                                 e.stopPropagation();
                                                                                 const analyzeKey = `${selectedCard.num}-${variant}`;
+                                                                                const cardKey = getCardKey(selectedCard.num);
                                                                                 setAnalyzingCards(prev => ({ ...prev, [analyzeKey]: true }));
                                                                                 try {
                                                                                     const newAnalysis = await reanalyzeCardValue(selectedCard.num, variant);
                                                                                     if (newAnalysis) {
-                                                                                        const key = getCardKey(selectedCard.num);
-                                                                                        const updatedCollection = { ...collection };
-                                                                                        if (!updatedCollection[key]._analyses) updatedCollection[key]._analyses = {};
-                                                                                        if (!updatedCollection[key]._analyses[variant]) updatedCollection[key]._analyses[variant] = [];
-                                                                                        updatedCollection[key]._analyses[variant].push({
-                                                                                            id: Date.now(),
-                                                                                            addedDate: new Date().toISOString(),
-                                                                                            analysis: newAnalysis
+                                                                                        // Use functional updater to avoid stale closure after long API call
+                                                                                        setCollection(prevCollection => {
+                                                                                            const updatedCollection = JSON.parse(JSON.stringify(prevCollection));
+                                                                                            if (!updatedCollection[cardKey]) updatedCollection[cardKey] = {};
+                                                                                            if (!updatedCollection[cardKey]._analyses) updatedCollection[cardKey]._analyses = {};
+                                                                                            if (!updatedCollection[cardKey]._analyses[variant]) updatedCollection[cardKey]._analyses[variant] = [];
+                                                                                            updatedCollection[cardKey]._analyses[variant].push({
+                                                                                                id: Date.now(),
+                                                                                                addedDate: new Date().toISOString(),
+                                                                                                analysis: newAnalysis,
+                                                                                                source: 'opus'
+                                                                                            });
+                                                                                            // Persist: trim, save to localStorage, sync to MongoDB
+                                                                                            trimAnalyses(updatedCollection, 3);
+                                                                                            localStorage.setItem('f1-collection-pro-v2', JSON.stringify(updatedCollection));
+                                                                                            const mongoData = stripMetadataForMongo(updatedCollection);
+                                                                                            fetch(`https://f1-card-tracker-backend-1.onrender.com/api/collection/cincymed-f1-collection`, {
+                                                                                                method: 'POST',
+                                                                                                headers: getAuthHeaders(),
+                                                                                                body: JSON.stringify({ cards: mongoData })
+                                                                                            }).catch(err => console.error('MongoDB sync error:', err));
+                                                                                            return updatedCollection;
                                                                                         });
-                                                                                        setCollection(updatedCollection);
-                                                                                        saveCollection(updatedCollection);
                                                                                     }
                                                                                 } catch (error) {
                                                                                     console.error('Analysis error:', error);
@@ -3604,6 +3683,15 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                             className="font-semibold text-blue-400 text-sm flex items-center gap-1 hover:text-blue-300 transition-colors"
                                                                         >
                                                                             💎 Card Value Analysis
+                                                                            {latestAnalysis.source && (
+                                                                                <span className={`text-xs px-1.5 py-0.5 rounded-full ml-1 ${
+                                                                                    latestAnalysis.source === 'opus'
+                                                                                        ? 'bg-purple-600/40 text-purple-300'
+                                                                                        : 'bg-blue-600/40 text-blue-300'
+                                                                                }`}>
+                                                                                    {latestAnalysis.source === 'opus' ? 'Opus' : 'Sonnet'}
+                                                                                </span>
+                                                                            )}
                                                                             <span className="text-xs">{collapsedSections[`analysis-${selectedCard.num}-${variant}`] ? '▼' : '▲'}</span>
                                                                         </button>
                                                                     </div>
@@ -4403,24 +4491,24 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                     <div className="flex gap-2 justify-center">
                                                         <span className="text-sm text-slate-400 self-center">Use analysis from:</span>
                                                         <button
-                                                            onClick={() => setSelectedAnalysisSource('opus')}
-                                                            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                                                                selectedAnalysisSource === 'opus' 
-                                                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/50' 
-                                                                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                                                            }`}
-                                                        >
-                                                            ⚡ Opus
-                                                        </button>
-                                                        <button
                                                             onClick={() => setSelectedAnalysisSource('sonnet')}
                                                             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                                                                selectedAnalysisSource === 'sonnet' 
-                                                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/50' 
+                                                                selectedAnalysisSource === 'sonnet'
+                                                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/50'
                                                                     : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                                                             }`}
                                                         >
-                                                            🔍 Sonnet
+                                                            ⚡ Sonnet
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setSelectedAnalysisSource('opus')}
+                                                            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                                                                selectedAnalysisSource === 'opus'
+                                                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/50'
+                                                                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                                            }`}
+                                                        >
+                                                            🔍 Opus
                                                         </button>
                                                     </div>
                                                 )}
@@ -4429,34 +4517,34 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                 <div>
                                                     <h4 className="font-semibold text-slate-200 mb-3">📊 Analysis Comparison</h4>
                                                     <div className={`grid ${isMobile ? 'grid-cols-1' : deepAnalysis ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
-                                                        {/* Analysis (Opus) */}
+                                                        {/* Initial Analysis (Sonnet) */}
                                                         {recognizedCard.analysis && (
                                                             <div className={`p-4 rounded-lg transition-all ${
-                                                                selectedAnalysisSource === 'sonnet' && deepAnalysis
-                                                                    ? 'bg-purple-900/20 border border-purple-500/30'
-                                                                    : 'bg-blue-900/40 border-2 border-blue-400 shadow-lg shadow-blue-500/30'
+                                                                selectedAnalysisSource === 'sonnet' || !deepAnalysis
+                                                                    ? 'bg-blue-900/40 border-2 border-blue-400 shadow-lg shadow-blue-500/30'
+                                                                    : 'bg-blue-900/20 border border-blue-500/30'
                                                             }`}>
                                                                 <div className="flex items-center justify-between mb-2">
-                                                                    <h5 className="font-semibold text-blue-400">⚡ Analysis (Opus)</h5>
-                                                                    {selectedAnalysisSource === 'opus' && deepAnalysis && (
+                                                                    <h5 className="font-semibold text-blue-400">⚡ Analysis (Sonnet)</h5>
+                                                                    {selectedAnalysisSource === 'sonnet' && deepAnalysis && (
                                                                         <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">SELECTED</span>
                                                                     )}
                                                                 </div>
                                                                 <div className="text-slate-300 leading-relaxed">{formatAnalysisText(recognizedCard.analysis)}</div>
                                                             </div>
                                                         )}
-                                                        
-                                                        {/* Analysis (Sonnet) */}
+
+                                                        {/* Deep Analysis (Opus) */}
                                                         {deepAnalysis && (
                                                             <div className={`p-4 rounded-lg transition-all ${
-                                                                selectedAnalysisSource === 'sonnet'
-                                                                    ? 'bg-purple-900/40 border-2 border-purple-400 shadow-lg shadow-purple-500/30'
-                                                                    : 'bg-purple-900/20 border border-purple-500/30'
+                                                                selectedAnalysisSource === 'opus'
+                                                                    ? 'bg-blue-900/40 border-2 border-blue-400 shadow-lg shadow-blue-500/30'
+                                                                    : 'bg-blue-900/20 border border-blue-500/30'
                                                             }`}>
                                                                 <div className="flex items-center justify-between mb-2">
-                                                                    <h5 className="font-semibold text-purple-400">🔍 Analysis (Sonnet)</h5>
-                                                                    {selectedAnalysisSource === 'sonnet' && (
-                                                                        <span className="text-xs bg-purple-600 text-white px-2 py-1 rounded-full">SELECTED</span>
+                                                                    <h5 className="font-semibold text-blue-400">🔍 Analysis (Opus)</h5>
+                                                                    {selectedAnalysisSource === 'opus' && (
+                                                                        <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">SELECTED</span>
                                                                     )}
                                                                 </div>
                                                                 <div className="text-slate-300 leading-relaxed">{formatAnalysisText(deepAnalysis)}</div>
