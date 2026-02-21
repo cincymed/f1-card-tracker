@@ -3201,6 +3201,34 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                 setShowMenuDropdown(false);
             };
 
+            // Force-push whatever is in this device's localStorage to MongoDB.
+            // Use this on mobile when a card was scanned but didn't sync to the cloud.
+            const forcePushToCloud = async () => {
+                setShowMenuDropdown(false);
+                const localRaw = localStorage.getItem('f1-collection-pro-v2');
+                if (!localRaw) {
+                    alert('❌ No local collection found to push.');
+                    return;
+                }
+                try {
+                    const localColl = JSON.parse(localRaw);
+                    const mongoData = stripMetadataForMongo(localColl);
+                    const cardCount = Object.keys(localColl).filter(k => k.startsWith('card-')).length;
+
+                    const res = await fetch(
+                        'https://f1-card-tracker-backend-1.onrender.com/api/collection/cincymed-f1-collection',
+                        { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ cards: mongoData }) }
+                    );
+                    if (res.ok) {
+                        alert(`☁️ Pushed to cloud!\n${cardCount} cards uploaded from this device.\n\nDesktop will pick up changes within 60 seconds, or use Force Reload on the laptop.`);
+                    } else {
+                        alert(`❌ Push failed (${res.status}). Check your connection and try again.`);
+                    }
+                } catch (err) {
+                    alert('❌ Push failed: ' + err.message);
+                }
+            };
+
             // Retry-aware MongoDB POST — handles Render.com cold starts (up to 3 attempts).
             const saveToMongoDB = (mongoData) => {
                 const id = 'cincymed-f1-collection';
@@ -3487,6 +3515,9 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                         📤 Export
                                                     </div>
                                                     <div className="dropdown-spacer"></div>
+                                                    <div className="dropdown-item" onClick={forcePushToCloud}>
+                                                        ☁️ Push to Cloud
+                                                    </div>
                                                     <div className="dropdown-item" onClick={forceReloadCollection}>
                                                         🔄 Force Reload
                                                     </div>
