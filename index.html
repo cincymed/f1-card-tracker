@@ -1438,7 +1438,8 @@
 
             // Strip _analyses and _gradeReports from collection for MongoDB storage.
             // MongoDB has a 16MB document size limit; analyses grow unboundedly and
-            // can easily exceed it. Card counts are tiny; analyses live in localStorage.
+            // can easily exceed it. Card counts are tiny; analyses live in localStorage
+            // and are preserved by mergeMongoWithLocal on each device.
             const stripMetadataForMongo = (coll) => {
                 const stripped = {};
                 Object.keys(coll).forEach(cardKey => {
@@ -1446,17 +1447,12 @@
                     const cardData = coll[cardKey];
                     const cardEntry = {};
                     Object.keys(cardData).forEach(key => {
-                        if (key === '_analyses') {
-                            // Include analyses in MongoDB for persistence
-                            cardEntry._analyses = cardData._analyses;
-                        } else if (key === '_gradeReports') {
-                            // Include grade reports in MongoDB for persistence
-                            cardEntry._gradeReports = cardData._gradeReports;
-                        } else if (!key.startsWith('_')) {
+                        // Only include variant counts — skip all _-prefixed metadata
+                        if (!key.startsWith('_')) {
                             cardEntry[key] = cardData[key];
                         }
                     });
-                    if (Object.keys(cardEntry).filter(k => !k.startsWith('_')).length > 0) {
+                    if (Object.keys(cardEntry).length > 0) {
                         stripped[cardKey] = cardEntry;
                     }
                 });
@@ -1573,12 +1569,12 @@
                     localStorage.setItem('f1-collection-pro-v2', jsonStr);
                     console.log('✅ Saved to localStorage:', jsonStr.length, 'bytes');
 
-                    // Save counts + analyses + gradeReports to MongoDB for persistence.
-                    // Analyses are trimmed to last 3 per variant to keep payload manageable.
+                    // Save counts-only to MongoDB (no analyses/gradeReports).
+                    // Analyses live in localStorage and are preserved by mergeMongoWithLocal.
                     const mongoData = stripMetadataForMongo(cleanedCollection);
 
                     const mongoPayloadSize = JSON.stringify({ cards: mongoData }).length;
-                    console.log('📤 MongoDB payload size:', mongoPayloadSize, 'bytes (counts + analyses)');
+                    console.log('📤 MongoDB payload size:', mongoPayloadSize, 'bytes (counts only)');
 
                     saveToMongoDB(mongoData);
                     
