@@ -978,6 +978,11 @@
             const [gradeCameraAutoOpen, setGradeCameraAutoOpen] = useState(() => localStorage.getItem('f1-grade-camera-auto') === 'true');  // Persist camera toggle
             const [gradeCardContext, setGradeCardContext] = useState(null);  // {cardNum, variant} being graded
             const [returnTo, setReturnTo] = useState(null);  // Track where user came from (e.g. 'dashboard')
+            const [scannerCameraActive, setScannerCameraActive] = useState(false);  // Scanner camera live view
+            const [scannerCameraStream, setScannerCameraStream] = useState(null);  // Scanner camera stream
+            const [scannerCapturedImages, setScannerCapturedImages] = useState([]);  // Images captured from scanner camera
+            const [scannerMode, setScannerMode] = useState('camera');  // 'camera' or 'upload'
+            const scannerVideoRef = React.useRef(null);
 
             // Make current state accessible to chatbot with debugging
             useEffect(() => {
@@ -1889,6 +1894,75 @@ If you cannot find the exact card, provide your best estimate based on similar c
                     img.src = dataUrl;
                 });
             };
+
+            // Scanner camera functions
+            const startScannerCamera = async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+                    });
+                    setScannerCameraStream(stream);
+                    setScannerCameraActive(true);
+                } catch (err) {
+                    console.error('Camera access error:', err);
+                    alert('Could not access camera. Please use file upload instead.');
+                    setScannerMode('upload');
+                }
+            };
+
+            const stopScannerCamera = () => {
+                if (scannerCameraStream) {
+                    scannerCameraStream.getTracks().forEach(track => track.stop());
+                    setScannerCameraStream(null);
+                }
+                setScannerCameraActive(false);
+            };
+
+            const captureScannerPhoto = async () => {
+                if (!scannerVideoRef.current) return;
+                const canvas = document.createElement('canvas');
+                canvas.width = scannerVideoRef.current.videoWidth;
+                canvas.height = scannerVideoRef.current.videoHeight;
+                canvas.getContext('2d').drawImage(scannerVideoRef.current, 0, 0);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                const compressed = await compressImage(dataUrl, 1200, 0.75);
+                const newImages = [...scannerCapturedImages, compressed];
+                setScannerCapturedImages(newImages);
+
+                if (newImages.length >= 2) {
+                    // Have both front and back — stop camera and recognize
+                    stopScannerCamera();
+                    setUploadedImages(newImages);
+                    recognizeCard(newImages);
+                }
+            };
+
+            const submitScannerImages = () => {
+                if (scannerCapturedImages.length === 0) return;
+                stopScannerCamera();
+                setUploadedImages(scannerCapturedImages);
+                recognizeCard(scannerCapturedImages);
+            };
+
+            const removeScannerImage = (index) => {
+                setScannerCapturedImages(prev => prev.filter((_, i) => i !== index));
+            };
+
+            // Attach scanner camera stream to video element
+            React.useEffect(() => {
+                if (scannerVideoRef.current && scannerCameraStream) {
+                    scannerVideoRef.current.srcObject = scannerCameraStream;
+                }
+            }, [scannerCameraStream]);
+
+            // Stop camera when scanner modal closes
+            React.useEffect(() => {
+                if (!showImageUpload && scannerCameraActive) {
+                    stopScannerCamera();
+                    setScannerCapturedImages([]);
+                    setScannerMode('camera');
+                }
+            }, [showImageUpload]);
 
             const handleImageUpload = async (event) => {
                 const files = Array.from(event.target.files);
@@ -4080,6 +4154,9 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                         {showImageUpload && (
                             <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
                                 onClick={() => {
+                                    stopScannerCamera();
+                                    setScannerCapturedImages([]);
+                                    setScannerMode('camera');
                                     setShowImageUpload(false);
                                     setUploadedImages([]);
                                     setPendingImages([]);
@@ -4096,6 +4173,9 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                         <h2 className="text-2xl font-bold">📷 AI Scanner</h2>
                                         <button
                                             onClick={() => {
+                                                stopScannerCamera();
+                                                setScannerCapturedImages([]);
+                                                setScannerMode('camera');
                                                 setShowImageUpload(false);
                                                 setUploadedImages([]);
                                                 setPendingImages([]);
@@ -4244,27 +4324,130 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                         </div>
                                     )}
                                     
-                                    <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageUpload} multiple className="hidden" />
-                                    
+                                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} multiple className="hidden" />
+
                                     <>
                                     {!uploadedImages || uploadedImages.length === 0 && !recognizedCard ? (
                                         <>
-                                            <button onClick={() => fileInputRef.current?.click()} className={`w-full border-2 border-dashed border-slate-600 rounded-xl flex flex-col items-center justify-center hover:border-blue-500 transition-colors bg-slate-900/50 ${isMobile ? 'h-48' : 'h-80'}`}>
-                                                <span className={`text-slate-300 mb-3 font-semibold ${isMobile ? 'text-sm' : 'text-base'}`}>📸 Upload Card Images</span>
-                                                <span className="text-7xl mb-3">📷</span>
-                                                <span className="text-slate-400 text-sm text-center px-4 font-semibold">Upload BOTH front and back images</span>
-                                                <span className="text-slate-500 text-xs text-center px-4 mt-2">The back image's card number guides AI analysis</span>
-                                            </button>
-                                            <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mt-4">
-                                                <p className="text-sm font-semibold text-blue-400 mb-2">
-                                                    ✨ How to Get Best Results:
-                                                </p>
-                                                <ul className="text-xs text-slate-300 space-y-1">
-                                                    <li>✓ <strong>Upload 2 images:</strong> First the front, then the back</li>
-                                                    <li>✓ <strong>Back image is crucial:</strong> Contains the card number</li>
-                                                    <li>✓ <strong>Good lighting:</strong> Ensures card details are visible</li>
-                                                </ul>
+                                            {/* Mode toggle: Camera vs Upload */}
+                                            <div className="flex gap-2 mb-4">
+                                                <button
+                                                    onClick={() => setScannerMode('camera')}
+                                                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${scannerMode === 'camera' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                                                >
+                                                    📷 Camera
+                                                </button>
+                                                <button
+                                                    onClick={() => { stopScannerCamera(); setScannerMode('upload'); }}
+                                                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${scannerMode === 'upload' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                                                >
+                                                    📁 Upload Files
+                                                </button>
                                             </div>
+
+                                            {scannerMode === 'camera' ? (
+                                                <div className="space-y-3">
+                                                    {/* Camera viewfinder */}
+                                                    <div className={`bg-slate-900 rounded-xl overflow-hidden relative ${isMobile ? 'h-48' : 'h-80'}`}>
+                                                        {scannerCameraActive ? (
+                                                            <video ref={scannerVideoRef} autoPlay playsInline muted className="w-full h-full object-contain" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex flex-col items-center justify-center">
+                                                                <span className="text-7xl mb-3">📷</span>
+                                                                <span className="text-slate-400 text-sm font-semibold">Camera not started</span>
+                                                                <button
+                                                                    onClick={startScannerCamera}
+                                                                    className="mt-4 bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-semibold text-sm"
+                                                                >
+                                                                    Start Camera
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Camera controls */}
+                                                    {scannerCameraActive && (
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={captureScannerPhoto}
+                                                                className="flex-1 bg-green-600 hover:bg-green-700 py-3 rounded-lg font-semibold text-sm"
+                                                            >
+                                                                📸 Capture {scannerCapturedImages.length === 0 ? 'Front' : 'Back'}
+                                                            </button>
+                                                            <button
+                                                                onClick={stopScannerCamera}
+                                                                className="bg-slate-600 hover:bg-slate-500 px-4 py-3 rounded-lg text-sm font-semibold"
+                                                            >
+                                                                Stop
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Captured image previews */}
+                                                    {scannerCapturedImages.length > 0 && (
+                                                        <div className="space-y-2">
+                                                            <div className="text-xs text-slate-400 font-semibold">
+                                                                Captured: {scannerCapturedImages.length}/2 images {scannerCapturedImages.length === 1 ? '(capture back next)' : ''}
+                                                            </div>
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                {scannerCapturedImages.map((img, idx) => (
+                                                                    <div key={idx} className="relative">
+                                                                        <img src={img} alt={idx === 0 ? 'Front' : 'Back'} className="w-full h-24 object-contain bg-slate-800 rounded-lg" />
+                                                                        <span className="absolute top-1 left-1 text-xs bg-black/60 px-1.5 py-0.5 rounded">{idx === 0 ? 'Front' : 'Back'}</span>
+                                                                        <button
+                                                                            onClick={() => removeScannerImage(idx)}
+                                                                            className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center"
+                                                                        >
+                                                                            x
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                            {scannerCapturedImages.length === 1 && !scannerCameraActive && (
+                                                                <div className="flex gap-2">
+                                                                    <button
+                                                                        onClick={startScannerCamera}
+                                                                        className="flex-1 bg-blue-600 hover:bg-blue-700 py-2 rounded-lg text-sm font-semibold"
+                                                                    >
+                                                                        📷 Capture Back
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={submitScannerImages}
+                                                                        className="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded-lg text-sm font-semibold"
+                                                                    >
+                                                                        Proceed with 1 Image
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3">
+                                                        <p className="text-xs text-slate-300">
+                                                            <strong>Tip:</strong> Capture the <strong>front</strong> first, then the <strong>back</strong> (card number). Good lighting helps!
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <button onClick={() => fileInputRef.current?.click()} className={`w-full border-2 border-dashed border-slate-600 rounded-xl flex flex-col items-center justify-center hover:border-blue-500 transition-colors bg-slate-900/50 ${isMobile ? 'h-48' : 'h-80'}`}>
+                                                        <span className={`text-slate-300 mb-3 font-semibold ${isMobile ? 'text-sm' : 'text-base'}`}>📸 Upload Card Images</span>
+                                                        <span className="text-7xl mb-3">📁</span>
+                                                        <span className="text-slate-400 text-sm text-center px-4 font-semibold">Upload BOTH front and back images</span>
+                                                        <span className="text-slate-500 text-xs text-center px-4 mt-2">The back image's card number guides AI analysis</span>
+                                                    </button>
+                                                    <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mt-4">
+                                                        <p className="text-sm font-semibold text-blue-400 mb-2">
+                                                            ✨ How to Get Best Results:
+                                                        </p>
+                                                        <ul className="text-xs text-slate-300 space-y-1">
+                                                            <li>✓ <strong>Upload 2 images:</strong> First the front, then the back</li>
+                                                            <li>✓ <strong>Back image is crucial:</strong> Contains the card number</li>
+                                                            <li>✓ <strong>Good lighting:</strong> Ensures card details are visible</li>
+                                                        </ul>
+                                                    </div>
+                                                </>
+                                            )}
                                         </>
                                     ) : (!uploadedImages || uploadedImages.length === 0) && recognizedCard ? (
                                         <div className="space-y-4">
