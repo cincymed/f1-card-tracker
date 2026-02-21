@@ -1007,6 +1007,15 @@
             const [availableCameras, setAvailableCameras] = useState([]);
             const [selectedCameraId, setSelectedCameraId] = useState(() => localStorage.getItem('f1-preferred-camera') || '');
 
+            // Toast notification state — lightweight, non-blocking user feedback
+            const [toastMessage, setToastMessage] = useState(null);
+            const toastTimerRef = useRef(null);
+            const showToast = (message, durationMs = 5000) => {
+                if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+                setToastMessage(message);
+                toastTimerRef.current = setTimeout(() => setToastMessage(null), durationMs);
+            };
+
             // Enumerate available cameras
             const enumerateCameras = async () => {
                 try {
@@ -1455,8 +1464,11 @@
             };
 
             // Merge MongoDB data with locally-stored data.
-            // MongoDB now stores counts + analyses + gradeReports.
-            // Local analyses take priority if present; fall back to MongoDB analyses.
+            // Uses Math.max for counts so no card/variant is ever lost:
+            //   - Local-only cards (e.g. scan failed to POST) are preserved
+            //   - Local-only variants (e.g. new variant added, POST failed) are preserved
+            //   - MongoDB counts that are higher (e.g. from another device) win
+            // Local analyses/gradeReports always take priority; fall back to MongoDB.
             const mergeMongoWithLocal = (mongoColl, localColl) => {
                 const merged = {};
                 const allKeys = new Set([...Object.keys(mongoColl), ...Object.keys(localColl)]);
@@ -1465,11 +1477,21 @@
                     const mongoCard = mongoColl[cardKey] || {};
                     const localCard = localColl[cardKey] || {};
 
-                    // Use MongoDB counts as the source of truth for card quantities
                     const mergedCard = {};
-                    Object.keys(mongoCard).forEach(variant => {
-                        if (!variant.startsWith('_')) {
-                            mergedCard[variant] = mongoCard[variant];
+
+                    // Merge variant counts from BOTH sources using Math.max.
+                    // This ensures local-only cards/variants survive even if the
+                    // MongoDB POST failed (429, cold-start, network error).
+                    const allVariants = new Set([
+                        ...Object.keys(mongoCard).filter(k => !k.startsWith('_')),
+                        ...Object.keys(localCard).filter(k => !k.startsWith('_'))
+                    ]);
+                    allVariants.forEach(variant => {
+                        const mongoCount = (typeof mongoCard[variant] === 'number') ? mongoCard[variant] : 0;
+                        const localCount = (typeof localCard[variant] === 'number') ? localCard[variant] : 0;
+                        const best = Math.max(mongoCount, localCount);
+                        if (best > 0) {
+                            mergedCard[variant] = best;
                         }
                     });
 
@@ -3270,6 +3292,15 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                         console.error(`MongoDB save failed (${triesLeft} retries left):`, err.message);
                         if (triesLeft > 0) {
                             setTimeout(() => attempt(triesLeft - 1, delay * 2), delay);
+                        } else {
+                            // All retries exhausted — notify the user
+                            const is429 = err.message.includes('429');
+                            showToast(
+                                is429
+                                    ? '☁️ Cloud sync delayed — server is busy. Your card is saved locally and will sync on next attempt, or use Push to Cloud from the menu.'
+                                    : '☁️ Cloud sync failed — your card is saved locally. Use Push to Cloud from the menu to retry.',
+                                7000
+                            );
                         }
                     }
                 };
@@ -6157,6 +6188,16 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                             </div>
                         )}
                     </div>
+
+                    {/* Toast notification — non-blocking, auto-dismissing */}
+                    {toastMessage && (
+                        <div
+                            className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[9999] max-w-md w-[90vw] bg-slate-800 border border-slate-600 text-white px-4 py-3 rounded-xl shadow-2xl text-sm animate-pulse cursor-pointer"
+                            onClick={() => setToastMessage(null)}
+                        >
+                            {toastMessage}
+                        </div>
+                    )}
                 </div>
             );
         }
