@@ -14,11 +14,12 @@
     <meta name="theme-color" content="#0f172a">
     
     <!-- App Icons -->
-    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' fill='%230f172a'/><text x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-size='100' fill='%2360a5fa'>🏎️</text></svg>">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🏎️</text></svg>">
-    
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+
     <!-- Manifest -->
-    <link rel="manifest" href="data:application/json,{%22name%22:%22F1%20Card%20Tracker%22,%22short_name%22:%22F1%20Tracker%22,%22start_url%22:%22./%22,%22display%22:%22standalone%22,%22background_color%22:%22%230f172a%22,%22theme_color%22:%22%230f172a%22,%22orientation%22:%22portrait%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%230f172a'/><text x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-size='120' fill='%2360a5fa'>🏎️</text></svg>%22,%22sizes%22:%22192x192%22,%22type%22:%22image/svg+xml%22},{%22src%22:%22data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%230f172a'/><text x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-size='320' fill='%2360a5fa'>🏎️</text></svg>%22,%22sizes%22:%22512x512%22,%22type%22:%22image/svg+xml%22}]}">
+    <link rel="manifest" href="manifest.json">
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -3243,6 +3244,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                 </div>
                                             )}
                                         </div>
+                                        {isMobile && <img src="logo.png" alt="F1 Card Tracker" className="w-10 h-10 rounded-lg flex-shrink-0" />}
                                         <h1 className={`font-bold bg-gradient-to-r from-blue-400 via-red-500 to-yellow-400 bg-clip-text text-transparent pb-2 ${isMobile ? 'text-lg' : 'text-5xl'}`}>
                                             {isMobile ? '2025 Topps Chrome F1 Cards' : '2025 Topps Chrome F1 Collection'}
                                         </h1>
