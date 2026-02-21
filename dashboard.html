@@ -31,6 +31,7 @@
 
     <script>
         const MONGODB_API = 'https://f1-card-tracker-backend-1.onrender.com/api/collection';
+        window.API_URL = 'https://f1-card-tracker-backend-1.onrender.com/api/recognize';
         const userId = 'cincymed-f1-collection';
         const cardDatabase = COMPLETE_CARD_DATABASE || [];
         const token = localStorage.getItem('f1-token');
@@ -525,16 +526,15 @@
                             </div>
                         </div>
 
-                        <!-- Right Sidebar Button -->
+                        <!-- Return to Main Page Button -->
                         <div class="fixed right-6 bottom-6 z-40">
                             <a
                                 href="index.html"
-                                class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-lg flex flex-col items-center justify-center gap-2 transition-all"
-                                style="width: 160px; height: 100px;"
+                                class="group bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-full font-semibold shadow-lg hover:shadow-blue-500/25 hover:shadow-xl flex items-center gap-2 transition-all duration-300 hover:scale-105 px-5 py-3"
                                 title="Return to main collection view"
                             >
-                                <span style="font-size: 2rem;">&#8593;</span>
-                                <span class="text-sm">Return to<br/>Main Page</span>
+                                <span class="text-lg transition-transform duration-300 group-hover:-translate-x-0.5">&#8592;</span>
+                                <span class="text-sm font-medium">Collection</span>
                             </a>
                         </div>
                     </div>

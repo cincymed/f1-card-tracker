@@ -107,7 +107,8 @@ window.sendChatMessage = async function(message) {
         console.log('Sending universal chat request:', requestBody);
 
         // Get API configuration from the current page
-        const API_URL = window.API_URL || (window.API_BASE + "/api/recognize") || 'https://f1-card-tracker-backend-1.onrender.com/api/recognize';
+        const BACKEND_BASE = 'https://f1-card-tracker-backend-1.onrender.com';
+        const API_URL = window.API_URL || (BACKEND_BASE + '/api/recognize');
         const getAuthHeaders = window.getAuthHeaders || function() {
             const token = localStorage.getItem('f1-token');
             return {
