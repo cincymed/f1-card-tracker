@@ -1305,6 +1305,7 @@ Base your analysis on current 2025 market data from web search.`
                         body: JSON.stringify({
                             model: 'claude-sonnet-4-5-20250929',
                             max_tokens: 500,
+                            tools: [{ type: 'web_search', name: 'web_search' }],
                             messages: [{
                                 role: 'user',
                                 content: `Find information about 2025 Topps Chrome F1 card #${cardNum}. Respond ONLY with JSON in this format:
