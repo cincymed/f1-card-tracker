@@ -1554,25 +1554,11 @@
                     // Save counts + analyses + gradeReports to MongoDB for persistence.
                     // Analyses are trimmed to last 3 per variant to keep payload manageable.
                     const mongoData = stripMetadataForMongo(cleanedCollection);
-                    const id = 'cincymed-f1-collection';
-                    const authHeaders = getAuthHeaders();
 
                     const mongoPayloadSize = JSON.stringify({ cards: mongoData }).length;
                     console.log('📤 MongoDB payload size:', mongoPayloadSize, 'bytes (counts + analyses)');
 
-                    fetch(`https://f1-card-tracker-backend-1.onrender.com/api/collection/${id}`, {
-                        method: 'POST',
-                        headers: authHeaders,
-                        body: JSON.stringify({ cards: mongoData })
-                    }).then(response => {
-                        if (response.ok) {
-                            console.log('✅ Collection synced to MongoDB');
-                        } else {
-                            console.error('MongoDB sync failed - status:', response.status);
-                        }
-                    }).catch(error => {
-                        console.error('MongoDB sync error:', error.message);
-                    });
+                    saveToMongoDB(mongoData);
                     
                 } catch (error) {
                     console.error('Error saving collection:', error);
@@ -3215,8 +3201,36 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                 setShowMenuDropdown(false);
             };
 
+            // Retry-aware MongoDB POST — handles Render.com cold starts (up to 3 attempts).
+            const saveToMongoDB = (mongoData) => {
+                const id = 'cincymed-f1-collection';
+                const url = `https://f1-card-tracker-backend-1.onrender.com/api/collection/${id}`;
+                const attempt = async (triesLeft, delay) => {
+                    try {
+                        const res = await fetch(url, {
+                            method: 'POST',
+                            headers: getAuthHeaders(),
+                            body: JSON.stringify({ cards: mongoData })
+                        });
+                        if (res.ok) {
+                            console.log('✅ Collection synced to MongoDB');
+                        } else {
+                            throw new Error(`HTTP ${res.status}`);
+                        }
+                    } catch (err) {
+                        console.error(`MongoDB save failed (${triesLeft} retries left):`, err.message);
+                        if (triesLeft > 0) {
+                            setTimeout(() => attempt(triesLeft - 1, delay * 2), delay);
+                        }
+                    }
+                };
+                attempt(2, 3000); // first retry after 3s, second after 6s
+            };
+
             // Silent background sync from MongoDB — used for cross-device sync.
             // Uses mergeMongoWithLocal so local analyses/grades aren't overwritten.
+            // Uses a ref so visibilitychange/polling always call the latest version.
+            const silentSyncRef = useRef(null);
             const silentSyncFromMongo = async () => {
                 try {
                     const controller = new AbortController();
@@ -3242,25 +3256,27 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                         console.log('🔄 Silent sync: collection updated from MongoDB');
                     }
                 } catch (err) {
-                    // Silently ignore — offline or timeout is fine
                     console.log('Silent sync skipped:', err.message);
                 }
             };
+            silentSyncRef.current = silentSyncFromMongo;
 
-            // Sync when the tab becomes visible again (user switches back from mobile, etc.)
+            // Sync when tab becomes visible or window is focused (covers switching back from mobile)
             useEffect(() => {
-                const handleVisibilityChange = () => {
-                    if (document.visibilityState === 'visible') {
-                        silentSyncFromMongo();
-                    }
+                const run = () => silentSyncRef.current?.();
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') run();
+                });
+                window.addEventListener('focus', run);
+                return () => {
+                    document.removeEventListener('visibilitychange', run);
+                    window.removeEventListener('focus', run);
                 };
-                document.addEventListener('visibilitychange', handleVisibilityChange);
-                return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
             }, []);
 
-            // Poll MongoDB every 60 seconds to pick up changes from other devices
+            // Poll MongoDB every 15 seconds to pick up changes from other devices
             useEffect(() => {
-                const interval = setInterval(silentSyncFromMongo, 60000);
+                const interval = setInterval(() => silentSyncRef.current?.(), 15000);
                 return () => clearInterval(interval);
             }, []);
 
