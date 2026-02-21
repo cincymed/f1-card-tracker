@@ -262,6 +262,16 @@
 
         const variants = OFFICIAL_VARIANTS;
 
+        // Variant groups for filter dropdowns
+        const VARIANT_GROUPS = [
+            { label: 'Standard', variants: ['Base', 'Refractor'] },
+            { label: 'Numbered Refractors', variants: ['Teal Refractor /299', 'Pink Refractor /250', 'Aqua Refractor /199', 'Blue Refractor /150', 'Green Refractor /99', 'F1 75th Anniversary Refractor /75', 'Gold Refractor /50', 'Orange Refractor /25', 'Black Refractor /10', 'Red Refractor /5'] },
+            { label: 'Checker Flag Parallels', variants: ['Checker Flag', 'Pink Checker Flag /250', 'Aqua Checker Flag /199', 'Blue Checker Flag /150', 'Green Checker Flag /99', 'Gold Checker Flag /50', 'Orange Checker Flag /25', 'Black Checker Flag /10', 'Red Checker Flag /5'] },
+            { label: 'RayWave Parallels', variants: ['B&W RayWave', 'Pink RayWave /250', 'Aqua RayWave /199', 'Blue RayWave /150', 'Forest Green RayWave /140', 'Green RayWave /99', 'Gold RayWave /50', 'Orange RayWave /25', 'Black RayWave /10', 'Red RayWave /5'] },
+            { label: 'Lazer & Special', variants: ['B&W Lazer', 'SuperFractor 1/1', 'Logofractor', 'Sapphire Edition', 'Padparadscha Sapphire 1/1'] },
+            { label: 'Printing Plates', variants: ['Printing Plate Cyan 1/1', 'Printing Plate Magenta 1/1', 'Printing Plate Yellow 1/1', 'Printing Plate Black 1/1'] }
+        ];
+
         // Helper function to format Quick Grade Report with app-matching style and responsive design
         const formatQuickGradeReport = (gradeText) => {
             if (!gradeText) {
@@ -1275,6 +1285,17 @@
                 return Object.keys(inventory)
                     .filter(key => !key.startsWith('_'))
                     .reduce((sum, variant) => sum + (inventory[variant] || 0), 0);
+            };
+
+            // Count total cards of a specific variant across the entire collection
+            const getVariantTotalCount = (variant) => {
+                let total = 0;
+                Object.keys(collection).forEach(cardKey => {
+                    if (cardKey.startsWith('_')) return;
+                    const count = collection[cardKey][variant];
+                    if (count > 0) total += count;
+                });
+                return total;
             };
 
             const getVariantBreakdown = (cardNum) => {
@@ -2855,58 +2876,14 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                     }}
                                                 >
                                                     <option value="">All Variants</option>
-                                                    <optgroup label="Standard">
-                                                        <option value="Base">Base</option>
-                                                        <option value="Refractor">Refractor</option>
-                                                    </optgroup>
-                                                    <optgroup label="Numbered Refractors">
-                                                        <option value="Teal Refractor /299">Teal Refractor /299</option>
-                                                        <option value="Pink Refractor /250">Pink Refractor /250</option>
-                                                        <option value="Aqua Refractor /199">Aqua Refractor /199</option>
-                                                        <option value="Blue Refractor /150">Blue Refractor /150</option>
-                                                        <option value="Green Refractor /99">Green Refractor /99</option>
-                                                        <option value="F1 75th Anniversary Refractor /75">F1 75th Anniversary Refractor /75</option>
-                                                        <option value="Gold Refractor /50">Gold Refractor /50</option>
-                                                        <option value="Orange Refractor /25">Orange Refractor /25</option>
-                                                        <option value="Black Refractor /10">Black Refractor /10</option>
-                                                        <option value="Red Refractor /5">Red Refractor /5</option>
-                                                    </optgroup>
-                                                    <optgroup label="Checker Flag Parallels">
-                                                        <option value="Checker Flag">Checker Flag</option>
-                                                        <option value="Pink Checker Flag /250">Pink Checker Flag /250</option>
-                                                        <option value="Aqua Checker Flag /199">Aqua Checker Flag /199</option>
-                                                        <option value="Blue Checker Flag /150">Blue Checker Flag /150</option>
-                                                        <option value="Green Checker Flag /99">Green Checker Flag /99</option>
-                                                        <option value="Gold Checker Flag /50">Gold Checker Flag /50</option>
-                                                        <option value="Orange Checker Flag /25">Orange Checker Flag /25</option>
-                                                        <option value="Black Checker Flag /10">Black Checker Flag /10</option>
-                                                        <option value="Red Checker Flag /5">Red Checker Flag /5</option>
-                                                    </optgroup>
-                                                    <optgroup label="RayWave Parallels">
-                                                        <option value="B&W RayWave">B&W RayWave</option>
-                                                        <option value="Pink RayWave /250">Pink RayWave /250</option>
-                                                        <option value="Aqua RayWave /199">Aqua RayWave /199</option>
-                                                        <option value="Blue RayWave /150">Blue RayWave /150</option>
-                                                        <option value="Forest Green RayWave /140">Forest Green RayWave /140</option>
-                                                        <option value="Green RayWave /99">Green RayWave /99</option>
-                                                        <option value="Gold RayWave /50">Gold RayWave /50</option>
-                                                        <option value="Orange RayWave /25">Orange RayWave /25</option>
-                                                        <option value="Black RayWave /10">Black RayWave /10</option>
-                                                        <option value="Red RayWave /5">Red RayWave /5</option>
-                                                    </optgroup>
-                                                    <optgroup label="Lazer & Special">
-                                                        <option value="B&W Lazer">B&W Lazer</option>
-                                                        <option value="SuperFractor 1/1">SuperFractor 1/1</option>
-                                                        <option value="Logofractor">Logofractor</option>
-                                                        <option value="Sapphire Edition">Sapphire Edition</option>
-                                                        <option value="Padparadscha Sapphire 1/1">Padparadscha Sapphire 1/1</option>
-                                                    </optgroup>
-                                                    <optgroup label="Printing Plates">
-                                                        <option value="Printing Plate Cyan 1/1">Printing Plate Cyan 1/1</option>
-                                                        <option value="Printing Plate Magenta 1/1">Printing Plate Magenta 1/1</option>
-                                                        <option value="Printing Plate Yellow 1/1">Printing Plate Yellow 1/1</option>
-                                                        <option value="Printing Plate Black 1/1">Printing Plate Black 1/1</option>
-                                                    </optgroup>
+                                                    {VARIANT_GROUPS.map(group => (
+                                                        <optgroup key={group.label} label={group.label}>
+                                                            {group.variants.map(v => {
+                                                                const count = getVariantTotalCount(v);
+                                                                return <option key={v} value={v}>{v}{count > 0 ? ` (${count})` : ''}</option>;
+                                                            })}
+                                                        </optgroup>
+                                                    ))}
                                                 </select>
                                             </div>
                                             {/* Subset Filter - Now Second */}
@@ -2979,58 +2956,14 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                         }}
                                     >
                                         <option value="">All Variants</option>
-                                        <optgroup label="Standard">
-                                            <option value="Base">Base</option>
-                                            <option value="Refractor">Refractor</option>
-                                        </optgroup>
-                                        <optgroup label="Numbered Refractors">
-                                            <option value="Teal Refractor /299">Teal Refractor /299</option>
-                                            <option value="Pink Refractor /250">Pink Refractor /250</option>
-                                            <option value="Aqua Refractor /199">Aqua Refractor /199</option>
-                                            <option value="Blue Refractor /150">Blue Refractor /150</option>
-                                            <option value="Green Refractor /99">Green Refractor /99</option>
-                                            <option value="F1 75th Anniversary Refractor /75">F1 75th Anniversary Refractor /75</option>
-                                            <option value="Gold Refractor /50">Gold Refractor /50</option>
-                                            <option value="Orange Refractor /25">Orange Refractor /25</option>
-                                            <option value="Black Refractor /10">Black Refractor /10</option>
-                                            <option value="Red Refractor /5">Red Refractor /5</option>
-                                        </optgroup>
-                                        <optgroup label="Checker Flag Parallels">
-                                            <option value="Checker Flag">Checker Flag</option>
-                                            <option value="Pink Checker Flag /250">Pink Checker Flag /250</option>
-                                            <option value="Aqua Checker Flag /199">Aqua Checker Flag /199</option>
-                                            <option value="Blue Checker Flag /150">Blue Checker Flag /150</option>
-                                            <option value="Green Checker Flag /99">Green Checker Flag /99</option>
-                                            <option value="Gold Checker Flag /50">Gold Checker Flag /50</option>
-                                            <option value="Orange Checker Flag /25">Orange Checker Flag /25</option>
-                                            <option value="Black Checker Flag /10">Black Checker Flag /10</option>
-                                            <option value="Red Checker Flag /5">Red Checker Flag /5</option>
-                                        </optgroup>
-                                        <optgroup label="RayWave Parallels">
-                                            <option value="B&W RayWave">B&W RayWave</option>
-                                            <option value="Pink RayWave /250">Pink RayWave /250</option>
-                                            <option value="Aqua RayWave /199">Aqua RayWave /199</option>
-                                            <option value="Blue RayWave /150">Blue RayWave /150</option>
-                                            <option value="Forest Green RayWave /140">Forest Green RayWave /140</option>
-                                            <option value="Green RayWave /99">Green RayWave /99</option>
-                                            <option value="Gold RayWave /50">Gold RayWave /50</option>
-                                            <option value="Orange RayWave /25">Orange RayWave /25</option>
-                                            <option value="Black RayWave /10">Black RayWave /10</option>
-                                            <option value="Red RayWave /5">Red RayWave /5</option>
-                                        </optgroup>
-                                        <optgroup label="Lazer & Special">
-                                            <option value="B&W Lazer">B&W Lazer</option>
-                                            <option value="SuperFractor 1/1">SuperFractor 1/1</option>
-                                            <option value="Logofractor">Logofractor</option>
-                                            <option value="Sapphire Edition">Sapphire Edition</option>
-                                            <option value="Padparadscha Sapphire 1/1">Padparadscha Sapphire 1/1</option>
-                                        </optgroup>
-                                        <optgroup label="Printing Plates">
-                                            <option value="Printing Plate Cyan 1/1">Printing Plate Cyan 1/1</option>
-                                            <option value="Printing Plate Magenta 1/1">Printing Plate Magenta 1/1</option>
-                                            <option value="Printing Plate Yellow 1/1">Printing Plate Yellow 1/1</option>
-                                            <option value="Printing Plate Black 1/1">Printing Plate Black 1/1</option>
-                                        </optgroup>
+                                        {VARIANT_GROUPS.map(group => (
+                                            <optgroup key={group.label} label={group.label}>
+                                                {group.variants.map(v => {
+                                                    const count = getVariantTotalCount(v);
+                                                    return <option key={v} value={v}>{v}{count > 0 ? ` (${count})` : ''}</option>;
+                                                })}
+                                            </optgroup>
+                                        ))}
                                     </select>
                                     <select
                                         className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm"
