@@ -3790,9 +3790,12 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                     const cardInventory = collection[cardKey] || {};
                                                     return OFFICIAL_VARIANTS
                                                         .filter(v => !(cardInventory[v] > 0))  // Only show variants not in collection
-                                                        .map(variant => (
-                                                            <option key={variant} value={variant}>{variant}</option>
-                                                        ));
+                                                        .map(variant => {
+                                                            const count = cardInventory[variant] || 0;
+                                                            return (
+                                                                <option key={variant} value={variant}>{variant}{count > 0 ? ` (${count})` : ''}</option>
+                                                            );
+                                                        });
                                                 })()}
                                             </select>
                                         </div>
@@ -4431,7 +4434,14 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                 <option disabled>──────────</option>
                                                             </>
                                                         )}
-                                                        {variants.map(v => <option key={v} value={v}>{v}</option>)}
+                                                        {(() => {
+                                                            const cardKey = recognizedCard?.cardNumber ? getCardKey(recognizedCard.cardNumber) : null;
+                                                            const cardInventory = cardKey ? (collection[cardKey] || {}) : {};
+                                                            return variants.map(v => {
+                                                                const count = cardInventory[v] || 0;
+                                                                return <option key={v} value={v}>{v}{count > 0 ? ` (${count})` : ''}</option>;
+                                                            });
+                                                        })()}
                                                     </select>
                                                 ) : (
                                                     <div>
@@ -4732,12 +4742,19 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                 onChange={(e) => setManualCardData({...manualCardData, variant: e.target.value})}
                                                 className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm focus:border-blue-500 focus:outline-none text-white"
                                             >
-                                                {OFFICIAL_VARIANTS.map(variant => (
-                                                    <option key={variant} value={variant}>{variant}</option>
-                                                ))}
+                                                {(() => {
+                                                    const cardKey = manualCardData.cardNumber ? getCardKey(manualCardData.cardNumber) : null;
+                                                    const cardInventory = cardKey ? (collection[cardKey] || {}) : {};
+                                                    return OFFICIAL_VARIANTS.map(variant => {
+                                                        const count = cardInventory[variant] || 0;
+                                                        return (
+                                                            <option key={variant} value={variant}>{variant}{count > 0 ? ` (${count})` : ''}</option>
+                                                        );
+                                                    });
+                                                })()}
                                             </select>
                                         </div>
-                                        
+
                                         {/* Serial Number */}
                                         <div>
                                             <label className="text-sm font-semibold text-slate-300 block mb-2">Serial Number (Optional)</label>
