@@ -3151,6 +3151,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                 setDeepAnalysis(null);
                 setSelectedAnalysisSource('opus'); // Reset to default
                 setVariantValidationModal(null);
+                setScannerCapturedImages([]);
             };
 
             const handleLogout = () => {
@@ -4037,7 +4038,19 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                         {/* AI Scanner, Dashboard & Bulk Analyze - Bottom Right */}
                         <div className={`fixed ${isMobile ? 'bottom-4 left-4 right-4' : 'bottom-6 right-6'} z-40 ${isMobile ? 'flex gap-2' : 'flex flex-col gap-3'}`}>
                             <button
-                                onClick={() => setShowImageUpload(true)}
+                                onClick={() => {
+                                    // Clear any leftover state from previous scan
+                                    setUploadedImages([]);
+                                    setPendingImages([]);
+                                    setScannerCapturedImages([]);
+                                    setRecognizedCard(null);
+                                    setRecognitionError(null);
+                                    setEditedCard(null);
+                                    setIsEditing(false);
+                                    setDeepAnalysis(null);
+                                    setSelectedAnalysisSource('opus');
+                                    setShowImageUpload(true);
+                                }}
                                 disabled={!serverOnline}
                                 title={serverOnline ? "Open AI Scanner to analyze card images (upload front and back)" : "Server offline - start server to enable AI scanning"}
                                 className={`bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-semibold shadow-lg disabled:opacity-50 flex flex-col items-center justify-center gap-2 transition-all ${isMobile ? 'flex-1 py-3' : 'px-4 py-3 w-28'}`}
@@ -4896,6 +4909,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                         onClick={() => {
                                                             setUploadedImages([]);
                                                             setPendingImages([]);
+                                                            setScannerCapturedImages([]);
                                                             setShowSecondImagePrompt(false);
                                                             setRecognitionError(null);
                                                             setDeepAnalysis(null);
@@ -4958,6 +4972,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                 setShowImageUpload(false);
                                                                 setUploadedImages([]);
                                                                 setPendingImages([]);
+                                                                setScannerCapturedImages([]);
                                                                 setShowSecondImagePrompt(false);
                                                                 setRecognizedCard(null);
                                                                 setEditedCard(null);
@@ -5008,6 +5023,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                 setShowImageUpload(false);
                                                                 setUploadedImages([]);
                                                                 setPendingImages([]);
+                                                                setScannerCapturedImages([]);
                                                                 setShowSecondImagePrompt(false);
                                                                 setRecognizedCard(null);
                                                                 setEditedCard(null);
