@@ -907,11 +907,13 @@
 
             const loadCollection = async () => {
             try {
-                // Load from localStorage FIRST (instant display)
+                // Load from localStorage FIRST (instant display, includes analyses)
+                let localCollection = {};
                 const saved = localStorage.getItem('f1-collection-pro-v2');
                 if (saved) {
                     try {
-                        setCollection(JSON.parse(saved));
+                        localCollection = JSON.parse(saved);
+                        setCollection(localCollection);
                         console.log('✅ Collection loaded from localStorage (instant)');
                     } catch (e) {
                         console.error('Error parsing localStorage:', e);
@@ -924,24 +926,27 @@
                 localStorage.setItem('cincymed-f1-user-id', id);
                 setUserId(id);
 
-                // Sync from MongoDB in background (5 second timeout)
+                // Sync from MongoDB in background (5 second timeout).
+                // MongoDB now stores only card counts (no analyses/gradeReports).
+                // We merge MongoDB counts with locally-stored analyses.
                 try {
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 5000);
-                    
+
                     const response = await fetch(`https://f1-card-tracker-backend-1.onrender.com/api/collection/${id}`, {
                         method: 'GET',
                         headers: getAuthHeaders(),
                         signal: controller.signal
                     });
                     clearTimeout(timeoutId);
-                    
+
                     const data = await response.json();
                     if (data.cards && Object.keys(data.cards).length > 0) {
-                        setCollection(data.cards);
-                        // Also save to localStorage as backup
-                        localStorage.setItem('f1-collection-pro-v2', JSON.stringify(data.cards));
-                        console.log('✅ Collection synced from MongoDB');
+                        // Merge MongoDB counts with local analyses/gradeReports
+                        const merged = mergeMongoWithLocal(data.cards, localCollection);
+                        setCollection(merged);
+                        localStorage.setItem('f1-collection-pro-v2', JSON.stringify(merged));
+                        console.log('✅ Collection synced from MongoDB (counts merged with local analyses)');
                     }
                 } catch (error) {
                     console.log('MongoDB sync skipped (using localStorage):', error.message);
@@ -986,6 +991,78 @@
                 return cleaned;
             };
 
+            // Strip _analyses and _gradeReports from collection for MongoDB storage.
+            // MongoDB has a 16MB document size limit; analyses grow unboundedly and
+            // can easily exceed it. Card counts are tiny; analyses live in localStorage.
+            const stripMetadataForMongo = (coll) => {
+                const stripped = {};
+                Object.keys(coll).forEach(cardKey => {
+                    if (cardKey.startsWith('_')) return;
+                    const cardData = coll[cardKey];
+                    const cardCounts = {};
+                    Object.keys(cardData).forEach(variant => {
+                        if (!variant.startsWith('_')) {
+                            cardCounts[variant] = cardData[variant];
+                        }
+                    });
+                    if (Object.keys(cardCounts).length > 0) {
+                        stripped[cardKey] = cardCounts;
+                    }
+                });
+                return stripped;
+            };
+
+            // Merge MongoDB card counts with locally-stored analyses/gradeReports.
+            // MongoDB only stores counts; localStorage has the full data with analyses.
+            const mergeMongoWithLocal = (mongoColl, localColl) => {
+                const merged = {};
+                // Start with all keys from both sources
+                const allKeys = new Set([...Object.keys(mongoColl), ...Object.keys(localColl)]);
+                allKeys.forEach(cardKey => {
+                    if (cardKey.startsWith('_')) return;
+                    const mongoCard = mongoColl[cardKey] || {};
+                    const localCard = localColl[cardKey] || {};
+
+                    // Use MongoDB counts as the source of truth for card quantities
+                    const mergedCard = {};
+                    Object.keys(mongoCard).forEach(variant => {
+                        if (!variant.startsWith('_')) {
+                            mergedCard[variant] = mongoCard[variant];
+                        }
+                    });
+
+                    // Preserve local analyses and grade reports
+                    if (localCard._analyses) {
+                        mergedCard._analyses = localCard._analyses;
+                    }
+                    if (localCard._gradeReports) {
+                        mergedCard._gradeReports = localCard._gradeReports;
+                    }
+
+                    if (Object.keys(mergedCard).length > 0) {
+                        merged[cardKey] = mergedCard;
+                    }
+                });
+                return merged;
+            };
+
+            // Trim analysis arrays to keep only the most recent N entries per variant
+            const trimAnalyses = (coll, maxPerVariant = 3) => {
+                Object.keys(coll).forEach(cardKey => {
+                    if (cardKey.startsWith('_')) return;
+                    const cardData = coll[cardKey];
+                    if (cardData._analyses) {
+                        Object.keys(cardData._analyses).forEach(variant => {
+                            const arr = cardData._analyses[variant];
+                            if (Array.isArray(arr) && arr.length > maxPerVariant) {
+                                cardData._analyses[variant] = arr.slice(-maxPerVariant);
+                            }
+                        });
+                    }
+                });
+                return coll;
+            };
+
             const saveCollection = (newCollection) => {
                 try {
                     const cardCountBefore = Object.keys(newCollection).filter(k => k.startsWith('card-')).length;
@@ -1011,22 +1088,30 @@
                     console.log('📊 Total copies:', totalCopies);
                     console.log('⚠️ CARDS LOST IN CLEANUP:', cardCountBefore - cardCountAfter);
                     
+                    // Trim analyses to last 3 per variant to prevent unbounded growth
+                    trimAnalyses(cleanedCollection, 3);
+
                     setCollection(cleanedCollection);
                     console.log('🔄 setCollection called');
-                    
-                    // Save to localStorage (backup)
+
+                    // Save full collection (with analyses) to localStorage
                     const jsonStr = JSON.stringify(cleanedCollection);
                     localStorage.setItem('f1-collection-pro-v2', jsonStr);
                     console.log('✅ Saved to localStorage:', jsonStr.length, 'bytes');
-                    
-                    // Save to MongoDB (async, don't wait)
-                    const id = 'cincymed-f1-collection'; // Always use this ID
+
+                    // Save ONLY card counts to MongoDB (strip analyses/gradeReports).
+                    // This keeps the MongoDB document small and avoids the 16MB limit.
+                    const mongoData = stripMetadataForMongo(cleanedCollection);
+                    const id = 'cincymed-f1-collection';
                     const authHeaders = getAuthHeaders();
-                    
+
+                    const mongoPayloadSize = JSON.stringify({ cards: mongoData }).length;
+                    console.log('📤 MongoDB payload size:', mongoPayloadSize, 'bytes (counts only, no analyses)');
+
                     fetch(`https://f1-card-tracker-backend-1.onrender.com/api/collection/${id}`, {
                         method: 'POST',
                         headers: authHeaders,
-                        body: JSON.stringify({ cards: cleanedCollection })
+                        body: JSON.stringify({ cards: mongoData })
                     }).then(response => {
                         if (response.ok) {
                             console.log('✅ Collection synced to MongoDB');
