@@ -539,11 +539,14 @@
                 }
 
                 // Value lines: Raw: $X-Y, PSA 9: $X-Y, PSA 10: $X-Y
-                const valueMatch = cleaned.match(/^(Raw|PSA\s*\d+)[:\s]+(\$[\d,]+\s*-\s*\$?[\d,]+)/i);
+                // Handle hyphen, en-dash, em-dash, and optional $ before second number
+                const valueMatch = cleaned.match(/^(Raw|PSA\s*\d+)[:\s]+(\$?[\d,]+\s*[-–—]\s*\$?[\d,]+)/i);
                 if (valueMatch) {
                     const label = valueMatch[1];
-                    const value = valueMatch[2];
-                    const rest = cleaned.substring(cleaned.indexOf(value) + value.length).replace(/^[,\s]+/, '').trim();
+                    // Normalize en-dash/em-dash to hyphen and ensure leading $
+                    const rawVal = valueMatch[2].replace(/[–—]/g, '-').trim();
+                    const value = rawVal.startsWith('$') ? rawVal : '$' + rawVal;
+                    const rest = cleaned.substring(cleaned.indexOf(valueMatch[2]) + valueMatch[2].length).replace(/^[,\s]+/, '').trim();
                     const colorClass = label.toLowerCase().includes('10') ? 'text-yellow-400' :
                                        label.toLowerCase().includes('9') ? 'text-blue-400' : 'text-green-400';
                     elements.push(
@@ -1346,8 +1349,13 @@ Keep response under 200 words total.`
                     });
 
                     const data = await response.json();
-                    if (data.content && data.content[0]?.text) {
-                        return data.content[0].text.trim();
+                    if (data.content) {
+                        const analysisText = data.content
+                            .filter(block => block.type === 'text')
+                            .map(block => block.text)
+                            .join('\n\n')
+                            .trim();
+                        return analysisText || null;
                     }
                     return null;
                 } catch (error) {
@@ -1366,14 +1374,14 @@ Keep response under 200 words total.`
                         headers: getAuthHeaders(),
                         body: JSON.stringify({
                             model: "claude-opus-4-5-20251101",
-                            max_tokens: 2000,
+                            max_tokens: 3000,
                             tools: [{
                                 type: "web_search_20250305",
                                 name: "web_search"
                             }],
                             messages: [{
                                 role: "user",
-                                content: `You are a trading card expert. Analyze the current market value of this 2025 Topps Chrome F1 card:
+                                content: `You are a trading card market expert. Use web search to find current market data for this 2025 Topps Chrome F1 card, then respond with your analysis.
 
 Card #${card.num}: ${card.name}
 Team: ${card.team || 'N/A'}
@@ -1381,54 +1389,40 @@ Variant: ${variant}
 Subset: ${card.subset}
 ${card.rookie ? 'ROOKIE CARD' : ''}
 
-CARD SET CONTEXT:
-This card is from the 2025 Topps Chrome Formula 1 set. Even if imagery or data appears to be from a prior year, treat this as a 2025 Topps Chrome F1 card for valuation purposes.
+FORMATTING RULES - follow exactly:
+- Plain text only. NO markdown (no **, no ##, no *, no _)
+- Use plain hyphens (-) in value ranges, NOT en-dashes or em-dashes
+- Section headers must be ALL CAPS followed by a colon on their own line
+- Value format must be exactly: Raw: $X-Y  (dollar sign, number, hyphen, number)
 
-IMPORTANT: Use web search to find CURRENT market data for similar 2025 Topps Chrome F1 cards, especially for this driver and variant.
-
-Provide a comprehensive analysis including:
+Respond using ONLY this structure:
 
 CARD IDENTIFICATION:
-- Confirm driver, team, and variant details
-- Note any special characteristics (rookie, serial numbered, etc.)
+[Driver name, team, card number, variant, and any special notes like rookie or serial number]
 
 VARIANT & RARITY:
-- Explain this specific variant and its rarity
-- Compare to other variants in the set
+[What this variant is, how rare it is, print run if applicable, and how it compares to other variants]
 
 VALUE ESTIMATES:
-Provide current market values in this format:
 Raw: $X-Y
-PSA 9: $X-Y  
+PSA 9: $X-Y
 PSA 10: $X-Y
 
 COMPARABLE SALES:
-List the top 5 most pertinent recent sales you can find. Sort by closest match to this card # and variant first, then by most recent sale date. For each sale include:
-1. Card # and variant sold
-2. Sale date
-3. Sale price
-4. Data source (eBay, PSA Price Guide, TCGPlayer, COMC, Beckett, 130point, StockX, etc.)
-Format each as a numbered line: "1. #[card#] [variant] - $[price] on [date] ([source])"
+1. #[card#] [variant] - $[price] on [date] ([source])
+2. #[card#] [variant] - $[price] on [date] ([source])
+3. #[card#] [variant] - $[price] on [date] ([source])
+4. #[card#] [variant] - $[price] on [date] ([source])
+5. #[card#] [variant] - $[price] on [date] ([source])
+[List top 5 most pertinent sales. Sort by: exact card/variant match first, then most recent date. Include card #, variant, price, date, and source (eBay, PSA Price Guide, TCGPlayer, COMC, Beckett, 130point, StockX)]
 
 VALUE SOURCES & DERIVATION:
-- Include calculation method: "Average of X comparable sales across Y sources"
-- Note any market condition factors affecting the estimate
-
-VALUE WEIGHTING PRIORITY (most to least important):
-- Sales of this EXACT card (same year, same driver/card #, same subset, same variant) carry the MOST weight in your estimate
-- Then sales of the same driver in the same set with different variants
-- Then sales of similar cards (same set, comparable drivers/variants)
-- General market trends carry least weight
-- Always prioritize and clearly cite exact card match sales when available
-
-IMPORTANT: Do NOT use trailing commas after value ranges.
+[How values were calculated: "Average of X comparable sales from Y sources." Include weighting notes.]
 
 COLLECTIBILITY:
-- Why collectors want this card
-- Investment potential
-- Market trends
+[Why collectors want this card, investment potential, market trend summary]
 
-Base your analysis on current 2025 market data from web search.`
+VALUE WEIGHTING: Weight most heavily sales of this exact card (same card #, variant, year). Then same driver different variant. Then similar cards in set.`
                             }]
                         })
                     });
@@ -2593,14 +2587,16 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
             const extractValueEstimates = (analysisText) => {
                 if (!analysisText) return null;
 
-                // Strip markdown formatting before regex matching
-                const cleanText = analysisText.replace(/\*\*/g, '').replace(/\*/g, '').replace(/^#+\s*/gm, '');
+                // Strip markdown formatting, normalize dashes, before regex matching
+                const cleanText = analysisText
+                    .replace(/\*\*/g, '').replace(/\*/g, '')
+                    .replace(/^#+\s*/gm, '')
+                    .replace(/[–—]/g, '-');  // normalize en-dash/em-dash to hyphen
 
-                // More robust patterns to handle various Opus/Sonnet output formats
-                // Handles: "Raw: $5-$10", "Raw (ungraded): $5-10", "Raw value: ~$5-$10", "Raw: approximately $5 - $10"
-                const rawMatch = cleanText.match(/Raw[^:\n]*?[:\s]+~?(?:approximately\s+)?\$?([\d,]+)\s*[-–—to]+\s*~?\$?([\d,]+)/i);
-                const psa9Match = cleanText.match(/PSA\s*9[^:\n]*?[:\s]+~?(?:approximately\s+)?\$?([\d,]+)\s*[-–—to]+\s*~?\$?([\d,]+)/i);
-                const psa10Match = cleanText.match(/PSA\s*10[^:\n]*?[:\s]+~?(?:approximately\s+)?\$?([\d,]+)\s*[-–—to]+\s*~?\$?([\d,]+)/i);
+                // Robust patterns: handle "Raw: $5-$10", "Raw: 5-10", "Raw (ungraded): ~$5 - $10", etc.
+                const rawMatch = cleanText.match(/\bRaw\b[^:\n]{0,25}:\s*~?(?:approximately\s+)?\$?([\d,]+)\s*-\s*~?\$?([\d,]+)/i);
+                const psa9Match = cleanText.match(/\bPSA\s*9\b[^:\n]{0,25}:\s*~?(?:approximately\s+)?\$?([\d,]+)\s*-\s*~?\$?([\d,]+)/i);
+                const psa10Match = cleanText.match(/\bPSA\s*10\b[^:\n]{0,25}:\s*~?(?:approximately\s+)?\$?([\d,]+)\s*-\s*~?\$?([\d,]+)/i);
 
                 if (!rawMatch && !psa9Match && !psa10Match) return null;
 
