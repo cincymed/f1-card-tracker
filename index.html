@@ -492,6 +492,9 @@
                 // Skip pure separator lines (---, ===, etc.)
                 if (/^[-=_*]{3,}$/.test(trimmed)) return;
 
+                // Detect if original line was a markdown header before cleaning
+                const isMarkdownHeader = /^#+\s+/.test(trimmed);
+
                 // Clean markdown formatting
                 let cleaned = trimmed
                     .replace(/^#+\s*/, '')           // Remove ## headers
@@ -499,12 +502,21 @@
                     .replace(/^\*\s+/, '')            // Remove * bullets
                     .replace(/^-\s+/, '')             // Remove - bullets
                     .replace(/^•\s*/, '')             // Remove bullet chars
+                    .replace(/^\d+\.\s+/, '')         // Remove numbered list markers
                     .trim();
 
                 if (!cleaned) return;
 
-                // Section headers: ALL CAPS words (with optional colon)
-                if (/^[A-Z][A-Z\s&/,]{4,}:?\s*$/.test(cleaned) && cleaned.length < 50) {
+                // Section headers: ALL CAPS words (with optional colon and parenthetical notes)
+                const isAllCapsHeader = /^[A-Z][A-Z\s&/,]{3,}(\([^)]*\))?:?\s*$/.test(cleaned) && cleaned.length < 80;
+                // Also match known section headers that may be mixed case (from Opus responses)
+                const knownSections = ['CARD IDENTIFICATION', 'VARIANT & RARITY', 'VALUE ESTIMATES', 'VALUE SOURCES & DERIVATION', 'VALUE SOURCES', 'COLLECTIBILITY', 'WEB SEARCH FINDINGS', 'MARKET ANALYSIS', 'INVESTMENT POTENTIAL', 'COMPARABLE SALES', 'RECENT SALES', 'SOURCES', 'MARKET TRENDS', 'RARITY'];
+                const cleanedUpper = cleaned.replace(/:$/, '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+                const isKnownSection = knownSections.includes(cleanedUpper.toUpperCase());
+                // Match markdown headers that were ## style
+                const isMixedCaseHeader = isMarkdownHeader && cleaned.length < 80;
+
+                if (isAllCapsHeader || isKnownSection || isMixedCaseHeader) {
                     elements.push(
                         <div key={idx} className="text-xs font-semibold text-blue-400 border-l-2 border-blue-400 pl-2 bg-blue-950/30 py-0.5 rounded-r mt-2 first:mt-0">
                             {cleaned.replace(/:$/, '')}
@@ -526,6 +538,21 @@
                             <span className="text-slate-400 font-medium">{label}:</span>
                             <span className={`font-bold ${colorClass}`}>{value}</span>
                             {rest && <span className="text-slate-500 text-xs">{rest}</span>}
+                        </div>
+                    );
+                    return;
+                }
+
+                // Source/citation lines (eBay, PSA, TCGPlayer, etc.)
+                const sourceMatch = cleaned.match(/^(eBay|PSA\s*(?:Price\s*Guide|Guide)?|TCGPlayer|COMC|Beckett|130point|StockX)[:\s]+(.+)$/i);
+                if (sourceMatch) {
+                    elements.push(
+                        <div key={idx} className="text-xs ml-3 flex items-start gap-1.5">
+                            <span className="text-emerald-400 mt-0.5">&#x2022;</span>
+                            <span>
+                                <span className="text-emerald-400 font-medium">{sourceMatch[1]}:</span>{' '}
+                                <span className="text-slate-300">{sourceMatch[2]}</span>
+                            </span>
                         </div>
                     );
                     return;
@@ -1268,6 +1295,12 @@ Please provide:
    - Show how averages were calculated
 3. Brief explanation of market factors affecting value
 
+VALUE WEIGHTING PRIORITY (most to least important):
+- Sales of this EXACT card (same year, driver/card #, subset, variant) carry the MOST weight
+- Then sales of the same driver in the same set with different variants
+- Then sales of similar cards (same set, comparable drivers/variants)
+- General market trends carry least weight
+
 Keep response under 150 words total, include source names and dates when available.`
                             }]
                         })
@@ -1338,6 +1371,13 @@ VALUE SOURCES & DERIVATION:
 - Show exact sales data: "Comparable card #XXX Refractor sold for $Y on [Date] on [Source]"
 - Include calculation method: "Average of X comparable sales across Y sources"
 - Note any market condition factors affecting the estimate
+
+VALUE WEIGHTING PRIORITY (most to least important):
+- Sales of this EXACT card (same year, same driver/card #, same subset, same variant) carry the MOST weight in your estimate
+- Then sales of the same driver in the same set with different variants
+- Then sales of similar cards (same set, comparable drivers/variants)
+- General market trends carry least weight
+- Always prioritize and clearly cite exact card match sales when available
 
 Example format: "Values based on 5 recent eBay sales ($5-8 avg, Feb 2025), PSA guide ($7-10), and TCGPlayer listings ($6-9). Card #161 Base shows strong demand due to rookie status."
 
@@ -1752,7 +1792,7 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
   "variant": "exact variant name",
   "isRookie": true or false,
   "confidence": "high/medium/low",
-  "analysis": "CARD IDENTIFICATION:\\n[Driver name, team, card number verification, visual details]\\n\\nVARIANT & RARITY:\\n[Specific variant analysis, serial number details if present]\\n\\nVALUE ESTIMATES (2025 Topps Chrome F1 - from web search):\\nRaw: $X-Y\\nPSA 9: $X-Y\\nPSA 10: $X-Y\\n\\nVALUE SOURCES & DERIVATION:\\n[List 1-3 credible sources with comparable sales data]\\n[Include: eBay recent sales (e.g. 3 sold $5-8 Feb 2025), PSA guide ($X-Y), TCGPlayer listings]\\n[Show specific comparable: Card #XXX sold for $Y on [Date]]\\n[Calculation: Average of X comparable sales]\\nExample: 'eBay: 5 Base cards $5-8 avg (Feb), PSA guide $7-10, TCGPlayer $6-9. #161 Base up 15% due to rookie demand'\\n\\nCOLLECTIBILITY:\\n[Why collectors want this card, current market trends]"
+  "analysis": "CARD IDENTIFICATION:\\n[Driver name, team, card number verification, visual details]\\n\\nVARIANT & RARITY:\\n[Specific variant analysis, serial number details if present]\\n\\nVALUE ESTIMATES (2025 Topps Chrome F1 - from web search):\\nRaw: $X-Y\\nPSA 9: $X-Y\\nPSA 10: $X-Y\\n\\nVALUE SOURCES & DERIVATION:\\n[Weight most heavily: sales of this EXACT card (year, driver/card #, subset, variant)]\\n[Then: same driver different variants, then similar cards in set]\\n[List 1-3 credible sources with comparable sales data]\\n[Include: eBay recent sales (e.g. 3 sold $5-8 Feb 2025), PSA guide ($X-Y), TCGPlayer listings]\\n[Show specific comparable: Card #XXX sold for $Y on [Date]]\\n[Calculation: Average of X comparable sales]\\nExample: 'eBay: 5 Base cards $5-8 avg (Feb), PSA guide $7-10, TCGPlayer $6-9. #161 Base up 15% due to rookie demand'\\n\\nCOLLECTIBILITY:\\n[Why collectors want this card, current market trends]"
 }`
                     });
                     
@@ -2203,7 +2243,7 @@ IMPORTANT: Return ONLY valid JSON with properly escaped newlines (use \\n for li
   "variant": "exact variant (Base, Refractor, Purple /299, Blue /150, Green /99, Gold /50, Orange /25, Red /5, SuperFractor 1/1, Black /10, Magenta /250, Gold Wave /75, Printing Plate 1/1)",
   "isRookie": true/false,
   "confidence": "high/medium/low",
-  "analysis": "CARD IDENTIFICATION:\\n[Back image card number and driver verification]\\n\\nWEB SEARCH FINDINGS:\\n[2025 Topps Chrome F1 market data for this card and variant]\\n\\nVARIANT & RARITY:\\n[Specific variant analysis]\\n\\nVALUE ESTIMATES (2025 Topps Chrome F1):\\nRaw: $X-Y\\nPSA 9: $X-Y\\nPSA 10: $X-Y\\n\\nVALUE SOURCES & DERIVATION:\\n[List 1-3 credible sources with comparable sales data]\\n[Include: eBay recent sales (e.g. 3 sold $5-8 Feb 2025), PSA guide, TCGPlayer prices]\\n[Show specific comparable: Card #XXX variant sold for $Y on [Date]]\\n[Calculation: Average of X comparable sales]\\nExample: 'eBay: 5 Base cards $5-8 avg (Feb), PSA guide $7-10, TCGPlayer $6-9. #161 Base up 15% due to rookie demand'\\n\\nCOLLECTIBILITY:\\n[Why collectors want this, market trends]"
+  "analysis": "CARD IDENTIFICATION:\\n[Back image card number and driver verification]\\n\\nWEB SEARCH FINDINGS:\\n[2025 Topps Chrome F1 market data for this card and variant]\\n\\nVARIANT & RARITY:\\n[Specific variant analysis]\\n\\nVALUE ESTIMATES (2025 Topps Chrome F1):\\nRaw: $X-Y\\nPSA 9: $X-Y\\nPSA 10: $X-Y\\n\\nVALUE SOURCES & DERIVATION:\\n[Weight most heavily: sales of this EXACT card (year, driver/card #, subset, variant)]\\n[Then: same driver different variants, then similar cards in set]\\n[List 1-3 credible sources with comparable sales data]\\n[Include: eBay recent sales (e.g. 3 sold $5-8 Feb 2025), PSA guide, TCGPlayer prices]\\n[Show specific comparable: Card #XXX variant sold for $Y on [Date]]\\n[Calculation: Average of X comparable sales]\\nExample: 'eBay: 5 Base cards $5-8 avg (Feb), PSA guide $7-10, TCGPlayer $6-9. #161 Base up 15% due to rookie demand'\\n\\nCOLLECTIBILITY:\\n[Why collectors want this, market trends]"
 }`
                     });
                     
@@ -3255,25 +3295,25 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                                 if (!mostExpensiveValues) return null;
                                                                 
                                                                 return (
-                                                                    <div className="mt-3 flex items-center gap-3 justify-between">
+                                                                    <div className="mt-3 flex flex-col items-center gap-2">
                                                                         <div className="flex items-center gap-3">
                                                                             {/* $ Indicator - Vertically Centered */}
                                                                             <span className="text-lg font-bold text-green-400" style={{textShadow: '0 0 10px rgba(34, 197, 94, 0.5)'}} title="Estimated total collection value (Raw max values): $ = <$5, $$ = $5-40, $$$ = $40-100, $$$$ = $100-500, $$$$$ = >$500">
                                                                                 {calculateCardValue(card.num)}
                                                                             </span>
-                                                                            
+
                                                                             {/* Value Box */}
-                                                                            <div className="text-xs space-y-0.5 bg-slate-900/80 rounded px-2 py-1 ring-2 ring-green-700">
+                                                                            <div className="text-xs space-y-0.5 bg-slate-900/80 rounded px-2 py-1 ring-2 ring-green-700 text-center">
                                                                                 <div className="text-slate-300" title="Most expensive variant - Raw value range">Raw: {mostExpensiveValues.raw}</div>
                                                                                 <div className="text-blue-400" title="Most expensive variant - PSA 9 value range">PSA 9: {mostExpensiveValues.psa9}</div>
                                                                                 <div className="text-yellow-400" title="Most expensive variant - PSA 10 value range">PSA 10: {mostExpensiveValues.psa10}</div>
                                                                             </div>
+
+                                                                            {/* Count Badge */}
+                                                                            <span className="bg-green-500 text-white text-sm px-3 py-1.5 rounded-full font-bold shadow-lg" title="Total number of this card in your collection">
+                                                                                {totalCount}
+                                                                            </span>
                                                                         </div>
-                                                                        
-                                                                        {/* Count Badge - Same Row */}
-                                                                        <span className="bg-green-500 text-white text-sm px-3 py-1.5 rounded-full font-bold shadow-lg" title="Total number of this card in your collection">
-                                                                            {totalCount}
-                                                                        </span>
                                                                     </div>
                                                                 );
                                                             })()}
@@ -3863,7 +3903,6 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                     <li>✓ <strong>Upload 2 images:</strong> First the front, then the back</li>
                                                     <li>✓ <strong>Back image is crucial:</strong> Contains the card number</li>
                                                     <li>✓ <strong>Good lighting:</strong> Ensures card details are visible</li>
-                                                    <li>✓ <strong>iPhone users:</strong> Use screenshots (JPG) for instant upload</li>
                                                 </ul>
                                             </div>
                                         </>
