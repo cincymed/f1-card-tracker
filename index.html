@@ -3181,10 +3181,13 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                         if (response.ok) {
                             const data = await response.json();
                             if (data.cards && Object.keys(data.cards).length > 0) {
-                                setCollection(data.cards);
-                                // Also save to localStorage as backup
-                                localStorage.setItem('f1-collection-pro-v2', JSON.stringify(data.cards));
-                                const cardCount = Object.keys(data.cards).filter(k => k.startsWith('card-')).length;
+                                // Merge with local so analyses/grade reports aren't lost
+                                const localRaw = localStorage.getItem('f1-collection-pro-v2');
+                                const localColl = localRaw ? JSON.parse(localRaw) : {};
+                                const merged = mergeMongoWithLocal(data.cards, localColl);
+                                setCollection(merged);
+                                localStorage.setItem('f1-collection-pro-v2', JSON.stringify(merged));
+                                const cardCount = Object.keys(merged).filter(k => k.startsWith('card-')).length;
                                 alert(`✅ Synced from MongoDB!\n${cardCount} cards loaded`);
                                 console.log('✅ Successfully synced from MongoDB');
                                 return;
@@ -3211,6 +3214,55 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                 }
                 setShowMenuDropdown(false);
             };
+
+            // Silent background sync from MongoDB — used for cross-device sync.
+            // Uses mergeMongoWithLocal so local analyses/grades aren't overwritten.
+            const silentSyncFromMongo = async () => {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 8000);
+                    const response = await fetch(
+                        `https://f1-card-tracker-backend-1.onrender.com/api/collection/cincymed-f1-collection`,
+                        { method: 'GET', headers: getAuthHeaders(), signal: controller.signal }
+                    );
+                    clearTimeout(timeoutId);
+                    if (!response.ok) return;
+                    const data = await response.json();
+                    if (!data.cards || Object.keys(data.cards).length === 0) return;
+
+                    // Merge MongoDB counts with whatever's in localStorage right now
+                    const localRaw = localStorage.getItem('f1-collection-pro-v2');
+                    const localColl = localRaw ? JSON.parse(localRaw) : {};
+                    const merged = mergeMongoWithLocal(data.cards, localColl);
+
+                    // Only update state+storage if something actually changed
+                    if (JSON.stringify(merged) !== localRaw) {
+                        setCollection(merged);
+                        localStorage.setItem('f1-collection-pro-v2', JSON.stringify(merged));
+                        console.log('🔄 Silent sync: collection updated from MongoDB');
+                    }
+                } catch (err) {
+                    // Silently ignore — offline or timeout is fine
+                    console.log('Silent sync skipped:', err.message);
+                }
+            };
+
+            // Sync when the tab becomes visible again (user switches back from mobile, etc.)
+            useEffect(() => {
+                const handleVisibilityChange = () => {
+                    if (document.visibilityState === 'visible') {
+                        silentSyncFromMongo();
+                    }
+                };
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+                return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+            }, []);
+
+            // Poll MongoDB every 60 seconds to pick up changes from other devices
+            useEffect(() => {
+                const interval = setInterval(silentSyncFromMongo, 60000);
+                return () => clearInterval(interval);
+            }, []);
 
             const needsVerification = (confidence) => {
                 return confidence === 'medium' || confidence === 'low';
