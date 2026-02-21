@@ -1125,6 +1125,23 @@
                 }
             }, [cardData]);
 
+            // Check for variant filter from dashboard
+            useEffect(() => {
+                const filterData = localStorage.getItem('filterVariantOnLoad');
+                if (filterData) {
+                    try {
+                        const { variant, timestamp } = JSON.parse(filterData);
+                        if (Date.now() - timestamp < 5000) {
+                            setFilterVariants([variant]);
+                            setShowOwnedOnly(true);
+                        }
+                        localStorage.removeItem('filterVariantOnLoad');
+                    } catch (error) {
+                        localStorage.removeItem('filterVariantOnLoad');
+                    }
+                }
+            }, []);
+
             // Detect mobile device
             useEffect(() => {
                 const handleResize = () => {
@@ -1343,24 +1360,30 @@
                 Object.keys(coll).forEach(cardKey => {
                     if (cardKey.startsWith('_')) return;
                     const cardData = coll[cardKey];
-                    const cardCounts = {};
-                    Object.keys(cardData).forEach(variant => {
-                        if (!variant.startsWith('_')) {
-                            cardCounts[variant] = cardData[variant];
+                    const cardEntry = {};
+                    Object.keys(cardData).forEach(key => {
+                        if (key === '_analyses') {
+                            // Include analyses in MongoDB for persistence
+                            cardEntry._analyses = cardData._analyses;
+                        } else if (key === '_gradeReports') {
+                            // Include grade reports in MongoDB for persistence
+                            cardEntry._gradeReports = cardData._gradeReports;
+                        } else if (!key.startsWith('_')) {
+                            cardEntry[key] = cardData[key];
                         }
                     });
-                    if (Object.keys(cardCounts).length > 0) {
-                        stripped[cardKey] = cardCounts;
+                    if (Object.keys(cardEntry).filter(k => !k.startsWith('_')).length > 0) {
+                        stripped[cardKey] = cardEntry;
                     }
                 });
                 return stripped;
             };
 
-            // Merge MongoDB card counts with locally-stored analyses/gradeReports.
-            // MongoDB only stores counts; localStorage has the full data with analyses.
+            // Merge MongoDB data with locally-stored data.
+            // MongoDB now stores counts + analyses + gradeReports.
+            // Local analyses take priority if present; fall back to MongoDB analyses.
             const mergeMongoWithLocal = (mongoColl, localColl) => {
                 const merged = {};
-                // Start with all keys from both sources
                 const allKeys = new Set([...Object.keys(mongoColl), ...Object.keys(localColl)]);
                 allKeys.forEach(cardKey => {
                     if (cardKey.startsWith('_')) return;
@@ -1375,12 +1398,22 @@
                         }
                     });
 
-                    // Preserve local analyses and grade reports
-                    if (localCard._analyses) {
-                        mergedCard._analyses = localCard._analyses;
+                    // Merge analyses: prefer local if present, fall back to MongoDB
+                    const localAnalyses = localCard._analyses;
+                    const mongoAnalyses = mongoCard._analyses;
+                    if (localAnalyses && Object.keys(localAnalyses).length > 0) {
+                        mergedCard._analyses = localAnalyses;
+                    } else if (mongoAnalyses && Object.keys(mongoAnalyses).length > 0) {
+                        mergedCard._analyses = mongoAnalyses;
                     }
-                    if (localCard._gradeReports) {
-                        mergedCard._gradeReports = localCard._gradeReports;
+
+                    // Merge grade reports: prefer local if present, fall back to MongoDB
+                    const localGrades = localCard._gradeReports;
+                    const mongoGrades = mongoCard._gradeReports;
+                    if (localGrades && Object.keys(localGrades).length > 0) {
+                        mergedCard._gradeReports = localGrades;
+                    } else if (mongoGrades && Object.keys(mongoGrades).length > 0) {
+                        mergedCard._gradeReports = mongoGrades;
                     }
 
                     if (Object.keys(mergedCard).length > 0) {
@@ -1443,14 +1476,14 @@
                     localStorage.setItem('f1-collection-pro-v2', jsonStr);
                     console.log('✅ Saved to localStorage:', jsonStr.length, 'bytes');
 
-                    // Save ONLY card counts to MongoDB (strip analyses/gradeReports).
-                    // This keeps the MongoDB document small and avoids the 16MB limit.
+                    // Save counts + analyses + gradeReports to MongoDB for persistence.
+                    // Analyses are trimmed to last 3 per variant to keep payload manageable.
                     const mongoData = stripMetadataForMongo(cleanedCollection);
                     const id = 'cincymed-f1-collection';
                     const authHeaders = getAuthHeaders();
 
                     const mongoPayloadSize = JSON.stringify({ cards: mongoData }).length;
-                    console.log('📤 MongoDB payload size:', mongoPayloadSize, 'bytes (counts only, no analyses)');
+                    console.log('📤 MongoDB payload size:', mongoPayloadSize, 'bytes (counts + analyses)');
 
                     fetch(`https://f1-card-tracker-backend-1.onrender.com/api/collection/${id}`, {
                         method: 'POST',
