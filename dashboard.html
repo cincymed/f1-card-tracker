@@ -123,6 +123,46 @@
             }
         }
 
+        // Load full collection from localStorage (includes _analyses for value calc)
+        function getLocalCollection() {
+            try {
+                return JSON.parse(localStorage.getItem('f1-collection-pro-v2') || '{}');
+            } catch (e) {
+                return {};
+            }
+        }
+
+        // Calculate $-$$$$$ value tier for a card using localStorage analyses
+        function calculateCardValue(cardNum) {
+            const localCollection = getLocalCollection();
+            const cardKey = `card-${cardNum}`;
+            const cardInventory = localCollection[cardKey] || {};
+            const analyses = cardInventory._analyses || {};
+
+            let totalMaxValue = 0;
+
+            Object.keys(cardInventory).forEach(variant => {
+                if (variant.startsWith('_')) return;
+                const count = cardInventory[variant];
+                if (count === 0) return;
+                const variantAnalyses = analyses[variant] || [];
+                if (variantAnalyses.length === 0) return;
+                const latestAnalysis = variantAnalyses[variantAnalyses.length - 1];
+                const cleanAnalysis = (latestAnalysis.analysis || '').replace(/\*\*/g, '').replace(/\*/g, '');
+                const rawMatch = cleanAnalysis.match(/Raw[:\s]*\$?([\d,]+)\s*-\s*\$?([\d,]+)(?:[,.\s]|$)/i);
+                if (rawMatch) {
+                    totalMaxValue += parseInt(rawMatch[2].replace(/,/g, '')) * count;
+                }
+            });
+
+            if (totalMaxValue === 0) return '';
+            if (totalMaxValue < 5) return '$';
+            if (totalMaxValue <= 40) return '$$';
+            if (totalMaxValue <= 100) return '$$$';
+            if (totalMaxValue <= 500) return '$$$$';
+            return '$$$$$';
+        }
+
         function calculateStats(collection) {
             let totalCards = 0;
             let uniqueCards = 0;
@@ -179,7 +219,8 @@
                 .filter(k => !k.startsWith('_') && variants[k] > 0)
                 .map(v => `${v} (${variants[v]})`)
                 .join(', ');
-            return { card, totalCount, variantList, subset: card.subset };
+            const valueTier = calculateCardValue(cardNum);
+            return { card, totalCount, variantList, subset: card.subset, valueTier };
         }
 
         function sortCards(cards, column, direction) {
@@ -205,6 +246,10 @@
                     case 'total':
                         valA = a.totalCount;
                         valB = b.totalCount;
+                        break;
+                    case 'value':
+                        valA = (a.valueTier || '').length;
+                        valB = (b.valueTier || '').length;
                         break;
                     default:
                         valA = parseInt(a.card.num) || 999999;
@@ -236,7 +281,8 @@
                 localStorage.setItem('openCardOnLoad', JSON.stringify({
                     cardNum: cardNum,
                     card: card,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    returnTo: 'dashboard'
                 }));
                 window.location.href = 'index.html';
             }
@@ -351,17 +397,18 @@
                 const cards = subsetGroups[subset];
                 if (!cards || cards.length === 0) return;
                 const isCollapsed = dashboardState.collapsedSections[subset] !== false;
-                const subsetTotalCards = cards.reduce((sum, c) => sum + c.totalCount, 0);
+                const subsetOwnedCards = cards.reduce((sum, c) => sum + c.totalCount, 0);
+                const subsetTotalInSet = cardDatabase.filter(c => c.subset === subset).length;
 
                 // Section header row
                 tableRows += `
                     <tr class="section-header" onclick="toggleSection('${subset.replace(/'/g, "\\'")}')">
-                        <td colspan="5" style="background: linear-gradient(90deg, #1e293b, #0f172a); padding: 12px 16px; border-bottom: 2px solid #3b82f6;">
+                        <td colspan="6" style="background: linear-gradient(90deg, #1e293b, #0f172a); padding: 12px 16px; border-bottom: 2px solid #3b82f6;">
                             <div style="display: flex; align-items: center; justify-content: space-between;">
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <span style="font-size: 14px; transition: transform 0.2s; display: inline-block; transform: rotate(${isCollapsed ? '0' : '90'}deg);">▶</span>
                                     <span style="font-weight: 700; font-size: 14px; color: #93c5fd;">${subset}</span>
-                                    <span style="font-size: 12px; color: #64748b; font-weight: 400;">${cards.length} card${cards.length !== 1 ? 's' : ''} &middot; ${subsetTotalCards} total</span>
+                                    <span style="font-size: 12px; color: #64748b; font-weight: 400;">Showing ${cards.length} of ${subsetTotalInSet} cards &middot; ${subsetOwnedCards} total copies</span>
                                 </div>
                             </div>
                         </td>
@@ -371,6 +418,9 @@
                 // Card rows (only if section is expanded)
                 if (!isCollapsed) {
                     cards.forEach(item => {
+                        const valueColor = item.valueTier
+                            ? (item.valueTier.length >= 4 ? '#fbbf24' : item.valueTier.length >= 3 ? '#22c55e' : '#94a3b8')
+                            : '';
                         tableRows += `
                             <tr class="data-row" onclick="openCardDetail('${item.card.num}')">
                                 <td class="font-bold">#${item.card.num}</td>
@@ -378,6 +428,7 @@
                                 <td class="text-sm text-slate-400">${item.card.team || 'N/A'}</td>
                                 <td class="text-sm">${item.variantList}</td>
                                 <td class="font-bold text-green-400">${item.totalCount}</td>
+                                <td class="font-bold text-sm" style="color: ${valueColor}">${item.valueTier || '<span style="color: #475569;">—</span>'}</td>
                             </tr>
                         `;
                     });
@@ -391,8 +442,16 @@
                     <div class="max-w-7xl mx-auto">
                         <!-- Header -->
                         <div class="mb-8">
-                            <h1 class="text-4xl font-bold mb-4">F1 Card Collection Dashboard</h1>
-                            <p class="text-slate-400">View and analyze your 2025 Topps Chrome F1 collection</p>
+                            <h1 class="text-4xl font-bold mb-2">F1 Card Collection Dashboard</h1>
+                            <p class="text-slate-400 mb-3">View and analyze your 2025 Topps Chrome F1 collection</p>
+                            <div class="inline-flex items-center gap-3 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2">
+                                <span class="text-slate-400 text-sm">Collection Progress:</span>
+                                <span class="text-2xl font-bold text-green-400">${stats.uniqueCards}</span>
+                                <span class="text-slate-500 text-lg">/</span>
+                                <span class="text-2xl font-bold text-slate-300">${stats.totalSetCards}</span>
+                                <span class="text-slate-400 text-sm">cards</span>
+                                <span class="text-xs text-slate-500">(${stats.totalCards} total with duplicates)</span>
+                            </div>
                         </div>
 
                         <!-- Stats Cards -->
@@ -500,6 +559,7 @@
                                             <th onclick="sortByColumn('team')" style="min-width: 120px;">Team ${renderSortArrow('team')}</th>
                                             <th onclick="sortByColumn('variants')" style="min-width: 160px;">Variants ${renderSortArrow('variants')}</th>
                                             <th onclick="sortByColumn('total')" style="min-width: 70px;">Total ${renderSortArrow('total')}</th>
+                                            <th onclick="sortByColumn('value')" style="min-width: 70px;">Value ${renderSortArrow('value')}</th>
                                         </tr>
                                         <tr style="background: #0f172a;">
                                             <th style="padding: 4px 8px;">
@@ -517,10 +577,11 @@
                                             <th style="padding: 4px 8px;">
                                                 <input type="text" class="filter-input" placeholder="Min" value="${filters.total}" oninput="updateFilter('total', this.value)" onclick="event.stopPropagation()">
                                             </th>
+                                            <th style="padding: 4px 8px;"></th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        ${tableRows || '<tr><td colspan="5" class="text-center text-slate-400 py-8">No cards match the current filters</td></tr>'}
+                                        ${tableRows || '<tr><td colspan="6" class="text-center text-slate-400 py-8">No cards match the current filters</td></tr>'}
                                     </tbody>
                                 </table>
                             </div>
