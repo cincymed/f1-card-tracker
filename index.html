@@ -3428,9 +3428,9 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                 // Return emoji based on total value
                 if (totalMaxValue === 0) return '';
                 if (totalMaxValue < 5) return '$';
-                if (totalMaxValue < 25) return '$$';
-                if (totalMaxValue < 40) return '$$$';
-                if (totalMaxValue <= 250) return '$$$$';
+                if (totalMaxValue < 15) return '$$';
+                if (totalMaxValue < 30) return '$$$';
+                if (totalMaxValue <= 150) return '$$$$';
                 return '$$$$$';
             };
 
@@ -3694,9 +3694,9 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                     value={filterRookie}
                                                     onChange={(e) => setFilterRookie(e.target.value)}
                                                 >
-                                                    <option value="all">Rookies & Veterans</option>
-                                                    <option value="rookie">Rookies Only</option>
-                                                    <option value="veteran">Veterans Only</option>
+                                                    <option value="all">Rookies and Veterans</option>
+                                                    <option value="rookie">Rookies</option>
+                                                    <option value="veteran">Veterans</option>
                                                 </select>
                                             </div>
                                             {/* Value Filter */}
@@ -3711,10 +3711,10 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                     }}
                                                 >
                                                     <option value="">All Values</option>
-                                                    <option value="$$$$$">$$$$$ (&gt;$500)</option>
-                                                    <option value="$$$$">$$$$ ($100-$500)</option>
-                                                    <option value="$$$">$$$ ($40-$100)</option>
-                                                    <option value="$$">$$ ($5-$40)</option>
+                                                    <option value="$$$$$">$$$$$ (&gt;$150)</option>
+                                                    <option value="$$$$">$$$$ ($30-$150)</option>
+                                                    <option value="$$$">$$$ ($15-$30)</option>
+                                                    <option value="$$">$$ ($5-$15)</option>
                                                     <option value="$">$ (&lt;$5)</option>
                                                 </select>
                                             </div>
@@ -3759,7 +3759,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                         value={filterRookie}
                                         onChange={(e) => setFilterRookie(e.target.value)}
                                     >
-                                        <option value="all">Rookies vs Veterans</option>
+                                        <option value="all">Rookies and Veterans</option>
                                         <option value="rookie">Rookies</option>
                                         <option value="veteran">Veterans</option>
                                     </select>
@@ -3772,10 +3772,10 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                         }}
                                     >
                                         <option value="">Value Estimate ($)</option>
-                                        <option value="$$$$$">$$$$$ (&gt;$500)</option>
-                                        <option value="$$$$">$$$$ ($100-$500)</option>
-                                        <option value="$$$">$$$ ($40-$100)</option>
-                                        <option value="$$">$$ ($5-$40)</option>
+                                        <option value="$$$$$">$$$$$ (&gt;$150)</option>
+                                        <option value="$$$$">$$$$ ($30-$150)</option>
+                                        <option value="$$$">$$$ ($15-$30)</option>
+                                        <option value="$$">$$ ($5-$15)</option>
                                         <option value="$">$ (&lt;$5)</option>
                                     </select>
                                     <div className="relative">
