@@ -367,69 +367,131 @@
 
         // Parse and evaluate numeric filter expressions
         // Supports: 42 (exact), 1-200 (range), <101, <=100, >50, >=50, 1,3,56,194 (list)
-        function matchesNumericFilter(value, filterStr) {
-            const s = filterStr.trim();
+        // Prefix ! negates: !1-10 excludes 1-10, !3 excludes card 3
+        // When used as numeric filter, only matches purely numeric values (rejects "4N-2" etc.)
+        function matchesNumericFilter(value, filterStr, strictNumeric) {
+            let s = filterStr.trim();
             if (!s) return true;
+
+            // Handle NOT operator
+            let negate = false;
+            if (s.startsWith('!')) {
+                negate = true;
+                s = s.slice(1).trim();
+                if (!s) return true;
+            }
+
+            // For strict numeric mode (# column), reject values that aren't purely digits
+            if (strictNumeric && !/^\d+$/.test(value.trim())) {
+                // Non-numeric card nums never match numeric expressions, but if negated they pass
+                return negate;
+            }
+
             const num = parseInt(value);
-            if (isNaN(num)) return false;
+            if (isNaN(num)) return negate;
+
+            let result;
 
             // Comma-separated list: 1,3,56,194
             if (s.includes(',')) {
                 const list = s.split(',').map(v => parseInt(v.trim())).filter(v => !isNaN(v));
-                return list.includes(num);
+                result = list.includes(num);
+                return negate ? !result : result;
             }
             // Range: 1-200 (but not negative like -5)
             const rangeMatch = s.match(/^(\d+)\s*-\s*(\d+)$/);
             if (rangeMatch) {
                 const lo = parseInt(rangeMatch[1]);
                 const hi = parseInt(rangeMatch[2]);
-                return num >= lo && num <= hi;
+                result = num >= lo && num <= hi;
+                return negate ? !result : result;
             }
             // Less than or equal: <=100
             if (s.startsWith('<=')) {
                 const threshold = parseInt(s.slice(2));
-                return !isNaN(threshold) && num <= threshold;
+                result = !isNaN(threshold) && num <= threshold;
+                return negate ? !result : result;
             }
             // Greater than or equal: >=50
             if (s.startsWith('>=')) {
                 const threshold = parseInt(s.slice(2));
-                return !isNaN(threshold) && num >= threshold;
+                result = !isNaN(threshold) && num >= threshold;
+                return negate ? !result : result;
             }
             // Less than: <101
             if (s.startsWith('<')) {
                 const threshold = parseInt(s.slice(1));
-                return !isNaN(threshold) && num < threshold;
+                result = !isNaN(threshold) && num < threshold;
+                return negate ? !result : result;
             }
             // Greater than: >50
             if (s.startsWith('>')) {
                 const threshold = parseInt(s.slice(1));
-                return !isNaN(threshold) && num > threshold;
+                result = !isNaN(threshold) && num > threshold;
+                return negate ? !result : result;
             }
-            // Plain number or partial string match fallback
-            return value.toLowerCase().includes(s.toLowerCase());
+            // Plain number: exact match in strict mode
+            if (strictNumeric) {
+                result = num === parseInt(s);
+                return negate ? !result : result;
+            }
+            // Fallback: partial string match
+            result = value.toLowerCase().includes(s.toLowerCase());
+            return negate ? !result : result;
         }
 
-        // Detect if a filter string looks like a numeric expression
+        // Detect if a filter string looks like a numeric expression (with optional ! prefix)
         function isNumericFilter(s) {
-            const t = s.trim();
-            return /^(\d+\s*-\s*\d+|[<>]=?\s*\d+|\d+(\s*,\s*\d+)+)$/.test(t);
+            const t = s.trim().replace(/^!/, '').trim();
+            return /^(\d+\s*-\s*\d+|[<>]=?\s*\d+|\d+(\s*,\s*\d+)+|\d+)$/.test(t);
         }
 
         function filterCards(cards, filters) {
             return cards.filter(item => {
                 if (filters.num) {
                     if (isNumericFilter(filters.num)) {
-                        if (!matchesNumericFilter(item.card.num, filters.num)) return false;
+                        if (!matchesNumericFilter(item.card.num, filters.num, true)) return false;
                     } else {
-                        if (!item.card.num.toLowerCase().includes(filters.num.toLowerCase())) return false;
+                        // Text filter: handle ! for NOT on string match too
+                        const f = filters.num.trim();
+                        if (f.startsWith('!')) {
+                            const term = f.slice(1).trim().toLowerCase();
+                            if (term && item.card.num.toLowerCase().includes(term)) return false;
+                        } else {
+                            if (!item.card.num.toLowerCase().includes(f.toLowerCase())) return false;
+                        }
                     }
                 }
-                if (filters.name && !item.card.name.toLowerCase().includes(filters.name.toLowerCase())) return false;
-                if (filters.team && !(item.card.team || '').toLowerCase().includes(filters.team.toLowerCase())) return false;
-                if (filters.variants && !item.variantList.toLowerCase().includes(filters.variants.toLowerCase())) return false;
+                if (filters.name) {
+                    const f = filters.name.trim();
+                    if (f.startsWith('!')) {
+                        const term = f.slice(1).trim().toLowerCase();
+                        if (term && item.card.name.toLowerCase().includes(term)) return false;
+                    } else {
+                        if (!item.card.name.toLowerCase().includes(f.toLowerCase())) return false;
+                    }
+                }
+                if (filters.team) {
+                    const f = filters.team.trim();
+                    if (f.startsWith('!')) {
+                        const term = f.slice(1).trim().toLowerCase();
+                        if (term && (item.card.team || '').toLowerCase().includes(term)) return false;
+                    } else {
+                        if (!(item.card.team || '').toLowerCase().includes(f.toLowerCase())) return false;
+                    }
+                }
+                if (filters.variants) {
+                    const f = filters.variants.trim();
+                    if (f.startsWith('!')) {
+                        const term = f.slice(1).trim().toLowerCase();
+                        if (term && item.variantList.toLowerCase().includes(term)) return false;
+                    } else {
+                        if (!item.variantList.toLowerCase().includes(f.toLowerCase())) return false;
+                    }
+                }
                 if (filters.total) {
                     if (isNumericFilter(filters.total)) {
-                        if (!matchesNumericFilter(String(item.totalCount), filters.total)) return false;
+                        if (!matchesNumericFilter(String(item.totalCount), filters.total, false)) return false;
                     } else {
                         if (item.totalCount < parseInt(filters.total)) return false;
                     }
@@ -888,7 +950,7 @@
                                         </tr>
                                         <tr style="background: #0f172a;">
                                             <th style="padding: 4px 8px;">
-                                                <input type="text" class="filter-input" placeholder="# 1-200, <50, >100" value="${filters.num}" oninput="updateFilter('num', this.value)" onclick="event.stopPropagation()">
+                                                <input type="text" class="filter-input" placeholder="1-200, <50, !3,5" value="${filters.num}" oninput="updateFilter('num', this.value)" onclick="event.stopPropagation()">
                                             </th>
                                             <th style="padding: 4px 8px;">
                                                 <input type="text" class="filter-input" placeholder="Filter driver" value="${filters.name}" oninput="updateFilter('name', this.value)" onclick="event.stopPropagation()">
@@ -900,7 +962,7 @@
                                                 <input type="text" class="filter-input" placeholder="Filter variant" value="${filters.variants}" oninput="updateFilter('variants', this.value)" onclick="event.stopPropagation()">
                                             </th>
                                             <th style="padding: 4px 8px;">
-                                                <input type="text" class="filter-input" placeholder="1-5, >2, <3" value="${filters.total}" oninput="updateFilter('total', this.value)" onclick="event.stopPropagation()">
+                                                <input type="text" class="filter-input" placeholder=">2, 1-5, !1" value="${filters.total}" oninput="updateFilter('total', this.value)" onclick="event.stopPropagation()">
                                             </th>
                                             <th style="padding: 4px 8px;"></th>
                                         </tr>
