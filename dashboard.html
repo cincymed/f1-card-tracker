@@ -455,8 +455,8 @@
             return `<span class="sort-arrow ${isActive ? 'active' : ''}">${arrow}</span>`;
         }
 
-        // Render SVG value trend graph
-        function renderValueTrendGraph(priceHistory) {
+        // Render SVG value trend graph with dual PSA 9 and PSA 10 lines
+        function renderValueTrendGraph(priceHistory, psa10Ratio) {
             // Deduplicate by date - keep last entry per date
             const byDate = {};
             priceHistory.forEach(e => {
@@ -467,25 +467,37 @@
 
             if (data.length < 2) return '<div class="text-slate-500 text-sm text-center py-8">Need at least 2 snapshots for trend graph</div>';
 
-            const width = 400;
+            const width = 440;
             const height = 180;
-            const pad = { top: 15, right: 45, bottom: 28, left: 50 };
+            const pad = { top: 15, right: 90, bottom: 28, left: 50 };
             const chartW = width - pad.left - pad.right;
             const chartH = height - pad.top - pad.bottom;
 
-            const values = data.map(e => e.totalValue);
-            const minVal = Math.min(...values) * 0.9;
-            const maxVal = Math.max(...values) * 1.1;
+            // PSA 9 values from history, PSA 10 estimated via ratio
+            const psa9Values = data.map(e => e.totalValue || 0);
+            const psa10Values = data.map(e => Math.round((e.totalValue || 0) * psa10Ratio));
+
+            const allValues = [...psa9Values, ...psa10Values];
+            const minVal = Math.min(...allValues) * 0.9;
+            const maxVal = Math.max(...allValues) * 1.1;
             const range = maxVal - minVal || 1;
 
-            const points = data.map((e, i) => {
-                const x = pad.left + (i / (data.length - 1)) * chartW;
-                const y = pad.top + chartH - ((e.totalValue - minVal) / range) * chartH;
-                return { x, y, val: e.totalValue, date: e.date };
-            });
+            function toPoints(values) {
+                return values.map((v, i) => {
+                    const x = pad.left + (i / (data.length - 1)) * chartW;
+                    const y = pad.top + chartH - ((v - minVal) / range) * chartH;
+                    return { x, y };
+                });
+            }
 
-            const polyline = points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-            const fillPoints = `${pad.left},${pad.top + chartH} ${polyline} ${(pad.left + chartW).toFixed(1)},${pad.top + chartH}`;
+            const psa9Pts = toPoints(psa9Values);
+            const psa10Pts = toPoints(psa10Values);
+
+            const psa9Line = psa9Pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+            const psa10Line = psa10Pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+            // Fill under PSA 9
+            const psa9Fill = `${pad.left},${pad.top + chartH} ${psa9Line} ${(pad.left + chartW).toFixed(1)},${pad.top + chartH}`;
 
             // Y-axis labels
             let yLabels = '';
@@ -496,33 +508,50 @@
                 yLabels += `<line x1="${pad.left}" y1="${y}" x2="${pad.left + chartW}" y2="${y}" stroke="#334155" stroke-width="0.5"/>`;
             }
 
-            // X-axis date labels (show first, last, and a few in between)
+            // X-axis date labels
             const labelIndices = [0];
             if (data.length > 2) labelIndices.push(Math.floor(data.length / 2));
             labelIndices.push(data.length - 1);
             const dateLabels = labelIndices.map(i => {
-                const p = points[i];
+                const p = psa9Pts[i];
                 return `<text x="${p.x.toFixed(1)}" y="${height - 4}" fill="#64748b" font-size="9" text-anchor="middle">${new Date(data[i].date).toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</text>`;
             }).join('');
 
-            // Data point circles with value tooltips
-            const circles = points.map(p =>
+            // Data point circles
+            const psa9Circles = psa9Pts.map(p =>
                 `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#22c55e" stroke="#0f172a" stroke-width="1"/>`
             ).join('');
+            const psa10Circles = psa10Pts.map(p =>
+                `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#eab308" stroke="#0f172a" stroke-width="1"/>`
+            ).join('');
+
+            // Legend (right side)
+            const legendX = pad.left + chartW + 10;
+            const legend = `
+                <line x1="${legendX}" y1="20" x2="${legendX + 16}" y2="20" stroke="#22c55e" stroke-width="2"/>
+                <circle cx="${legendX + 8}" cy="20" r="3" fill="#22c55e"/>
+                <text x="${legendX + 22}" y="24" fill="#94a3b8" font-size="9">PSA 9</text>
+                <line x1="${legendX}" y1="38" x2="${legendX + 16}" y2="38" stroke="#eab308" stroke-width="2"/>
+                <circle cx="${legendX + 8}" cy="38" r="3" fill="#eab308"/>
+                <text x="${legendX + 22}" y="42" fill="#94a3b8" font-size="9">PSA 10</text>
+            `;
 
             return `
                 <svg viewBox="0 0 ${width} ${height}" class="w-full" style="max-height: 200px;">
                     <defs>
-                        <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stop-color="#22c55e" stop-opacity="0.3"/>
+                        <linearGradient id="trendFill9" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#22c55e" stop-opacity="0.2"/>
                             <stop offset="100%" stop-color="#22c55e" stop-opacity="0.02"/>
                         </linearGradient>
                     </defs>
                     ${yLabels}
-                    <polygon points="${fillPoints}" fill="url(#trendFill)"/>
-                    <polyline points="${polyline}" fill="none" stroke="#22c55e" stroke-width="2" stroke-linejoin="round"/>
-                    ${circles}
+                    <polygon points="${psa9Fill}" fill="url(#trendFill9)"/>
+                    <polyline points="${psa9Line}" fill="none" stroke="#22c55e" stroke-width="2" stroke-linejoin="round"/>
+                    <polyline points="${psa10Line}" fill="none" stroke="#eab308" stroke-width="2" stroke-linejoin="round" stroke-dasharray="6,3"/>
+                    ${psa9Circles}
+                    ${psa10Circles}
                     ${dateLabels}
+                    ${legend}
                 </svg>
             `;
         }
@@ -597,17 +626,18 @@
                         </tr>
                     `;
                 } else {
-                    // Expanded: full-width section header
+                    // Expanded: section header with value visible
                     tableRows += `
                         <tr class="section-header" onclick="toggleSection('${subset.replace(/'/g, "\\'")}')">
-                            <td colspan="6" style="background: linear-gradient(90deg, #1e293b, #0f172a); padding: 12px 16px; border-bottom: 2px solid #3b82f6;">
-                                <div style="display: flex; align-items: center; justify-content: space-between;">
-                                    <div style="display: flex; align-items: center; gap: 10px;">
-                                        <span style="font-size: 14px; transition: transform 0.2s; display: inline-block; transform: rotate(90deg);">&#9654;</span>
-                                        <span style="font-weight: 700; font-size: 14px; color: #93c5fd;">${subset}</span>
-                                        <span style="font-size: 12px; color: #64748b; font-weight: 400;">Showing ${cards.length} of ${subsetTotalInSet} cards &middot; ${subsetOwnedCards} total copies</span>
-                                    </div>
+                            <td colspan="5" style="background: linear-gradient(90deg, #1e293b, #0f172a); padding: 12px 16px; border-bottom: 2px solid #3b82f6;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-size: 14px; transition: transform 0.2s; display: inline-block; transform: rotate(90deg);">&#9654;</span>
+                                    <span style="font-weight: 700; font-size: 14px; color: #93c5fd;">${subset}</span>
+                                    <span style="font-size: 12px; color: #64748b; font-weight: 400;">Showing ${cards.length} of ${subsetTotalInSet} cards &middot; ${subsetOwnedCards} total copies</span>
                                 </div>
+                            </td>
+                            <td style="background: linear-gradient(90deg, #0f172a, #0f172a); padding: 12px 16px; border-bottom: 2px solid #3b82f6; font-weight: 700; color: #22c55e; font-size: 14px; text-align: right;">
+                                ${sectionValue > 0 ? '$' + sectionValue.toLocaleString() : ''}
                             </td>
                         </tr>
                     `;
@@ -647,13 +677,13 @@
                         <div class="mb-8">
                             <h1 class="text-4xl font-bold mb-2">F1 Card Collection Dashboard</h1>
                             <p class="text-slate-400 mb-3">View and analyze your 2025 Topps Chrome F1 collection</p>
-                            <div class="inline-flex items-center gap-3 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2">
-                                <span class="text-slate-400 text-sm">Collection Progress:</span>
-                                <span class="text-2xl font-bold text-green-400">${stats.uniqueCards}</span>
-                                <span class="text-slate-500 text-lg">/</span>
-                                <span class="text-2xl font-bold text-slate-300">${stats.totalSetCards}</span>
-                                <span class="text-slate-400 text-sm">cards</span>
-                                <span class="text-xs text-slate-500">(${stats.totalCards} total with duplicates)</span>
+                            <div class="flex items-center justify-center gap-4 bg-slate-800 border border-slate-700 rounded-lg px-6 py-6 w-full">
+                                <span class="text-slate-400 text-lg">Collection Progress:</span>
+                                <span class="text-4xl font-bold text-green-400">${stats.uniqueCards}</span>
+                                <span class="text-slate-500 text-2xl">/</span>
+                                <span class="text-4xl font-bold text-slate-300">${stats.totalSetCards}</span>
+                                <span class="text-slate-400 text-lg">cards</span>
+                                <span class="text-sm text-slate-500">(${stats.totalCards} total with duplicates)</span>
                             </div>
                         </div>
 
@@ -670,14 +700,14 @@
                                 <div class="text-xs text-slate-500 mt-2">Different card types</div>
                             </div>
                             <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
-                                <div class="text-slate-400 text-sm mb-2">Completion</div>
-                                <div class="text-3xl font-bold text-purple-400">${completion}%</div>
-                                <div class="text-xs text-slate-500 mt-2">of ${stats.totalSetCards} set</div>
-                            </div>
-                            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
                                 <div class="text-slate-400 text-sm mb-2">Variants Owned</div>
                                 <div class="text-3xl font-bold text-yellow-400">${Object.keys(stats.cardsByVariant).length}</div>
                                 <div class="text-xs text-slate-500 mt-2">Different variants</div>
+                            </div>
+                            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                                <div class="text-slate-400 text-sm mb-2">Completion</div>
+                                <div class="text-3xl font-bold text-purple-400">${completion}%</div>
+                                <div class="text-xs text-slate-500 mt-2">of ${stats.totalSetCards} set</div>
                             </div>
                         </div>
 
@@ -718,23 +748,42 @@
                                 </div>
                                 <div class="bg-slate-700 rounded p-4">
                                     <div class="text-slate-400 text-sm mb-2">Value Trend</div>
-                                    ${renderValueTrendGraph(priceHistory)}
+                                    ${renderValueTrendGraph(priceHistory, stats.currentValue > 0 ? stats.currentPSA10Value / stats.currentValue : 1.5)}
                                 </div>
                             </div>
-                            ${uniqueHistory.length > 0 ? `
+                            ${uniqueHistory.length > 0 ? (() => {
+                                const ratio = stats.currentValue > 0 ? stats.currentPSA10Value / stats.currentValue : 1.5;
+                                return `
                                 <div class="text-sm text-slate-400 mb-2">
                                     Total Snapshots: ${uniqueHistory.length}
                                 </div>
-                                <div class="space-y-2 text-sm">
-                                    ${uniqueHistory.slice(-5).reverse().map(entry => `
-                                        <div class="flex justify-between bg-slate-700 p-2 rounded">
-                                            <span>${new Date(entry.date).toLocaleDateString()}</span>
-                                            <span class="font-semibold text-green-400">$${(entry.totalValue || 0).toLocaleString()}</span>
-                                            <span class="text-slate-400">${entry.cardCount} cards</span>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            ` : ''}
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead>
+                                            <tr class="text-slate-400 border-b border-slate-600">
+                                                <th class="text-left py-2 px-2 font-medium">Date</th>
+                                                <th class="text-right py-2 px-2 font-medium" style="color: #22c55e;">PSA 9</th>
+                                                <th class="text-right py-2 px-2 font-medium" style="color: #eab308;">PSA 10</th>
+                                                <th class="text-right py-2 px-2 font-medium text-slate-400">Cards</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${uniqueHistory.slice(-5).reverse().map(entry => {
+                                                const psa9 = entry.totalValue || 0;
+                                                const psa10 = Math.round(psa9 * ratio);
+                                                return `
+                                                    <tr class="border-b border-slate-700/50">
+                                                        <td class="py-2 px-2">${new Date(entry.date).toLocaleDateString()}</td>
+                                                        <td class="py-2 px-2 text-right font-semibold text-green-400">$${psa9.toLocaleString()}</td>
+                                                        <td class="py-2 px-2 text-right font-semibold text-yellow-400">$${psa10.toLocaleString()}</td>
+                                                        <td class="py-2 px-2 text-right text-slate-400">${entry.cardCount}</td>
+                                                    </tr>
+                                                `;
+                                            }).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>`;
+                            })() : ''}
                         </div>
 
                         <!-- Collection Table -->
@@ -798,11 +847,12 @@
                         <div class="fixed right-6 bottom-6 z-40">
                             <a
                                 href="index.html"
-                                class="group bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold shadow-lg hover:shadow-blue-500/25 hover:shadow-xl flex items-center justify-center gap-2 transition-all duration-300 hover:scale-105 px-5 py-3"
-                                style="clip-path: polygon(20% 0, 100% 0, 100% 100%, 20% 100%, 0 50%); padding-left: 28px;"
+                                class="group bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold shadow-lg hover:shadow-blue-500/25 hover:shadow-xl flex flex-col items-center justify-center gap-2 transition-all duration-300 hover:scale-105"
+                                style="clip-path: polygon(0 50%, 38px 0, 100% 0, 100% 100%, 38px 100%); padding-left: 38px; width: 150px; height: 120px;"
                                 title="Return to main collection view"
                             >
-                                <span class="text-sm font-medium">Return to Collection</span>
+                                <span class="text-4xl">📋</span>
+                                <span class="text-sm font-medium">Return to<br>Collection</span>
                             </a>
                         </div>
                     </div>
