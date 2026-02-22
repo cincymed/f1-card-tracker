@@ -78,6 +78,13 @@
 
                 const stats = calculateStats(collection);
 
+                // Override the latest snapshot's totalValue with the live-calculated value
+                // so graph and snapshot table match the Current Value display
+                if (priceHistory.length > 0) {
+                    const latest = priceHistory[priceHistory.length - 1];
+                    latest.totalValue = stats.currentValue;
+                }
+
                 // Store globally for re-renders
                 window.dashboardData = { collection, stats, priceHistory };
 
