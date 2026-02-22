@@ -3428,9 +3428,9 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                 // Return emoji based on total value
                 if (totalMaxValue === 0) return '';
                 if (totalMaxValue < 5) return '$';
-                if (totalMaxValue <= 40) return '$$';
-                if (totalMaxValue <= 100) return '$$$';
-                if (totalMaxValue <= 500) return '$$$$';
+                if (totalMaxValue < 25) return '$$';
+                if (totalMaxValue < 40) return '$$$';
+                if (totalMaxValue <= 250) return '$$$$';
                 return '$$$$$';
             };
 
