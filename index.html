@@ -3595,15 +3595,15 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                     <div className={`${isMobile ? 'flex gap-4 w-full' : 'flex gap-8 ml-auto justify-end'}`}>
                                         <div className="flex flex-col items-center gap-1" title="Total number of cards in your collection (including duplicates)">
                                             <span className={`font-bold text-green-400 ${isMobile ? 'text-lg' : 'text-xl'}`}>{stats.totalCopies}</span>
-                                            <span className="text-xs text-slate-400">Total Cards</span>
+                                            <span className="text-xs text-slate-400 text-center">Total Cards</span>
                                         </div>
                                         <div className="flex flex-col items-center gap-1" title="Number of different cards you own out of total cards in set">
                                             <span className={`font-bold text-blue-400 ${isMobile ? 'text-lg' : 'text-xl'}`}>{stats.cardsOwned}/{stats.totalCards}</span>
-                                            <span className="text-xs text-slate-400">Unique Cards</span>
+                                            <span className="text-xs text-slate-400 text-center">Unique<br/>Cards</span>
                                         </div>
                                         <div className="flex flex-col items-center gap-1" title="Percentage of the complete set you own">
                                             <span className={`font-bold text-purple-400 ${isMobile ? 'text-lg' : 'text-xl'}`}>{((stats.cardsOwned/stats.totalCards)*100).toFixed(1)}%</span>
-                                            <span className="text-xs text-slate-400">Complete Set</span>
+                                            <span className="text-xs text-slate-400 text-center">Complete Set</span>
                                         </div>
                                     </div>
                                 </div>
@@ -3917,8 +3917,8 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                     <div key={groupIndex}>
                                         <div className="page-container flex items-start">
                                             {/* Large page number in left margin with long-press menu */}
-                                            <div 
-                                                className="page-number flex-shrink-0 relative"
+                                            <div
+                                                className="page-number flex-shrink-0"
                                                 title="Long-press to jump to any page"
                                                 onMouseDown={() => {
                                                     const pressTimer = setTimeout(() => {
@@ -4221,12 +4221,12 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                             {/* Dashboard Button */}
                             <a
                                 href="dashboard.html"
-                                className={`bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-lg flex flex-col items-center justify-center gap-2 transition-all ${isMobile ? 'flex-1 py-3' : 'px-4 py-3 w-28'}`}
+                                className={`group bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg font-semibold shadow-lg flex flex-col items-center justify-center gap-2 transition-all ${isMobile ? 'flex-1 py-3' : 'px-4 py-3 w-28'}`}
                                 style={isMobile ? {height: '60px'} : {height: '120px'}}
                                 title="View your collection dashboard and analytics"
                             >
                                 <span className={isMobile ? 'text-2xl' : 'text-4xl'}>📊</span>
-                                <span className={isMobile ? 'text-xs' : 'text-sm'}>Dashboard</span>
+                                <span className={`flex items-center gap-1 ${isMobile ? 'text-xs' : 'text-sm'}`}>Dashboard <span className="transition-transform duration-300 group-hover:translate-x-0.5">→</span></span>
                             </a>
 
                             {/* Bulk Analyze Button - Desktop only */}

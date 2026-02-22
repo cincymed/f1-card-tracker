@@ -375,6 +375,9 @@
         // Update filter
         function updateFilter(column, value) {
             dashboardState.filters[column] = value;
+            dashboardState._activeFilterColumn = column;
+            const el = document.activeElement;
+            dashboardState._cursorPosition = el ? el.selectionStart : null;
             reRender();
         }
 
@@ -641,34 +644,36 @@
                                 title="Return to main collection view"
                             >
                                 <span class="text-lg transition-transform duration-300 group-hover:-translate-x-0.5">&#8592;</span>
-                                <span class="text-sm font-medium">Collection</span>
+                                <span class="text-sm font-medium">Return to Collection</span>
                             </a>
                         </div>
                     </div>
                 </div>
             `;
 
+            // Save scroll position before replacing DOM
+            const scrollTop = window.scrollY || document.documentElement.scrollTop;
+
             document.getElementById('root').innerHTML = html;
 
+            // Restore scroll position
+            window.scrollTo(0, scrollTop);
+
             // Restore filter input focus if user was typing
-            setTimeout(() => {
-                const activeFilter = document.activeElement;
-                if (activeFilter && activeFilter.classList && activeFilter.classList.contains('filter-input')) {
-                    // Already focused
-                } else {
-                    // Try to restore focus to filter inputs that have values
-                    Object.entries(dashboardState.filters).forEach(([col, val]) => {
-                        if (val) {
-                            const inputs = document.querySelectorAll('.filter-input');
-                            inputs.forEach(input => {
-                                if (input.value === val) {
-                                    // Don't steal focus, just ensure value persists
-                                }
-                            });
-                        }
-                    });
+            if (dashboardState._activeFilterColumn) {
+                const columns = ['num', 'name', 'team', 'variants', 'total'];
+                const idx = columns.indexOf(dashboardState._activeFilterColumn);
+                const inputs = document.querySelectorAll('.filter-input');
+                if (idx >= 0 && inputs[idx]) {
+                    inputs[idx].focus();
+                    const pos = dashboardState._cursorPosition;
+                    if (pos !== null && pos !== undefined) {
+                        try { inputs[idx].setSelectionRange(pos, pos); } catch(e) {}
+                    }
                 }
-            }, 0);
+                dashboardState._activeFilterColumn = null;
+                dashboardState._cursorPosition = null;
+            }
         }
 
         loadDashboard();
