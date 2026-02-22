@@ -27,8 +27,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
     <style>
-        html { overflow-x: hidden; }
-        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overflow-x: hidden; }
+        html { overflow-x: clip; }
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overflow-x: clip; }
         .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.75rem; }
         @media (min-width: 768px) {
             .card-grid { grid-template-columns: repeat(4, 1fr); }
@@ -64,19 +64,14 @@
             text-orientation: mixed;
             transform: rotate(180deg);
             margin-right: 1rem;
-            display: none;
+            display: flex;
+            align-items: flex-start;
             user-select: none;
             cursor: pointer;
             transition: opacity 0.2s;
         }
         .page-number:hover {
             opacity: 0.7;
-        }
-        @media (min-width: 768px) {
-            .page-number {
-                display: flex;
-                align-items: flex-start;
-            }
         }
         .page-divider {
             position: sticky;
@@ -3542,7 +3537,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                             )}
 
                             <div className="mb-2">
-                                <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-start'} mb-1 relative`}>
+                                <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'} mb-1 relative`}>
                                     {/* Hamburger Menu + Title */}
                                     <div className="flex items-center gap-2 md:gap-3 w-full">
                                         {/* Hamburger Menu */}
@@ -3915,10 +3910,11 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                 
                                 return (
                                     <div key={groupIndex}>
-                                        <div className="page-container flex items-start">
-                                            {/* Large page number in left margin with long-press menu */}
+                                        <div className="page-container flex">
+                                            {/* Page number column - self-stretch for sticky to work */}
+                                            <div className="flex-shrink-0 self-stretch hidden md:block">
                                             <div
-                                                className="page-number flex-shrink-0"
+                                                className="page-number"
                                                 title="Long-press to jump to any page"
                                                 onMouseDown={() => {
                                                     const pressTimer = setTimeout(() => {
@@ -3975,7 +3971,8 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                             >
                                                 Page {groupIndex + 1}
                                             </div>
-                                            
+                                            </div>
+
                                             <div className="flex-1">
                                             <div className="card-grid mb-4">
                                                 {groupCards.map(card => {
@@ -4218,17 +4215,6 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                 {!serverOnline && <span className="text-xs text-red-300">Offline</span>}
                             </button>
 
-                            {/* Dashboard Button */}
-                            <a
-                                href="dashboard.html"
-                                className={`group bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg font-semibold shadow-lg flex flex-col items-center justify-center gap-2 transition-all ${isMobile ? 'flex-1 py-3' : 'px-4 py-3 w-28'}`}
-                                style={isMobile ? {height: '60px'} : {height: '120px'}}
-                                title="View your collection dashboard and analytics"
-                            >
-                                <span className={isMobile ? 'text-2xl' : 'text-4xl'}>📊</span>
-                                <span className={`flex items-center gap-1 ${isMobile ? 'text-xs' : 'text-sm'}`}>Dashboard <span className="transition-transform duration-300 group-hover:translate-x-0.5">→</span></span>
-                            </a>
-
                             {/* Bulk Analyze Button - Desktop only */}
                             {!isMobile && (
                                 <button
@@ -4242,6 +4228,17 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                     <span className="text-sm text-center leading-tight">{bulkAnalyzing ? `${bulkAnalyzeProgress.current}/${bulkAnalyzeProgress.total}` : bulkSelectMode ? (bulkSelectedCards.size > 0 ? `Analyze (${bulkSelectedCards.size})` : 'Select Cards') : 'Bulk Analyze'}</span>
                                 </button>
                             )}
+
+                            {/* Dashboard Button - 5-sided arrow pointing right */}
+                            <a
+                                href="dashboard.html"
+                                className={`group bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold shadow-lg flex flex-col items-center justify-center gap-2 transition-all ${isMobile ? 'flex-1 py-3' : 'px-4 py-3 w-28'}`}
+                                style={isMobile ? {height: '60px', clipPath: 'polygon(0 0, 80% 0, 100% 50%, 80% 100%, 0 100%)', paddingRight: '24px'} : {height: '120px', clipPath: 'polygon(0 0, 75% 0, 100% 50%, 75% 100%, 0 100%)', paddingRight: '28px'}}
+                                title="View your collection dashboard and analytics"
+                            >
+                                <span className={isMobile ? 'text-2xl' : 'text-4xl'}>📊</span>
+                                <span className={isMobile ? 'text-xs' : 'text-sm'}>Dashboard</span>
+                            </a>
                         </div>
 
                         {selectedCard && (

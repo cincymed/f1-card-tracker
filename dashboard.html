@@ -17,6 +17,7 @@
         .card-table tr.data-row:active { background: #334155; }
         .section-header { cursor: pointer; user-select: none; }
         .section-header:hover { background: rgba(59, 130, 246, 0.1) !important; }
+        .section-header td { position: sticky; z-index: 5; }
         .sort-arrow { display: inline-block; margin-left: 4px; font-size: 10px; opacity: 0.5; }
         .sort-arrow.active { opacity: 1; color: #60a5fa; }
         .filter-input { background: #1e293b; border: 1px solid #475569; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; width: 100%; margin-top: 4px; }
@@ -151,6 +152,15 @@
             return 0;
         }
 
+        // Extract max PSA 10 value from analysis text
+        function extractMaxPSA10Value(analysisText) {
+            if (!analysisText) return 0;
+            const clean = analysisText.replace(/\*\*/g, '').replace(/\*/g, '').replace(/[–—]/g, '-');
+            const psa10Match = clean.match(/\bPSA\s*10\b[^:\n]{0,25}:\s*~?(?:approximately\s+)?\$?([\d,]+)\s*-\s*~?\$?([\d,]+)/i);
+            if (psa10Match) return parseInt(psa10Match[2].replace(/,/g, ''));
+            return 0;
+        }
+
         // Calculate $-$$$$$ value tier for a card
         function calculateCardValue(cardNum, collection) {
             const cardKey = `card-${cardNum}`;
@@ -178,6 +188,25 @@
             return '$$$$$';
         }
 
+        // Calculate raw dollar value for a card (PSA 9 max)
+        function calculateCardRawValue(cardNum, collection) {
+            const cardKey = `card-${cardNum}`;
+            const cardInventory = collection[cardKey] || {};
+            const analyses = getCardAnalyses(cardNum, collection);
+            let total = 0;
+            Object.keys(cardInventory).forEach(variant => {
+                if (variant.startsWith('_')) return;
+                const count = cardInventory[variant];
+                if (count === 0) return;
+                const variantAnalyses = analyses[variant] || [];
+                if (variantAnalyses.length === 0) return;
+                const latestAnalysis = variantAnalyses[variantAnalyses.length - 1];
+                const maxVal = extractMaxPSA9Value(latestAnalysis.analysis);
+                if (maxVal > 0) total += maxVal * count;
+            });
+            return total;
+        }
+
         // Calculate total collection value as sum of max PSA 9 values
         function calculateTotalCollectionValue(collection) {
             let total = 0;
@@ -195,6 +224,29 @@
                     if (variantAnalyses.length === 0) return;
                     const latestAnalysis = variantAnalyses[variantAnalyses.length - 1];
                     const maxVal = extractMaxPSA9Value(latestAnalysis.analysis);
+                    if (maxVal > 0) total += maxVal * count;
+                });
+            });
+            return total;
+        }
+
+        // Calculate total collection value as sum of max PSA 10 values
+        function calculateTotalCollectionPSA10Value(collection) {
+            let total = 0;
+            Object.keys(collection).forEach(cardKey => {
+                if (cardKey.startsWith('_') || !cardKey.startsWith('card-')) return;
+                const cardNum = cardKey.replace('card-', '');
+                const cardInventory = collection[cardKey];
+                const analyses = getCardAnalyses(cardNum, collection);
+
+                Object.keys(cardInventory).forEach(variant => {
+                    if (variant.startsWith('_')) return;
+                    const count = cardInventory[variant];
+                    if (count === 0) return;
+                    const variantAnalyses = analyses[variant] || [];
+                    if (variantAnalyses.length === 0) return;
+                    const latestAnalysis = variantAnalyses[variantAnalyses.length - 1];
+                    const maxVal = extractMaxPSA10Value(latestAnalysis.analysis);
                     if (maxVal > 0) total += maxVal * count;
                 });
             });
@@ -226,13 +278,15 @@
             });
 
             const currentValue = calculateTotalCollectionValue(collection);
+            const currentPSA10Value = calculateTotalCollectionPSA10Value(collection);
 
             return {
                 totalCards,
                 uniqueCards,
                 cardsByVariant,
                 totalSetCards: cardDatabase.length,
-                currentValue
+                currentValue,
+                currentPSA10Value
             };
         }
 
@@ -260,7 +314,8 @@
                 .map(v => `${v} (${variants[v]})`)
                 .join(', ');
             const valueTier = calculateCardValue(cardNum, collection);
-            return { card, totalCount, variantList, subset: card.subset, valueTier };
+            const rawValue = calculateCardRawValue(cardNum, collection);
+            return { card, totalCount, variantList, subset: card.subset, valueTier, rawValue };
         }
 
         function sortCards(cards, column, direction) {
@@ -400,6 +455,78 @@
             return `<span class="sort-arrow ${isActive ? 'active' : ''}">${arrow}</span>`;
         }
 
+        // Render SVG value trend graph
+        function renderValueTrendGraph(priceHistory) {
+            // Deduplicate by date - keep last entry per date
+            const byDate = {};
+            priceHistory.forEach(e => {
+                const dateStr = new Date(e.date).toLocaleDateString();
+                byDate[dateStr] = e;
+            });
+            const data = Object.values(byDate);
+
+            if (data.length < 2) return '<div class="text-slate-500 text-sm text-center py-8">Need at least 2 snapshots for trend graph</div>';
+
+            const width = 400;
+            const height = 180;
+            const pad = { top: 15, right: 45, bottom: 28, left: 50 };
+            const chartW = width - pad.left - pad.right;
+            const chartH = height - pad.top - pad.bottom;
+
+            const values = data.map(e => e.totalValue);
+            const minVal = Math.min(...values) * 0.9;
+            const maxVal = Math.max(...values) * 1.1;
+            const range = maxVal - minVal || 1;
+
+            const points = data.map((e, i) => {
+                const x = pad.left + (i / (data.length - 1)) * chartW;
+                const y = pad.top + chartH - ((e.totalValue - minVal) / range) * chartH;
+                return { x, y, val: e.totalValue, date: e.date };
+            });
+
+            const polyline = points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+            const fillPoints = `${pad.left},${pad.top + chartH} ${polyline} ${(pad.left + chartW).toFixed(1)},${pad.top + chartH}`;
+
+            // Y-axis labels
+            let yLabels = '';
+            for (let i = 0; i <= 4; i++) {
+                const val = minVal + range * (i / 4);
+                const y = pad.top + chartH - (i / 4) * chartH;
+                yLabels += `<text x="${pad.left - 5}" y="${y + 4}" fill="#64748b" font-size="9" text-anchor="end">$${Math.round(val).toLocaleString()}</text>`;
+                yLabels += `<line x1="${pad.left}" y1="${y}" x2="${pad.left + chartW}" y2="${y}" stroke="#334155" stroke-width="0.5"/>`;
+            }
+
+            // X-axis date labels (show first, last, and a few in between)
+            const labelIndices = [0];
+            if (data.length > 2) labelIndices.push(Math.floor(data.length / 2));
+            labelIndices.push(data.length - 1);
+            const dateLabels = labelIndices.map(i => {
+                const p = points[i];
+                return `<text x="${p.x.toFixed(1)}" y="${height - 4}" fill="#64748b" font-size="9" text-anchor="middle">${new Date(data[i].date).toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</text>`;
+            }).join('');
+
+            // Data point circles with value tooltips
+            const circles = points.map(p =>
+                `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#22c55e" stroke="#0f172a" stroke-width="1"/>`
+            ).join('');
+
+            return `
+                <svg viewBox="0 0 ${width} ${height}" class="w-full" style="max-height: 200px;">
+                    <defs>
+                        <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#22c55e" stop-opacity="0.3"/>
+                            <stop offset="100%" stop-color="#22c55e" stop-opacity="0.02"/>
+                        </linearGradient>
+                    </defs>
+                    ${yLabels}
+                    <polygon points="${fillPoints}" fill="url(#trendFill)"/>
+                    <polyline points="${polyline}" fill="none" stroke="#22c55e" stroke-width="2" stroke-linejoin="round"/>
+                    ${circles}
+                    ${dateLabels}
+                </svg>
+            `;
+        }
+
         function renderDashboard(collection, stats, priceHistory = []) {
             const completion = ((stats.uniqueCards / stats.totalSetCards) * 100).toFixed(1);
 
@@ -451,24 +578,40 @@
                 const isCollapsed = dashboardState.collapsedSections[subset] !== false;
                 const subsetOwnedCards = cards.reduce((sum, c) => sum + c.totalCount, 0);
                 const subsetTotalInSet = cardDatabase.filter(c => c.subset === subset).length;
+                const sectionValue = cards.reduce((sum, c) => sum + c.rawValue, 0);
 
-                // Section header row
-                tableRows += `
-                    <tr class="section-header" onclick="toggleSection('${subset.replace(/'/g, "\\'")}')">
-                        <td colspan="6" style="background: linear-gradient(90deg, #1e293b, #0f172a); padding: 12px 16px; border-bottom: 2px solid #3b82f6;">
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                if (isCollapsed) {
+                    // Collapsed: show value in the Value column
+                    tableRows += `
+                        <tr class="section-header" onclick="toggleSection('${subset.replace(/'/g, "\\'")}')">
+                            <td colspan="5" style="background: linear-gradient(90deg, #1e293b, #0f172a); padding: 12px 16px; border-bottom: 2px solid #3b82f6;">
                                 <div style="display: flex; align-items: center; gap: 10px;">
-                                    <span style="font-size: 14px; transition: transform 0.2s; display: inline-block; transform: rotate(${isCollapsed ? '0' : '90'}deg);">▶</span>
+                                    <span style="font-size: 14px; transition: transform 0.2s; display: inline-block; transform: rotate(0deg);">&#9654;</span>
                                     <span style="font-weight: 700; font-size: 14px; color: #93c5fd;">${subset}</span>
                                     <span style="font-size: 12px; color: #64748b; font-weight: 400;">Showing ${cards.length} of ${subsetTotalInSet} cards &middot; ${subsetOwnedCards} total copies</span>
                                 </div>
-                            </div>
-                        </td>
-                    </tr>
-                `;
+                            </td>
+                            <td style="background: linear-gradient(90deg, #0f172a, #0f172a); padding: 12px 16px; border-bottom: 2px solid #3b82f6; font-weight: 700; color: #22c55e; font-size: 14px; text-align: right;">
+                                ${sectionValue > 0 ? '$' + sectionValue.toLocaleString() : ''}
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    // Expanded: full-width section header
+                    tableRows += `
+                        <tr class="section-header" onclick="toggleSection('${subset.replace(/'/g, "\\'")}')">
+                            <td colspan="6" style="background: linear-gradient(90deg, #1e293b, #0f172a); padding: 12px 16px; border-bottom: 2px solid #3b82f6;">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <span style="font-size: 14px; transition: transform 0.2s; display: inline-block; transform: rotate(90deg);">&#9654;</span>
+                                        <span style="font-weight: 700; font-size: 14px; color: #93c5fd;">${subset}</span>
+                                        <span style="font-size: 12px; color: #64748b; font-weight: 400;">Showing ${cards.length} of ${subsetTotalInSet} cards &middot; ${subsetOwnedCards} total copies</span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
 
-                // Card rows (only if section is expanded)
-                if (!isCollapsed) {
                     cards.forEach(item => {
                         const valueColor = item.valueTier
                             ? (item.valueTier.length >= 4 ? '#fbbf24' : item.valueTier.length >= 3 ? '#22c55e' : '#94a3b8')
@@ -480,7 +623,7 @@
                                 <td class="text-sm text-slate-400">${item.card.team || 'N/A'}</td>
                                 <td class="text-sm">${item.variantList}</td>
                                 <td class="font-bold text-green-400">${item.totalCount}</td>
-                                <td class="font-bold text-sm" style="color: ${valueColor}">${item.valueTier || '<span style="color: #475569;">—</span>'}</td>
+                                <td class="font-bold text-sm" style="color: ${valueColor}">${item.valueTier || '<span style="color: #475569;">&mdash;</span>'}</td>
                             </tr>
                         `;
                     });
@@ -488,6 +631,14 @@
             });
 
             const filters = dashboardState.filters;
+
+            // Deduplicate price history by date (keep last entry per date)
+            const historyByDate = {};
+            priceHistory.forEach(e => {
+                const dateStr = new Date(e.date).toLocaleDateString();
+                historyByDate[dateStr] = e;
+            });
+            const uniqueHistory = Object.values(historyByDate).sort((a, b) => new Date(a.date) - new Date(b.date));
 
             const html = `
                 <div class="min-h-screen p-8">
@@ -552,27 +703,34 @@
                             <h2 class="text-xl font-bold mb-4">Valuation History</h2>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                 <div class="bg-slate-700 rounded p-4">
-                                    <div class="text-slate-400 text-sm mb-2">Current Value <span class="text-xs text-slate-500">(PSA 9 max estimates)</span></div>
-                                    <div class="text-3xl font-bold text-green-400">${stats.currentValue > 0 ? '$' + stats.currentValue.toLocaleString() : 'No data'}</div>
-                                    <div class="text-xs text-slate-500 mt-1">Sum of max PSA 9 values across all owned cards</div>
-                                </div>
-                                ${priceHistory.length > 0 ? `
-                                    <div class="bg-slate-700 rounded p-4">
-                                        <div class="text-slate-400 text-sm mb-2">Latest Snapshot</div>
-                                        <div class="text-lg font-semibold">${new Date(priceHistory[priceHistory.length - 1]?.date).toLocaleDateString()}</div>
+                                    <div class="text-slate-400 text-sm mb-3">Current Value</div>
+                                    <div class="flex justify-between items-end mb-2">
+                                        <div>
+                                            <div class="text-xs text-slate-400 mb-1">PSA 9 max estimates</div>
+                                            <div class="text-3xl font-bold text-green-400">${stats.currentValue > 0 ? '$' + stats.currentValue.toLocaleString() : 'No data'}</div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="text-xs text-slate-400 mb-1">PSA 10 max estimates</div>
+                                            <div class="text-3xl font-bold text-yellow-400">${stats.currentPSA10Value > 0 ? '$' + stats.currentPSA10Value.toLocaleString() : 'No data'}</div>
+                                        </div>
                                     </div>
-                                ` : ''}
+                                    <div class="text-xs text-slate-500 mt-1">Sum of max values across all owned cards</div>
+                                </div>
+                                <div class="bg-slate-700 rounded p-4">
+                                    <div class="text-slate-400 text-sm mb-2">Value Trend</div>
+                                    ${renderValueTrendGraph(priceHistory)}
+                                </div>
                             </div>
-                            ${priceHistory.length > 0 ? `
+                            ${uniqueHistory.length > 0 ? `
                                 <div class="text-sm text-slate-400 mb-2">
-                                    Total Snapshots: ${priceHistory.length}
+                                    Total Snapshots: ${uniqueHistory.length}
                                 </div>
                                 <div class="space-y-2 text-sm">
-                                    ${priceHistory.slice(-5).reverse().map(entry => `
+                                    ${uniqueHistory.slice(-5).reverse().map(entry => `
                                         <div class="flex justify-between bg-slate-700 p-2 rounded">
                                             <span>${new Date(entry.date).toLocaleDateString()}</span>
-                                            <span class="font-semibold text-green-400">$${entry.totalValue}</span>
-                                            <span class="text-slate-400">(${entry.cardCount} cards)</span>
+                                            <span class="font-semibold text-green-400">$${(entry.totalValue || 0).toLocaleString()}</span>
+                                            <span class="text-slate-400">${entry.cardCount} cards</span>
                                         </div>
                                     `).join('')}
                                 </div>
@@ -636,14 +794,14 @@
                             </div>
                         </div>
 
-                        <!-- Return to Main Page Button -->
+                        <!-- Return to Collection Button - 5-sided arrow pointing left -->
                         <div class="fixed right-6 bottom-6 z-40">
                             <a
                                 href="index.html"
-                                class="group bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-full font-semibold shadow-lg hover:shadow-blue-500/25 hover:shadow-xl flex items-center gap-2 transition-all duration-300 hover:scale-105 px-5 py-3"
+                                class="group bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold shadow-lg hover:shadow-blue-500/25 hover:shadow-xl flex items-center justify-center gap-2 transition-all duration-300 hover:scale-105 px-5 py-3"
+                                style="clip-path: polygon(20% 0, 100% 0, 100% 100%, 20% 100%, 0 50%); padding-left: 28px;"
                                 title="Return to main collection view"
                             >
-                                <span class="text-lg transition-transform duration-300 group-hover:-translate-x-0.5">&#8592;</span>
                                 <span class="text-sm font-medium">Return to Collection</span>
                             </a>
                         </div>
@@ -674,6 +832,17 @@
                 dashboardState._activeFilterColumn = null;
                 dashboardState._cursorPosition = null;
             }
+
+            // Set sticky section header top based on thead height
+            setTimeout(() => {
+                const thead = document.querySelector('.card-table thead');
+                if (thead) {
+                    const theadHeight = thead.offsetHeight;
+                    document.querySelectorAll('.section-header td').forEach(td => {
+                        td.style.top = theadHeight + 'px';
+                    });
+                }
+            }, 0);
         }
 
         loadDashboard();
