@@ -1313,8 +1313,8 @@
                     const header = document.querySelector('.sticky.top-0.z-30');
                     if (header) {
                         const headerHeight = header.offsetHeight;
-                        // Add 20px buffer below header
-                        const pageNumberTop = headerHeight + 20;
+                        // Add buffer below header to clear filter bar
+                        const pageNumberTop = headerHeight + 48;
                         const pageDividerTop = pageNumberTop + 16; // Additional spacing for divider
                         document.documentElement.style.setProperty('--page-number-top', `${pageNumberTop}px`);
                         document.documentElement.style.setProperty('--page-divider-top', `${pageDividerTop}px`);
@@ -3552,24 +3552,24 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                             {showMenuDropdown && (
                                                 <div className="dropdown-menu">
                                                     <div className="dropdown-item" onClick={() => { importInputRef.current?.click(); setShowMenuDropdown(false); }}>
-                                                        📥 Import
+                                                        <span style={{fontSize: '1.35rem'}}>📥</span> Import
                                                     </div>
                                                     <div className="dropdown-item" onClick={() => { exportCollection(); setShowMenuDropdown(false); }}>
-                                                        📤 Export
+                                                        <span style={{fontSize: '1.35rem'}}>📤</span> Export
                                                     </div>
                                                     <div className="dropdown-spacer"></div>
                                                     <div className="dropdown-item" onClick={forcePushToCloud}>
-                                                        ☁️ Push to Cloud
+                                                        <span style={{fontSize: '1.35rem'}}>☁️</span> Push to Cloud
                                                     </div>
                                                     <div className="dropdown-item" onClick={forceReloadCollection}>
-                                                        🔄 Force Reload
+                                                        <span style={{fontSize: '1.35rem'}}>🔄</span> Force Reload
                                                     </div>
                                                     <div className="dropdown-item" onClick={() => { window.location.reload(); }}>
-                                                        🔃 Refresh Page
+                                                        <span style={{fontSize: '1.35rem'}}>🔃</span> Refresh Page
                                                     </div>
                                                     <div className="dropdown-spacer"></div>
                                                     <div className="dropdown-item" onClick={handleLogout}>
-                                                        🚪 Logout
+                                                        <span style={{fontSize: '1.35rem'}}>🚪</span> Logout
                                                     </div>
                                                     {/* Spacer between Logout and Delete */}
                                                     <div className="dropdown-spacer"></div>
@@ -3577,7 +3577,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                                         onClick={() => { setShowExportBeforeDelete(true); setShowMenuDropdown(false); }}
                                                         className="dropdown-item-delete"
                                                     >
-                                                        🗑️ Delete
+                                                        <span style={{fontSize: '1.35rem'}}>🗑️</span> Delete
                                                     </button>
                                                 </div>
                                             )}
@@ -4190,7 +4190,7 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
 
                         {/* Right Sidebar - Fixed buttons at bottom */}
                         {/* AI Scanner, Dashboard & Bulk Analyze - Bottom Right */}
-                        <div className={`fixed ${isMobile ? 'bottom-4 left-4 right-4' : 'bottom-6 right-6'} z-40 ${isMobile ? 'flex gap-2' : 'flex flex-col gap-3 items-end'}`}>
+                        <div className={`fixed ${isMobile ? 'bottom-4 left-4 right-4' : 'bottom-6 right-16'} z-40 ${isMobile ? 'flex gap-2' : 'flex flex-col gap-3 items-end'}`}>
                             <button
                                 onClick={() => {
                                     // Clear any leftover state from previous scan
