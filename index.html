@@ -1727,7 +1727,7 @@ Keep response under 200 words total.`
             };
 
             const runBulkAnalysis = async () => {
-                // Gather all unanalyzed variants for selected cards
+                // Gather all owned variants for selected cards (re-analyzes existing ones too)
                 const cardsToAnalyze = [];
 
                 bulkSelectedCards.forEach(cardNum => {
@@ -1737,16 +1737,13 @@ Keep response under 200 words total.`
 
                     Object.keys(cardEntry).filter(k => !k.startsWith('_')).forEach(variant => {
                         if (cardEntry[variant] && cardEntry[variant] > 0) {
-                            const hasAnalysis = cardEntry._analyses && cardEntry._analyses[variant] && cardEntry._analyses[variant].length > 0;
-                            if (!hasAnalysis) {
-                                cardsToAnalyze.push({ cardNum, variant });
-                            }
+                            cardsToAnalyze.push({ cardNum, variant });
                         }
                     });
                 });
 
                 if (cardsToAnalyze.length === 0) {
-                    alert('All selected cards already have analyses!');
+                    alert('No owned variants found for the selected cards.');
                     setBulkSelectMode(false);
                     setBulkSelectedCards(new Set());
                     return;
@@ -3479,27 +3476,42 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                     (filterRookie === 'veteran' && !card.rookie);
                 
                 // Owned only filter
-                const matchesOwned = ownedFilter === 'all' || (ownedFilter === 'owned' && getTotalCount(card.num) > 0) || (ownedFilter === 'not_owned' && getTotalCount(card.num) === 0);
+                // When a variant filter is active, "Not Owned" means "doesn't own that variant"
+                // so we skip the global ownership check and let matchesVariant handle it
+                const matchesOwned = ownedFilter === 'all' ||
+                    (ownedFilter === 'owned' && getTotalCount(card.num) > 0) ||
+                    (ownedFilter === 'not_owned' && (filterVariants.length > 0 || getTotalCount(card.num) === 0));
                 
                 // Variant filtering (multi-select)
+                // When combined with "Not Owned", show cards that DON'T have the selected variant
                 const matchesVariant = filterVariants.length === 0 || (() => {
                     const cardKey = getCardKey(card.num);
                     const cardInventory = collection[cardKey];
-                    if (!cardInventory) return false; // Card not in collection
-                    
-                    // Get all variants for this card
-                    const cardVariants = Object.keys(cardInventory)
-                        .filter(key => key !== '_analyses')
-                        .map(variant => {
-                            // Normalize variant names for comparison
-                            if (variant.includes('Chrome') && !variant.includes('Refractor')) {
-                                return 'Base';
-                            }
-                            return variant;
-                        });
-                    
-                    // Check if any of the card's variants match the filter
-                    return cardVariants.some(variant => filterVariants.includes(variant));
+
+                    // Get normalized variants this card actually has (with count > 0)
+                    const ownedVariants = [];
+                    if (cardInventory) {
+                        Object.keys(cardInventory)
+                            .filter(key => !key.startsWith('_'))
+                            .forEach(variant => {
+                                if (cardInventory[variant] > 0) {
+                                    if (variant.includes('Chrome') && !variant.includes('Refractor')) {
+                                        ownedVariants.push('Base');
+                                    } else {
+                                        ownedVariants.push(variant);
+                                    }
+                                }
+                            });
+                    }
+
+                    const hasFilteredVariant = ownedVariants.some(v => filterVariants.includes(v));
+
+                    if (ownedFilter === 'not_owned') {
+                        // "Not Owned" + variant filter = cards missing this variant
+                        return !hasFilteredVariant;
+                    }
+                    // "All" or "Owned" = cards that have this variant
+                    return hasFilteredVariant;
                 })();
                 
                 // Value-based filtering (multi-select)
@@ -3868,6 +3880,15 @@ Storage: ${(jsonStr.length / 1024).toFixed(1)}KB`);
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
+                                    <button
+                                        onClick={() => {
+                                            const ownedShown = filteredCards.filter(c => getTotalCount(c.num) > 0);
+                                            setBulkSelectedCards(new Set(ownedShown.map(c => c.num)));
+                                        }}
+                                        className="bg-purple-400 hover:bg-purple-300 text-purple-950 text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors"
+                                    >
+                                        Select All Shown ({filteredCards.filter(c => getTotalCount(c.num) > 0).length})
+                                    </button>
                                     <button onClick={cancelBulkSelect} className="bg-slate-600 hover:bg-slate-500 text-white text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors">
                                         Cancel
                                     </button>
